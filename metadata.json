@@ -1,0 +1,9 @@
+
+{
+  "name": "Oxmon Admin",
+  "description": "Enterprise infrastructure monitoring dashboard featuring agent management, SSL certificate tracking, and real-time system health metrics.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}
