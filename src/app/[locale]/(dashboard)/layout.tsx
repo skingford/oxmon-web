@@ -1,17 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { AppProvider, useAppContext } from '@/contexts/AppContext'
 import { I18nProvider } from '@/contexts/I18nContext'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import Toast from '@/components/Toast'
 import LiveAssistant from '@/components/LiveAssistant'
+import { buildLocalePath, type Locale } from '@/lib/locale'
 
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const pathname = usePathname()
+  const params = useParams<{ locale: Locale }>()
+  const locale = params?.locale ?? 'en'
   const {
     isAuthenticated,
     setIsAuthenticated,
@@ -45,7 +47,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         onLogout={() => {
           setIsAuthenticated(false)
           showToast('Session terminated.', 'info')
-          router.push('/login')
+          router.push(buildLocalePath(locale, '/login'))
         }}
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}

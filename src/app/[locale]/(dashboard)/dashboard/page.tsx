@@ -1,12 +1,15 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useAppContext } from '@/contexts/AppContext'
 import Dashboard from '@/components/Dashboard'
 import { generateSystemSummary, generateFullReport, generatePredictiveMaintenance } from '@/actions/ai'
+import { buildLocalePath, type Locale } from '@/lib/locale'
 
 export default function DashboardPage() {
   const router = useRouter()
+  const params = useParams<{ locale: Locale }>()
+  const locale = params?.locale ?? 'en'
   const {
     agents,
     certificates,
@@ -60,7 +63,7 @@ export default function DashboardPage() {
 
   return (
     <Dashboard
-      onChangeView={(view) => router.push(`/${view}`)}
+      onChangeView={(view) => router.push(buildLocalePath(locale, `/${view}`))}
       agents={agents}
       certificates={certificates}
       alerts={alerts}

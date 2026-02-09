@@ -12,6 +12,7 @@ import {
   type TranslationKey,
   t,
 } from '@/lib/i18n'
+import { useParams } from 'next/navigation'
 
 type TranslationValues = Record<string, string | number>
 
@@ -35,6 +36,7 @@ export function useI18n() {
 }
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
+  const params = useParams<{ locale?: string }>()
   const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE)
 
   const setLocale = useCallback((nextLocale: Locale) => {
@@ -43,9 +45,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const preferredLocale = getPreferredLocale()
+    const routeLocale = params?.locale === 'en' || params?.locale === 'zh' ? params.locale : null
+    const preferredLocale = routeLocale ?? getPreferredLocale()
     setLocaleState((currentLocale) => (currentLocale === preferredLocale ? currentLocale : preferredLocale))
-  }, [])
+
+    if (routeLocale) {
+      persistLocale(routeLocale)
+    }
+  }, [params?.locale])
 
   useEffect(() => {
     if (typeof document === 'undefined') return

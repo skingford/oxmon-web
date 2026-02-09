@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAppContext } from '@/contexts/AppContext'
 import { useI18n } from '@/contexts/I18nContext'
+import { buildLocalePath, stripLocalePrefix } from '@/lib/locale'
 import GlobalSearch from './GlobalSearch'
 import CommandPalette from './CommandPalette'
 import LanguageSwitcher from './LanguageSwitcher'
@@ -12,11 +13,12 @@ import LanguageSwitcher from './LanguageSwitcher'
 const Header: React.FC = () => {
   const pathname = usePathname()
   const { agents, alerts } = useAppContext()
-  const { t, viewLabel } = useI18n()
+  const { locale, t, viewLabel } = useI18n()
 
   const systemHealth = 100 - (alerts.filter(a => a.severity === 'Critical').length * 15) - (agents.filter(a => a.status === 'Offline').length * 5)
 
-  const currentView = pathname.split('/').pop() || 'dashboard'
+  const normalizedPath = stripLocalePrefix(pathname || '/dashboard')
+  const currentView = normalizedPath.split('/').pop() || 'dashboard'
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = React.useState(false)
   React.useEffect(() => {
@@ -42,7 +44,7 @@ const Header: React.FC = () => {
             <span className="material-symbols-outlined">menu</span>
           </button>
           <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.25em] text-[#86868B]">
-            <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer group">
+            <Link href={buildLocalePath(locale, '/dashboard')} className="flex items-center gap-2 cursor-pointer group">
               <span className="group-hover:text-[#0071E3] transition-colors">{t('header.sentinel')}</span>
             </Link>
             <span className="opacity-20">/</span>

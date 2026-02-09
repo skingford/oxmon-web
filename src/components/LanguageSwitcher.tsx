@@ -1,14 +1,18 @@
 'use client'
 
 import React from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { useI18n } from '@/contexts/I18nContext'
 import type { Locale } from '@/lib/i18n'
+import { replaceLocaleInPath } from '@/lib/locale'
 
 interface LanguageSwitcherProps {
   compact?: boolean
 }
 
 const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ compact = false }) => {
+  const pathname = usePathname()
+  const router = useRouter()
   const { locale, setLocale, t } = useI18n()
 
   const options: Array<{ value: Locale; label: string }> = [
@@ -31,7 +35,11 @@ const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ compact = false }) 
             <button
               key={option.value}
               type="button"
-              onClick={() => setLocale(option.value)}
+              onClick={() => {
+                if (option.value === locale) return
+                setLocale(option.value)
+                router.push(replaceLocaleInPath(pathname || '/', option.value))
+              }}
               className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                 active
                   ? 'bg-[#0071E3] text-white shadow-md shadow-[#0071E3]/30'
@@ -49,4 +57,3 @@ const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ compact = false }) 
 }
 
 export default LanguageSwitcher
-

@@ -1,12 +1,15 @@
 import { getFromLocalStorage, setToLocalStorage } from './localStorage'
+import {
+  DEFAULT_LOCALE,
+  LOCALE_COOKIE_KEY,
+  normalizeLocale,
+  SUPPORTED_LOCALES,
+  type Locale,
+} from './locale'
+
+export { DEFAULT_LOCALE, SUPPORTED_LOCALES, LOCALE_COOKIE_KEY, normalizeLocale, type Locale }
 
 export const LOCALE_STORAGE_KEY = 'ox_locale'
-
-export type Locale = 'en' | 'zh'
-
-export const SUPPORTED_LOCALES: Locale[] = ['en', 'zh']
-
-export const DEFAULT_LOCALE: Locale = 'en'
 
 type TranslationValues = Record<string, string | number>
 
@@ -508,9 +511,18 @@ function interpolate(template: string, values?: TranslationValues): string {
   })
 }
 
-export function normalizeLocale(value: string | null | undefined): Locale {
-  if (!value) return DEFAULT_LOCALE
-  return value.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+function getLocaleFromCookie(): Locale | null {
+  if (typeof document === 'undefined') return null
+
+  const localeCookie = document.cookie
+    .split(';')
+    .map((segment) => segment.trim())
+    .find((segment) => segment.startsWith(`${LOCALE_COOKIE_KEY}=`))
+
+  if (!localeCookie) return null
+
+  const cookieValue = localeCookie.split('=')[1]
+  return cookieValue === 'en' || cookieValue === 'zh' ? cookieValue : null
 }
 
 export function getPreferredLocale(): Locale {
@@ -519,12 +531,16 @@ export function getPreferredLocale(): Locale {
   const storedLocale = getFromLocalStorage<Locale | null>(LOCALE_STORAGE_KEY, null)
   if (storedLocale === 'en' || storedLocale === 'zh') return storedLocale
 
+  const cookieLocale = getLocaleFromCookie()
+  if (cookieLocale) return cookieLocale
+
   return normalizeLocale(window.navigator.language)
 }
 
 export function persistLocale(locale: Locale): void {
   if (typeof window === 'undefined') return
   setToLocalStorage(LOCALE_STORAGE_KEY, locale)
+  document.cookie = `${LOCALE_COOKIE_KEY}=${locale}; path=/; max-age=31536000; samesite=lax`
 }
 
 export function t(locale: Locale, key: TranslationKey, values?: TranslationValues): string {

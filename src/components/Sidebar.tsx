@@ -4,6 +4,7 @@ import { memo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/contexts/I18nContext'
+import { buildLocalePath, stripLocalePrefix } from '@/lib/locale'
 
 interface SidebarProps {
   onLogout: () => void
@@ -66,7 +67,7 @@ const NavItem = memo<NavItemProps>(({ path, label, icon, isActive, badge, badgeT
   )
 })
 
-const Sidebar = memo<SidebarProps>(({
+const Sidebar = memo<SidebarProps>(({ 
   onLogout,
   isOpen,
   onClose,
@@ -74,7 +75,8 @@ const Sidebar = memo<SidebarProps>(({
   stats = { criticalAlerts: 0, offlineAgents: 0 }
 }) => {
   const pathname = usePathname()
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
+  const normalizedPath = stripLocalePrefix(pathname || '/dashboard')
 
   const handleNavClick = () => {
     if (window.innerWidth < 1024) {
@@ -114,10 +116,10 @@ const Sidebar = memo<SidebarProps>(({
               return (
                 <NavItem
                   key={item.path}
-                  path={item.path}
+                  path={buildLocalePath(locale, item.path)}
                   label={t(item.labelKey)}
                   icon={item.icon}
-                  isActive={pathname === item.path}
+                  isActive={normalizedPath === item.path}
                   badge={badge}
                   badgeType={badgeType}
                   onClick={handleNavClick}
@@ -127,10 +129,10 @@ const Sidebar = memo<SidebarProps>(({
 
             <div className="mt-6 pt-6 border-t border-[#E5E5EA]">
               <NavItem
-                path="/settings"
+                path={buildLocalePath(locale, '/settings')}
                 label={t('sidebar.nav.settings')}
                 icon="settings"
-                isActive={pathname === '/settings'}
+                isActive={normalizedPath === '/settings'}
                 onClick={handleNavClick}
               />
             </div>

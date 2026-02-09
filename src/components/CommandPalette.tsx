@@ -6,6 +6,7 @@ import { useAppContext } from '@/contexts/AppContext'
 import { useI18n } from '@/contexts/I18nContext'
 import { interpretCommand } from '@/actions/ai'
 import { ViewState } from '@/lib/types'
+import { buildLocalePath } from '@/lib/locale'
 
 interface CommandPaletteProps {
   onClose: () => void
@@ -26,7 +27,7 @@ const viewToRoute: Record<string, string> = {
 const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose }) => {
   const router = useRouter()
   const { showToast } = useAppContext()
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const [commandInput, setCommandInput] = useState('')
   const [isCommandExecuting, setIsCommandExecuting] = useState(false)
 
@@ -38,7 +39,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose }) => {
       const result = await interpretCommand(commandInput)
       if (result.action === 'navigate') {
         const route = viewToRoute[result.target] || '/dashboard'
-        router.push(route)
+        router.push(buildLocalePath(locale, route))
         showToast(result.message, 'info')
       }
       onClose()

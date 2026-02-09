@@ -4,11 +4,12 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppContext } from '@/contexts/AppContext'
 import { useI18n } from '@/contexts/I18nContext'
+import { buildLocalePath } from '@/lib/locale'
 
 const GlobalSearch: React.FC = () => {
   const router = useRouter()
   const { agents, certificates, alerts } = useAppContext()
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -37,7 +38,7 @@ const GlobalSearch: React.FC = () => {
 
   const handleResultClick = (type: string) => {
     const route = type === 'Agent' ? '/agents' : type === 'Certificate' ? '/certificates' : '/alerts'
-    router.push(route)
+    router.push(buildLocalePath(locale, route))
     setIsSearchFocused(false)
     setSearchTerm('')
   }
