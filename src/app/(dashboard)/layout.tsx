@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { AppProvider, useAppContext } from '@/contexts/AppContext'
+import { I18nProvider } from '@/contexts/I18nContext'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import Toast from '@/components/Toast'
@@ -75,8 +76,10 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AppProvider>
-      <DashboardLayoutInner>{children}</DashboardLayoutInner>
-    </AppProvider>
+    <I18nProvider>
+      <AppProvider>
+        <DashboardLayoutInner>{children}</DashboardLayoutInner>
+      </AppProvider>
+    </I18nProvider>
   )
 }

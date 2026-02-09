@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Agent } from '@/lib/types';
 import { simulateNodeFailure, analyzeHardwareImage } from '@/actions/ai';
+import { useI18n } from '@/contexts/I18nContext';
 
 interface InfrastructureProps {
     agents: Agent[];
@@ -10,6 +11,7 @@ interface InfrastructureProps {
 }
 
 const GlobalNodeMap: React.FC<{ agents: Agent[] }> = ({ agents }) => {
+    const { tr } = useI18n();
     const regions = [
         { id: 'us-east', name: 'Americas', x: 22, y: 38, color: '#0071E3' },
         { id: 'eu-west', name: 'Europe', x: 48, y: 32, color: '#34C759' },
@@ -33,7 +35,7 @@ const GlobalNodeMap: React.FC<{ agents: Agent[] }> = ({ agents }) => {
 
             {regions.map(r => (
                 <div key={r.id} className="absolute text-[10px] font-black text-white/40 uppercase tracking-[0.5em] pointer-events-none" style={{ left: `${r.x}%`, top: `${r.y - 10}%` }}>
-                    {r.name}
+                    {tr(r.name)}
                 </div>
             ))}
 
@@ -60,6 +62,7 @@ const GlobalNodeMap: React.FC<{ agents: Agent[] }> = ({ agents }) => {
 };
 
 const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) => {
+    const { tr } = useI18n();
     const [viewMode, setViewMode] = useState<'topology' | 'map' | 'inspector'>('topology');
     const [selectedNode, setSelectedNode] = useState<Agent | null>(null);
 
@@ -97,7 +100,7 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                 setIsCameraActive(true);
             }
         } catch (err) {
-            onShowToast('Vision sync failed: Camera permission required.', 'error');
+            onShowToast(tr('Vision sync failed: Camera permission required.'), 'error');
         }
     };
 
@@ -130,8 +133,8 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
         try {
             const result = await simulateNodeFailure(selectedNode.name, selectedNode.ip);
             setFailureAnalysis(result);
-            onShowToast('Sim-X Projection synchronized.', 'info');
-        } catch (err) { onShowToast('Neural sim interrupted.', 'error'); } finally { setIsSimulatingFailure(false); }
+            onShowToast(tr('Sim-X Projection synchronized.'), 'info');
+        } catch (err) { onShowToast(tr('Neural sim interrupted.'), 'error'); } finally { setIsSimulatingFailure(false); }
     };
 
     const analyzeHardware = async (base64: string) => {
@@ -141,8 +144,8 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
             const data = base64.split(',')[1];
             const result = await analyzeHardwareImage(data);
             setImageAnalysis(result);
-            onShowToast('Physical Audit synchronized.', 'success');
-        } catch (err) { onShowToast('Neural Vision handshake failed.', 'error'); } finally { setIsAnalyzingImage(false); }
+            onShowToast(tr('Physical Audit synchronized.'), 'success');
+        } catch (err) { onShowToast(tr('Neural Vision handshake failed.'), 'error'); } finally { setIsAnalyzingImage(false); }
     };
 
     const activeNodes = agents.filter(a => a.status !== 'Offline');
@@ -154,13 +157,13 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
         <div className="h-full flex flex-col space-y-12 animate-fade-in pb-16">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
                 <div className="space-y-3">
-                    <h2 className="text-5xl font-black text-text-main tracking-tighter uppercase">Topology Mesh</h2>
-                    <p className="text-secondary text-base font-medium">Interactive neural topology explorer for distributed infrastructure visualization.</p>
+                    <h2 className="text-5xl font-black text-text-main tracking-tighter uppercase">{tr('Topology Mesh')}</h2>
+                    <p className="text-secondary text-base font-medium">{tr('Interactive neural topology explorer for distributed infrastructure visualization.')}</p>
                 </div>
                 <div className="bg-[#F5F5F7] p-2 rounded-[1.75rem] flex gap-2 shadow-inner border border-[#E5E5EA]">
-                    <button onClick={() => setViewMode('topology')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'topology' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>Mesh Grid</button>
-                    <button onClick={() => setViewMode('map')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'map' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>Global Map</button>
-                    <button onClick={() => setViewMode('inspector')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'inspector' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>HW Vision</button>
+                    <button onClick={() => setViewMode('topology')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'topology' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('Mesh Grid')}</button>
+                    <button onClick={() => setViewMode('map')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'map' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('Global Map')}</button>
+                    <button onClick={() => setViewMode('inspector')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'inspector' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('HW Vision')}</button>
                 </div>
             </div>
 
@@ -171,7 +174,7 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                             <div className="absolute top-12 left-12 z-30">
                                 <button onClick={() => setIsTelemetryFlowOn(!isTelemetryFlowOn)} className={`px-8 py-4 rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.3em] transition-all flex items-center gap-4 border shadow-soft ${isTelemetryFlowOn ? 'bg-primary border-primary text-white shadow-primary/30' : 'bg-white border-[#E5E5EA] text-[#86868B] hover:border-primary/40'}`}>
                                     <span className={`material-symbols-outlined text-[22px] ${isTelemetryFlowOn ? 'animate-pulse' : ''}`}>online_prediction</span>
-                                    {isTelemetryFlowOn ? 'Live Telemetry Active' : 'Enable Neural Flow'}
+                                    {isTelemetryFlowOn ? tr('Live Telemetry Active') : tr('Enable Neural Flow')}
                                 </button>
                             </div>
                             <svg className="w-full h-full absolute inset-0">
@@ -219,8 +222,8 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                         <div className="flex-1 p-24 overflow-y-auto flex flex-col items-center custom-scrollbar">
                             <div className="max-w-5xl w-full space-y-20">
                                 <div className="text-center space-y-6">
-                                    <h3 className="text-5xl font-black text-text-main tracking-tighter uppercase">Hardware Vision Audit</h3>
-                                    <p className="text-secondary text-lg font-medium max-w-3xl mx-auto leading-relaxed">AI-powered physical infrastructure diagnostics via remote visual sync. Capture hardware logic frames for high-fidelity health assessment.</p>
+                                    <h3 className="text-5xl font-black text-text-main tracking-tighter uppercase">{tr('Hardware Vision Audit')}</h3>
+                                    <p className="text-secondary text-lg font-medium max-w-3xl mx-auto leading-relaxed">{tr('AI-powered physical infrastructure diagnostics via remote visual sync. Capture hardware logic frames for high-fidelity health assessment.')}</p>
                                 </div>
 
                                 {isCameraActive ? (
@@ -230,8 +233,8 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                         <div className="absolute inset-0 border-[40px] border-white/5 pointer-events-none"></div>
                                         <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-red-500/50 animate-pulse shadow-2xl shadow-red-500/60"></div>
                                         <div className="absolute bottom-16 left-0 right-0 flex justify-center gap-10">
-                                            <button onClick={captureAndAnalyze} className="px-14 py-6 bg-primary text-white rounded-[1.75rem] font-black text-[12px] uppercase tracking-[0.4em] shadow-3xl shadow-primary/40 hover:bg-primary-hover active:scale-95 transition-all">Capture Logic Frame</button>
-                                            <button onClick={stopCamera} className="px-14 py-6 bg-white/10 text-white rounded-[1.75rem] font-black text-[12px] uppercase tracking-[0.4em] border border-white/20 backdrop-blur-3xl hover:bg-white/20 transition-all">Terminate Stream</button>
+                                            <button onClick={captureAndAnalyze} className="px-14 py-6 bg-primary text-white rounded-[1.75rem] font-black text-[12px] uppercase tracking-[0.4em] shadow-3xl shadow-primary/40 hover:bg-primary-hover active:scale-95 transition-all">{tr('Capture Logic Frame')}</button>
+                                            <button onClick={stopCamera} className="px-14 py-6 bg-white/10 text-white rounded-[1.75rem] font-black text-[12px] uppercase tracking-[0.4em] border border-white/20 backdrop-blur-3xl hover:bg-white/20 transition-all">{tr('Terminate Stream')}</button>
                                         </div>
                                     </div>
                                 ) : (
@@ -249,14 +252,14 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                                 <div className="w-32 h-32 bg-[#F5F5F7] rounded-[3rem] flex items-center justify-center text-[#C1C1C1] group-hover:text-primary transition-all">
                                                     <span className="material-symbols-outlined text-8xl">cloud_upload</span>
                                                 </div>
-                                                <p className="mt-12 text-sm font-black text-text-main uppercase tracking-[0.5em] text-center">Sync Static Payload</p>
+                                                <p className="mt-12 text-sm font-black text-text-main uppercase tracking-[0.5em] text-center">{tr('Sync Static Payload')}</p>
                                             </div>
                                         </div>
                                         <button onClick={startCamera} className="p-28 border-4 border-dashed border-[#E5E5EA] rounded-[4.5rem] bg-white flex flex-col items-center justify-center transition-all hover:border-indigo-500 hover:bg-indigo-50 shadow-inner group">
                                             <div className="w-32 h-32 bg-[#F5F5F7] rounded-[3rem] flex items-center justify-center text-[#C1C1C1] group-hover:text-indigo-500 transition-all">
                                                 <span className="material-symbols-outlined text-8xl">linked_camera</span>
                                             </div>
-                                            <p className="mt-12 text-sm font-black text-text-main uppercase tracking-[0.5em] text-center">Neural Live-Stream</p>
+                                            <p className="mt-12 text-sm font-black text-text-main uppercase tracking-[0.5em] text-center">{tr('Neural Live-Stream')}</p>
                                         </button>
                                     </div>
                                 )}
@@ -264,24 +267,24 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                 {isAnalyzingImage && (
                                     <div className="p-20 bg-white rounded-[4rem] border border-[#E5E5EA] shadow-soft flex flex-col items-center gap-10 animate-pulse">
                                         <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                                        <p className="text-[12px] font-black text-primary uppercase tracking-[0.6em]">Synchronizing Vision Logic...</p>
+                                        <p className="text-[12px] font-black text-primary uppercase tracking-[0.6em]">{tr('Synchronizing Vision Logic...')}</p>
                                     </div>
                                 )}
 
                                 {uploadedImage && !isAnalyzingImage && (
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 animate-fade-in-up">
                                         <div className="rounded-[3.5rem] border border-[#E5E5EA] overflow-hidden shadow-2xl bg-white p-6 group">
-                                            <img src={uploadedImage} className="w-full h-auto rounded-[2.5rem] grayscale brightness-110 group-hover:grayscale-0 transition-all duration-1000" alt="Hardware Payload" />
+                                            <img src={uploadedImage} className="w-full h-auto rounded-[2.5rem] grayscale brightness-110 group-hover:grayscale-0 transition-all duration-1000" alt={tr('Hardware Payload')} />
                                         </div>
                                         <div className="bg-[#0F172A] text-white p-20 rounded-[3.5rem] shadow-2xl border border-white/10 overflow-y-auto max-h-[600px] custom-scrollbar flex flex-col">
                                             <div className="flex items-center gap-6 mb-16 border-b border-white/10 pb-12 shrink-0">
                                                 <div className="w-20 h-20 bg-success text-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-success/40 ring-1 ring-white/10"><span className="material-symbols-outlined text-5xl filled">verified</span></div>
                                                 <div>
-                                                    <h4 className="text-[14px] font-black uppercase tracking-[0.4em] text-indigo-300">Vision Diagnostic Audit</h4>
-                                                    <p className="text-white/40 text-[11px] font-black uppercase mt-3">SRE Grade: Optimized Physical Layer</p>
+                                                    <h4 className="text-[14px] font-black uppercase tracking-[0.4em] text-indigo-300">{tr('Vision Diagnostic Audit')}</h4>
+                                                    <p className="text-white/40 text-[11px] font-black uppercase mt-3">{tr('SRE Grade: Optimized Physical Layer')}</p>
                                                 </div>
                                             </div>
-                                            <div className="text-[17px] text-white/90 leading-[2.2] font-medium whitespace-pre-wrap font-sans">{imageAnalysis || "Handshaking with neural vision mesh..."}</div>
+                                            <div className="text-[17px] text-white/90 leading-[2.2] font-medium whitespace-pre-wrap font-sans">{imageAnalysis || tr('Handshaking with neural vision mesh...')}</div>
                                         </div>
                                     </div>
                                 )}
@@ -291,26 +294,26 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                 </div>
 
                 <div className="w-full lg:w-[520px] border-t lg:border-t-0 lg:border-l border-[#E5E5EA] bg-[#F5F5F7]/40 p-16 flex flex-col overflow-y-auto custom-scrollbar">
-                    <h3 className="font-black text-text-main text-[12px] uppercase tracking-[0.6em] mb-16">Neural Cluster Profile</h3>
+                    <h3 className="font-black text-text-main text-[12px] uppercase tracking-[0.6em] mb-16">{tr('Neural Cluster Profile')}</h3>
                     {selectedNode ? (
                         <div className="space-y-16 animate-fade-in">
                             <div className="p-12 bg-white rounded-[3.5rem] border border-[#E5E5EA] shadow-soft group relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-[120px] text-primary">dns</span></div>
-                                <p className="text-[11px] uppercase font-black text-secondary mb-5 tracking-[0.5em]">Entity Identifier</p>
+                                <p className="text-[11px] uppercase font-black text-secondary mb-5 tracking-[0.5em]">{tr('Entity Identifier')}</p>
                                 <p className="text-4xl font-black text-primary tracking-tighter truncate">{selectedNode.name}</p>
                                 <div className="mt-14 space-y-10">
-                                    <div className="flex justify-between items-center text-[12px] font-black uppercase tracking-widest text-secondary"><span>Mesh Integrity</span><span className="text-success flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-success"></div>OPTIMIZED</span></div>
-                                    <div className="flex justify-between items-center text-[12px] font-black uppercase tracking-widest text-secondary"><span>Cluster Uptime</span><span className="text-text-main">99.982%</span></div>
-                                    <div className="flex justify-between items-center text-[12px] font-black uppercase tracking-widest text-secondary"><span>Global Endpoint</span><span className="text-text-main font-mono opacity-60 tracking-tight">{selectedNode.ip}</span></div>
+                                    <div className="flex justify-between items-center text-[12px] font-black uppercase tracking-widest text-secondary"><span>{tr('Mesh Integrity')}</span><span className="text-success flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-success"></div>{tr('OPTIMIZED')}</span></div>
+                                    <div className="flex justify-between items-center text-[12px] font-black uppercase tracking-widest text-secondary"><span>{tr('Cluster Uptime')}</span><span className="text-text-main">99.982%</span></div>
+                                    <div className="flex justify-between items-center text-[12px] font-black uppercase tracking-widest text-secondary"><span>{tr('Global Endpoint')}</span><span className="text-text-main font-mono opacity-60 tracking-tight">{selectedNode.ip}</span></div>
                                 </div>
                             </div>
                             <div className="space-y-6">
                                 <button onClick={handleSimulateFailure} disabled={isSimulatingFailure} className="w-full py-7 bg-danger text-white rounded-[2rem] font-black text-[12px] uppercase tracking-[0.5em] hover:bg-danger/90 transition-all shadow-2xl shadow-danger/40 active:scale-95 disabled:opacity-50">
-                                    {isSimulatingFailure ? 'Initializing Sim-X...' : 'Execute Failure Sim-X'}
+                                    {isSimulatingFailure ? tr('Initializing Sim-X...') : tr('Execute Failure Sim-X')}
                                 </button>
                                 {failureAnalysis && (
                                     <div className="p-12 bg-red-50/90 border border-red-200 rounded-[3.5rem] text-[14px] text-red-950 leading-relaxed font-bold animate-fade-in-up shadow-inner backdrop-blur-3xl">
-                                        <div className="flex items-center gap-5 mb-8 text-danger"><span className="material-symbols-outlined text-[28px] filled">emergency_home</span><span className="text-[12px] uppercase tracking-[0.4em] font-black">Risk Projection Audit</span></div>
+                                        <div className="flex items-center gap-5 mb-8 text-danger"><span className="material-symbols-outlined text-[28px] filled">emergency_home</span><span className="text-[12px] uppercase tracking-[0.4em] font-black">{tr('Risk Projection Audit')}</span></div>
                                         <div className="prose prose-sm text-red-900 font-medium">
                                             {failureAnalysis}
                                         </div>
@@ -321,7 +324,7 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center text-center p-20 space-y-12 opacity-20 grayscale">
                             <div className="w-32 h-32 bg-[#E5E5EA] rounded-full flex items-center justify-center text-secondary"><span className="material-symbols-outlined text-8xl">ads_click</span></div>
-                            <p className="text-[13px] font-black text-secondary uppercase tracking-[0.6em] leading-[3.2]">Await Target Selection for<br/>High-Fidelity Neural Profile</p>
+                            <p className="text-[13px] font-black text-secondary uppercase tracking-[0.6em] leading-[3.2]">{tr('Await Target Selection for')}<br/>{tr('High-Fidelity Neural Profile')}</p>
                         </div>
                     )}
                 </div>

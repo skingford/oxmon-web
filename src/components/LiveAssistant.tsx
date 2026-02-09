@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '@google/genai';
 import { Agent, Alert, Certificate } from '@/lib/types';
+import { useI18n } from '@/contexts/I18nContext';
 
 interface LiveAssistantProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
   onUpdateAgentStatus,
   onAcknowledgeAlert
 }) => {
+  const { tr } = useI18n();
   const [isActive, setIsActive] = useState(false);
   const [transcriptions, setTranscriptions] = useState<{ type: 'user' | 'model', text: string }[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -68,7 +70,7 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
 
   const startSession = async () => {
     setIsConnecting(true);
-    setTranscriptions([{ type: 'model', text: 'Initializing high-fidelity neural link...' }]);
+    setTranscriptions([{ type: 'model', text: tr('Initializing high-fidelity neural link...') }]);
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
@@ -82,9 +84,9 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         callbacks: {
           onopen: () => {
-            setIsActive(true);
-            setIsConnecting(false);
-            setTranscriptions(prev => [...prev, { type: 'model', text: 'Oxmon Sentinel Link established. Awaiting voice directives.' }]);
+              setIsActive(true);
+              setIsConnecting(false);
+              setTranscriptions(prev => [...prev, { type: 'model', text: tr('Oxmon Sentinel Link established. Awaiting voice directives.') }]);
 
             const source = inputAudioContextRef.current!.createMediaStreamSource(stream);
             const scriptProcessor = inputAudioContextRef.current!.createScriptProcessor(4096, 1, 1);
@@ -205,7 +207,7 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
 
     } catch (err) {
       setIsConnecting(false);
-      setTranscriptions(prev => [...prev, { type: 'model', text: 'Error: Neural handshake failed. Check environment configuration.' }]);
+      setTranscriptions(prev => [...prev, { type: 'model', text: tr('Error: Neural handshake failed. Check environment configuration.') }]);
     }
   };
 
@@ -232,8 +234,8 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
                     <span className={`material-symbols-outlined text-[32px] filled ${isActive ? 'animate-pulse' : ''}`}>neurology</span>
                 </div>
                 <div>
-                    <h3 className="text-white font-black text-xs uppercase tracking-[0.25em]">Sentinel Assistant</h3>
-                    <p className={`text-[10px] font-black uppercase mt-1 ${isActive ? 'text-success' : isConnecting ? 'text-warning' : 'text-white/40'}`}>{isActive ? 'Neural Link Active' : isConnecting ? 'Handshaking...' : 'Ready for Telemetry'}</p>
+                    <h3 className="text-white font-black text-xs uppercase tracking-[0.25em]">{tr('Sentinel Assistant')}</h3>
+                    <p className={`text-[10px] font-black uppercase mt-1 ${isActive ? 'text-success' : isConnecting ? 'text-warning' : 'text-white/40'}`}>{isActive ? tr('Neural Link Active') : isConnecting ? tr('Handshaking...') : tr('Ready for Telemetry')}</p>
                 </div>
             </div>
             <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white transition-colors bg-white/5 rounded-xl">
@@ -247,7 +249,7 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
                     <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
                         <span className="material-symbols-outlined text-5xl text-white">settings_voice</span>
                     </div>
-                    <p className="text-white text-xs leading-loose font-medium max-w-xs uppercase tracking-widest">Awaiting neural handshake for real-time infrastructure command & control.</p>
+                    <p className="text-white text-xs leading-loose font-medium max-w-xs uppercase tracking-widest">{tr('Awaiting neural handshake for real-time infrastructure command & control.')}</p>
                 </div>
             )}
             {transcriptions.map((t, i) => (
@@ -259,7 +261,7 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
             ))}
             {isConnecting && (
                 <div className="flex justify-start animate-pulse">
-                     <div className="bg-white/5 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-indigo-300 border border-white/5 italic">Initializing high-fidelity stream...</div>
+                     <div className="bg-white/5 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-indigo-300 border border-white/5 italic">{tr('Initializing high-fidelity stream...')}</div>
                 </div>
             )}
          </div>
@@ -283,7 +285,7 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
                   className="w-full py-5 bg-primary text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-4 shadow-2xl shadow-primary/30 hover:bg-primary-hover active:scale-95 transition-all"
                 >
                     <span className="material-symbols-outlined">mic</span>
-                    Initiate Neural Session
+                    {tr('Initiate Neural Session')}
                 </button>
             ) : isActive ? (
                 <button
@@ -291,15 +293,15 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
                   className="w-full py-5 bg-white/5 hover:bg-white/10 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-4 border border-white/10 transition-all active:scale-95"
                 >
                     <span className="material-symbols-outlined">mic_off</span>
-                    Terminate Link
+                    {tr('Terminate Link')}
                 </button>
             ) : (
                 <div className="w-full py-5 bg-primary/20 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-4 animate-pulse">
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Synthesizing Link...
+                    {tr('Synthesizing Link...')}
                 </div>
             )}
-            <p className="text-[9px] text-white/20 uppercase font-black tracking-[0.4em]">Oxmon Native Audio Intelligence v3.1</p>
+            <p className="text-[9px] text-white/20 uppercase font-black tracking-[0.4em]">{tr('Oxmon Native Audio Intelligence v3.1')}</p>
          </div>
       </div>
     </div>

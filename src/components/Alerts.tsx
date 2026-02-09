@@ -5,6 +5,7 @@ import type { Alert } from '@/lib/types';
 import { AreaChart } from 'recharts/lib/chart/AreaChart';
 import { Area } from 'recharts/lib/cartesian/Area';
 import { ResponsiveContainer } from 'recharts/lib/component/ResponsiveContainer';
+import { useI18n } from '@/contexts/I18nContext';
 
 interface AlertsProps {
   alerts: Alert[];
@@ -15,6 +16,7 @@ interface AlertsProps {
 }
 
 const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onDiagnose, onRunScript }) => {
+  const { tr } = useI18n();
   const [filter, setFilter] = useState<'All' | 'Critical' | 'Warning' | 'Info' | 'Resolved'>('All');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -31,7 +33,7 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
     setDiagnosingId(alert.id);
     setDiagnosticResult(null);
     const result = await onDiagnose(alert);
-    setDiagnosticResult(result || "Diagnostic handshake failed.");
+    setDiagnosticResult(result || tr('Diagnostic handshake failed.'));
     setDiagnosingId(null);
   };
 
@@ -49,17 +51,17 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
     <div className="space-y-10 animate-fade-in pb-20">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
         <div className="space-y-3">
-            <h2 className="text-5xl font-black text-text-main tracking-tighter uppercase">Incident War Room</h2>
-            <p className="text-secondary text-base font-medium">Real-time anomaly detection, correlation engine, and neural root-cause diagnostics.</p>
+            <h2 className="text-5xl font-black text-text-main tracking-tighter uppercase">{tr('Incident War Room')}</h2>
+            <p className="text-secondary text-base font-medium">{tr('Real-time anomaly detection, correlation engine, and neural root-cause diagnostics.')}</p>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
             <div className="relative group">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary text-[22px] group-focus-within:text-primary transition-colors">search</span>
-                <input type="text" placeholder="Grep incident payload..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 pr-6 py-3.5 bg-white border border-border rounded-2xl text-sm w-72 shadow-soft focus:ring-8 focus:ring-primary/5 transition-all outline-none font-bold" />
+                <input type="text" placeholder={tr('Grep incident payload...')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 pr-6 py-3.5 bg-white border border-border rounded-2xl text-sm w-72 shadow-soft focus:ring-8 focus:ring-primary/5 transition-all outline-none font-bold" />
             </div>
             <div className="flex gap-1.5 bg-[#F5F5F7] p-1.5 rounded-[1.5rem] border border-[#E5E5EA] shadow-inner">
                 {['All', 'Critical', 'Warning'].map(l => (
-                  <button key={l} onClick={() => setFilter(l as any)} className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === l ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{l}</button>
+                  <button key={l} onClick={() => setFilter(l as any)} className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === l ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr(l)}</button>
                 ))}
             </div>
         </div>
@@ -71,10 +73,10 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
                 <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-[150px] text-danger">pulse</span></div>
                 <div className="flex items-center justify-between mb-10 relative z-10">
                     <div className="flex items-center gap-4">
-                        <span className="text-[11px] font-black text-secondary uppercase tracking-[0.4em]">24H Activity Pulse</span>
+                        <span className="text-[11px] font-black text-secondary uppercase tracking-[0.4em]">{tr('24H Activity Pulse')}</span>
                         <div className="flex items-center gap-2 px-3 py-1 bg-success/5 border border-success/10 rounded-full">
                             <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></div>
-                            <span className="text-[9px] font-black text-success uppercase tracking-widest">Normal Gradient</span>
+                            <span className="text-[9px] font-black text-success uppercase tracking-widest">{tr('Normal Gradient')}</span>
                         </div>
                     </div>
                 </div>
@@ -116,7 +118,7 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
                         </div>
                         <div className="flex items-center gap-4">
                              {alert.severity === 'Critical' && (
-                                <div className="hidden sm:flex px-5 py-2 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-2xl shadow-primary/30 group-hover:scale-105 transition-transform">Analyze</div>
+                                <div className="hidden sm:flex px-5 py-2 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-2xl shadow-primary/30 group-hover:scale-105 transition-transform">{tr('Analyze')}</div>
                              )}
                              <span className="material-symbols-outlined text-gray-200 group-hover:text-primary transition-all group-hover:translate-x-2">arrow_forward</span>
                         </div>
@@ -124,7 +126,7 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
                 )) : (
                     <div className="p-32 bg-white rounded-[3.5rem] border-4 border-dashed border-gray-50 flex flex-col items-center justify-center space-y-8 opacity-40">
                          <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-gray-300"><span className="material-symbols-outlined text-5xl">cloud_done</span></div>
-                         <p className="text-[12px] font-black text-secondary uppercase tracking-[0.4em]">No active incidents in this domain.</p>
+                         <p className="text-[12px] font-black text-secondary uppercase tracking-[0.4em]">{tr('No active incidents in this domain.')}</p>
                     </div>
                 )}
             </div>
@@ -135,17 +137,17 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
                 <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-[180px] text-white">neurology</span></div>
                 <div className="flex items-center gap-5 mb-10 relative z-10">
                     <div className="w-14 h-14 bg-indigo-500 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-indigo-500/30"><span className="material-symbols-outlined text-[32px] filled">psychology</span></div>
-                    <h3 className="text-white font-black text-sm uppercase tracking-[0.3em]">Neural Triage</h3>
+                    <h3 className="text-white font-black text-sm uppercase tracking-[0.3em]">{tr('Neural Triage')}</h3>
                 </div>
-                <p className="text-indigo-100/60 text-sm leading-loose font-medium mb-12 relative z-10">Correlate global telemetry stream to identify silent systemic failures and cross-node impact profiles.</p>
-                <button onClick={() => onShowToast('Synthesizing cluster-wide triage audit...', 'info')} className="w-full py-5 bg-white/5 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] hover:bg-white/10 transition-all border border-white/10 relative z-10 shadow-inner">Initiate Handshake</button>
+                <p className="text-indigo-100/60 text-sm leading-loose font-medium mb-12 relative z-10">{tr('Correlate global telemetry stream to identify silent systemic failures and cross-node impact profiles.')}</p>
+                <button onClick={() => onShowToast(tr('Synthesizing cluster-wide triage audit...'), 'info')} className="w-full py-5 bg-white/5 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] hover:bg-white/10 transition-all border border-white/10 relative z-10 shadow-inner">{tr('Initiate Handshake')}</button>
             </div>
 
             <div className="bg-white rounded-[3.5rem] border border-border p-12 shadow-soft flex flex-col items-center text-center space-y-6 group">
                 <div className="w-24 h-24 bg-success/5 text-success rounded-full flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-5xl filled">verified</span></div>
                 <div className="space-y-2">
-                    <h4 className="text-lg font-black uppercase tracking-tighter text-text-main">Global Heartbeat Active</h4>
-                    <p className="text-sm text-secondary font-medium leading-relaxed">99.98% of infrastructure endpoints are reporting healthy telemetry. No critical drift detected.</p>
+                    <h4 className="text-lg font-black uppercase tracking-tighter text-text-main">{tr('Global Heartbeat Active')}</h4>
+                    <p className="text-sm text-secondary font-medium leading-relaxed">{tr('99.98% of infrastructure endpoints are reporting healthy telemetry. No critical drift detected.')}</p>
                 </div>
             </div>
         </div>
@@ -159,7 +161,7 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
                       <div className="flex items-center gap-6">
                         <div className={`w-16 h-16 rounded-[2rem] flex items-center justify-center font-black text-2xl shadow-2xl transition-transform hover:scale-110 ${detailAlert.severity === 'Critical' ? 'bg-red-50 text-danger shadow-red-500/10' : 'bg-orange-50 text-warning shadow-orange-500/10'}`}>!</div>
                         <div>
-                            <h3 className="text-3xl font-black text-text-main tracking-tighter uppercase leading-none">Incident Focus</h3>
+                            <h3 className="text-3xl font-black text-text-main tracking-tighter uppercase leading-none">{tr('Incident Focus')}</h3>
                             <p className="text-[11px] font-black text-secondary uppercase tracking-[0.4em] mt-3">{detailAlert.source} • {detailAlert.time}</p>
                         </div>
                       </div>
@@ -168,17 +170,17 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
 
                   <div className="flex-1 overflow-y-auto space-y-14 pr-4 custom-scrollbar">
                       <div className="p-12 bg-gray-50/50 rounded-[3rem] border border-border shadow-inner group">
-                          <p className="text-[11px] uppercase font-black text-secondary mb-6 tracking-[0.5em] opacity-40">Telemetry Payload</p>
+                          <p className="text-[11px] uppercase font-black text-secondary mb-6 tracking-[0.5em] opacity-40">{tr('Telemetry Payload')}</p>
                           <p className="text-xl font-bold text-indigo-950 leading-relaxed tracking-tight">{detailAlert.message}</p>
                       </div>
 
                       <div className="space-y-8">
                           <div className="flex items-center justify-between">
-                            <h5 className="text-[11px] uppercase font-black text-secondary tracking-[0.5em]">Neural Root-Cause Analysis</h5>
+                            <h5 className="text-[11px] uppercase font-black text-secondary tracking-[0.5em]">{tr('Neural Root-Cause Analysis')}</h5>
                             {!diagnosticResult && (
                                 <button onClick={() => handleDiagnose(detailAlert)} disabled={diagnosingId === detailAlert.id} className="text-[11px] font-black text-primary flex items-center gap-3 uppercase tracking-widest disabled:opacity-50 group/btn">
                                     <span className={`material-symbols-outlined text-[20px] ${diagnosingId === detailAlert.id ? 'animate-spin' : ''}`}>auto_awesome</span>
-                                    {diagnosingId === detailAlert.id ? 'Synthesizing...' : 'Launch Diagnostics'}
+                                    {diagnosingId === detailAlert.id ? tr('Synthesizing...') : tr('Launch Diagnostics')}
                                 </button>
                             )}
                           </div>
@@ -195,10 +197,10 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
                                       {extractCommand(diagnosticResult) && (
                                           <button onClick={() => onRunScript?.(detailAlert.source, extractCommand(diagnosticResult)!)} className="flex-1 py-6 bg-primary text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.4em] hover:bg-primary-hover shadow-3xl shadow-primary/40 transition-all flex items-center justify-center gap-4 active:scale-95">
                                               <span className="material-symbols-outlined text-[24px]">terminal</span>
-                                              Execute Remediation
+                                              {tr('Execute Remediation')}
                                           </button>
                                       )}
-                                      <button onClick={() => { onAcknowledge(detailAlert.id); setDetailAlert(null); }} className="flex-1 py-6 border border-border rounded-[2rem] text-[11px] font-black uppercase tracking-[0.4em] text-text-main hover:bg-gray-50 transition-all active:scale-95 shadow-soft">Resolve Principal</button>
+                                      <button onClick={() => { onAcknowledge(detailAlert.id); setDetailAlert(null); }} className="flex-1 py-6 border border-border rounded-[2rem] text-[11px] font-black uppercase tracking-[0.4em] text-text-main hover:bg-gray-50 transition-all active:scale-95 shadow-soft">{tr('Resolve Principal')}</button>
                                   </div>
                               </div>
                           ) : diagnosingId === detailAlert.id ? (
@@ -210,7 +212,7 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
                           ) : (
                               <div className="p-20 border-4 border-dashed border-gray-50 rounded-[3.5rem] text-center space-y-8 group hover:border-primary/20 transition-all">
                                   <div className="w-16 h-16 bg-gray-50 rounded-full mx-auto flex items-center justify-center text-gray-300 group-hover:text-primary transition-colors"><span className="material-symbols-outlined text-4xl">psychology</span></div>
-                                  <p className="text-[11px] font-black text-secondary uppercase tracking-[0.5em] leading-[2.5]">Initiate neural handshake for<br/>automated remediation forecast</p>
+                                  <p className="text-[11px] font-black text-secondary uppercase tracking-[0.5em] leading-[2.5]">{tr('Initiate neural handshake for')}<br/>{tr('automated remediation forecast')}</p>
                               </div>
                           )}
                       </div>

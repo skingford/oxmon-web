@@ -2,8 +2,10 @@
 
 import React, { useState } from 'react';
 import { searchKnowledgeBase } from '@/actions/ai';
+import { useI18n } from '@/contexts/I18nContext';
 
 const HelpCenter: React.FC = () => {
+  const { tr } = useI18n();
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
@@ -27,7 +29,7 @@ const HelpCenter: React.FC = () => {
       const result = await searchKnowledgeBase(query);
       setAnswer(result.answer);
       setGroundingChunks(result.groundingChunks);
-    } catch (err) { setAnswer("Neural connection to the Knowledge Hub failed."); } finally { setIsSearching(false); }
+    } catch (err) { setAnswer(tr("Neural connection to the Knowledge Hub failed.")); } finally { setIsSearching(false); }
   };
 
   return (
@@ -36,8 +38,8 @@ const HelpCenter: React.FC = () => {
         <div className="w-24 h-24 bg-primary/10 text-primary rounded-[2.5rem] flex items-center justify-center mx-auto shadow-soft ring-[12px] ring-primary/5">
             <span className="material-symbols-outlined text-5xl filled">neurology</span>
         </div>
-        <h2 className="text-5xl font-black text-text-main tracking-tighter uppercase">Knowledge Hub</h2>
-        <p className="text-secondary max-w-2xl mx-auto leading-[2] text-base font-medium">Neural advisor for global infrastructure patterns, enterprise DevOps best practices, and Oxmon technical documentation.</p>
+        <h2 className="text-5xl font-black text-text-main tracking-tighter uppercase">{tr('Knowledge Hub')}</h2>
+        <p className="text-secondary max-w-2xl mx-auto leading-[2] text-base font-medium">{tr('Neural advisor for global infrastructure patterns, enterprise DevOps best practices, and Oxmon technical documentation.')}</p>
       </div>
 
       <div className="bg-white rounded-[4rem] border border-[#E5E5EA] shadow-2xl p-4 relative group focus-within:ring-[14px] focus-within:ring-primary/5 transition-all">
@@ -47,7 +49,7 @@ const HelpCenter: React.FC = () => {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Consult the SRE Neural Advisor..."
+                placeholder={tr('Consult the SRE Neural Advisor...')}
                 className="flex-1 px-8 py-6 outline-none text-2xl font-bold text-text-main placeholder:text-gray-200"
               />
               <button
@@ -55,7 +57,7 @@ const HelpCenter: React.FC = () => {
                 disabled={isSearching}
                 className="bg-primary text-white px-14 py-6 rounded-[3rem] font-black text-[11px] uppercase tracking-[0.3em] shadow-2xl shadow-primary/30 hover:bg-primary-hover active:scale-95 transition-all disabled:opacity-50"
               >
-                  {isSearching ? 'Thinking...' : 'Launch Neural Search'}
+                  {isSearching ? tr('Thinking...') : tr('Launch Neural Search')}
               </button>
           </form>
       </div>
@@ -64,20 +66,20 @@ const HelpCenter: React.FC = () => {
           {!answer && !isSearching && (
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-fade-in">
                   <div className="lg:col-span-4">
-                      <h4 className="text-[11px] font-black text-secondary uppercase tracking-[0.4em] mb-8">Sentinel Trending Insights</h4>
+                      <h4 className="text-[11px] font-black text-secondary uppercase tracking-[0.4em] mb-8">{tr('Sentinel Trending Insights')}</h4>
                   </div>
                   {TRENDING_INSIGHTS.map((insight) => (
                       <button
                         key={insight.title}
-                        onClick={() => { setQuery(insight.title + ": " + insight.sub); }}
+                        onClick={() => { setQuery(tr(insight.title) + ": " + tr(insight.sub)); }}
                         className="bg-white p-10 rounded-[3rem] border border-[#E5E5EA] text-left hover:border-primary hover:shadow-soft transition-all group flex flex-col justify-between h-56"
                       >
                           <div className="w-14 h-14 bg-gray-50 rounded-[1.5rem] flex items-center justify-center text-secondary group-hover:bg-primary/5 group-hover:text-primary transition-all">
                               <span className="material-symbols-outlined text-[28px]">{insight.icon}</span>
                           </div>
                           <div>
-                              <p className="text-base font-black text-text-main uppercase tracking-tight mb-2 group-hover:text-primary transition-colors">{insight.title}</p>
-                              <p className="text-[11px] text-secondary font-bold leading-relaxed opacity-60">{insight.sub}</p>
+                              <p className="text-base font-black text-text-main uppercase tracking-tight mb-2 group-hover:text-primary transition-colors">{tr(insight.title)}</p>
+                              <p className="text-[11px] text-secondary font-bold leading-relaxed opacity-60">{tr(insight.sub)}</p>
                           </div>
                       </button>
                   ))}
@@ -90,7 +92,7 @@ const HelpCenter: React.FC = () => {
                       "Automating remediation for Nginx 504 events"
                     ].map((hint) => (
                       <button key={hint} onClick={() => { setQuery(hint); }} className="text-left p-10 bg-white/50 border-2 border-dashed border-[#E5E5EA] rounded-[3rem] text-[11px] font-black uppercase tracking-[0.3em] text-secondary hover:border-primary/40 hover:text-primary hover:bg-white transition-all">
-                          {hint}
+                          {tr(hint)}
                       </button>
                     ))}
                   </div>
@@ -101,7 +103,7 @@ const HelpCenter: React.FC = () => {
               <div className="space-y-16 animate-fade-in-up">
                   <div className="bg-white rounded-[4rem] border border-[#E5E5EA] p-20 shadow-soft animate-pulse flex flex-col items-center justify-center space-y-10">
                       <div className="w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-[11px] font-black text-secondary uppercase tracking-[0.4em]">Handshaking with global SRE knowledge mesh...</p>
+                      <p className="text-[11px] font-black text-secondary uppercase tracking-[0.4em]">{tr('Handshaking with global SRE knowledge mesh...')}</p>
                   </div>
               </div>
           )}
@@ -112,8 +114,8 @@ const HelpCenter: React.FC = () => {
                   <div className="flex items-center gap-6 mb-12 border-b border-[#F5F5F7] pb-10 relative z-10">
                       <div className="p-4 bg-indigo-600 text-white rounded-[1.5rem] shadow-2xl shadow-indigo-600/30"><span className="material-symbols-outlined text-[32px] filled">verified</span></div>
                       <div>
-                        <h3 className="font-black text-text-main text-xl uppercase tracking-tighter leading-none">AI Neural Insight</h3>
-                        <p className="text-indigo-600 text-[11px] font-black uppercase tracking-widest mt-2">Grounded Domain Synthesis Active</p>
+                        <h3 className="font-black text-text-main text-xl uppercase tracking-tighter leading-none">{tr('AI Neural Insight')}</h3>
+                        <p className="text-indigo-600 text-[11px] font-black uppercase tracking-widest mt-2">{tr('Grounded Domain Synthesis Active')}</p>
                       </div>
                   </div>
                   <div className="prose prose-lg max-w-none text-secondary leading-[2.2] font-medium whitespace-pre-wrap relative z-10 text-[17px]">
@@ -122,7 +124,7 @@ const HelpCenter: React.FC = () => {
 
                   {groundingChunks.length > 0 && (
                       <div className="mt-16 pt-12 border-t border-[#F5F5F7] relative z-10">
-                          <p className="text-[11px] font-black text-secondary uppercase tracking-[0.4em] mb-10">Expert Reference Nodes</p>
+                          <p className="text-[11px] font-black text-secondary uppercase tracking-[0.4em] mb-10">{tr('Expert Reference Nodes')}</p>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               {groundingChunks.map((chunk, i) => chunk.web && (
                                   <a key={i} href={chunk.web.uri} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-8 bg-[#F5F5F7]/50 rounded-[2.5rem] hover:bg-white hover:shadow-soft border border-transparent hover:border-[#E5E5EA] transition-all group">

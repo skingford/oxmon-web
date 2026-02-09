@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useI18n } from '@/contexts/I18nContext'
 
 interface SidebarProps {
   onLogout: () => void
@@ -16,14 +17,14 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { path: '/dashboard', label: 'Sentinel Core', icon: 'dashboard' },
-  { path: '/infrastructure', label: 'Topology Map', icon: 'hub' },
-  { path: '/agents', label: 'Agent Grid', icon: 'dns' },
-  { path: '/certificates', label: 'Trust Perimeter', icon: 'verified_user' },
-  { path: '/alerts', label: 'Incident Hub', icon: 'notifications' },
-  { path: '/logs', label: 'Audit Stream', icon: 'list_alt' },
-  { path: '/tools', label: 'Config Forge', icon: 'construction' },
-  { path: '/help', label: 'Knowledge Hub', icon: 'help' },
+  { path: '/dashboard', labelKey: 'sidebar.nav.dashboard', icon: 'dashboard' },
+  { path: '/infrastructure', labelKey: 'sidebar.nav.infrastructure', icon: 'hub' },
+  { path: '/agents', labelKey: 'sidebar.nav.agents', icon: 'dns' },
+  { path: '/certificates', labelKey: 'sidebar.nav.certificates', icon: 'verified_user' },
+  { path: '/alerts', labelKey: 'sidebar.nav.alerts', icon: 'notifications' },
+  { path: '/logs', labelKey: 'sidebar.nav.logs', icon: 'list_alt' },
+  { path: '/tools', labelKey: 'sidebar.nav.tools', icon: 'construction' },
+  { path: '/help', labelKey: 'sidebar.nav.help', icon: 'help' },
 ] as const
 
 // Apply rerender-memo pattern: Extract NavItem component
@@ -73,6 +74,7 @@ const Sidebar = memo<SidebarProps>(({
   stats = { criticalAlerts: 0, offlineAgents: 0 }
 }) => {
   const pathname = usePathname()
+  const { t } = useI18n()
 
   const handleNavClick = () => {
     if (window.innerWidth < 1024) {
@@ -96,7 +98,7 @@ const Sidebar = memo<SidebarProps>(({
               </div>
               <div className="flex flex-col">
                 <h1 className="text-[#1D1D1F] text-xl font-black tracking-tighter uppercase leading-none">Oxmon</h1>
-                <p className="text-[#86868B] text-[9px] font-black uppercase tracking-widest mt-1 opacity-60">SRE Console</p>
+                <p className="text-[#86868B] text-[9px] font-black uppercase tracking-widest mt-1 opacity-60">{t('sidebar.sreConsole')}</p>
               </div>
             </div>
             <button onClick={onClose} className="lg:hidden text-[#86868B] p-1 hover:bg-[#F5F5F7] rounded-lg">
@@ -113,7 +115,7 @@ const Sidebar = memo<SidebarProps>(({
                 <NavItem
                   key={item.path}
                   path={item.path}
-                  label={item.label}
+                  label={t(item.labelKey)}
                   icon={item.icon}
                   isActive={pathname === item.path}
                   badge={badge}
@@ -126,7 +128,7 @@ const Sidebar = memo<SidebarProps>(({
             <div className="mt-6 pt-6 border-t border-[#E5E5EA]">
               <NavItem
                 path="/settings"
-                label="Governance"
+                label={t('sidebar.nav.settings')}
                 icon="settings"
                 isActive={pathname === '/settings'}
                 onClick={handleNavClick}
@@ -139,7 +141,7 @@ const Sidebar = memo<SidebarProps>(({
                 className="mt-8 flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-[#5856D6] to-[#0071E3] text-white rounded-[1.25rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-[#0071E3]/20 hover:shadow-[#0071E3]/40 hover:scale-[1.02] active:scale-[0.98] transition-all group"
               >
                 <span className="material-symbols-outlined text-[20px] animate-pulse">mic</span>
-                <span>Neural Link</span>
+                <span>{t('sidebar.neuralLink')}</span>
               </button>
             )}
           </nav>
@@ -152,9 +154,9 @@ const Sidebar = memo<SidebarProps>(({
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[11px] font-black text-[#1D1D1F] truncate uppercase tracking-tight">Alex Morgan</span>
-              <span className="text-[9px] text-[#86868B] font-black truncate uppercase tracking-widest opacity-60">Master Admin</span>
+              <span className="text-[9px] text-[#86868B] font-black truncate uppercase tracking-widest opacity-60">{t('sidebar.masterAdmin')}</span>
             </div>
-            <button onClick={onLogout} className="absolute right-3 p-2 text-[#86868B] hover:text-[#FF3B30] rounded-xl hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100" title="Terminate Session">
+            <button onClick={onLogout} className="absolute right-3 p-2 text-[#86868B] hover:text-[#FF3B30] rounded-xl hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100" title={t('sidebar.terminateSession')}>
               <span className="material-symbols-outlined text-[18px]">logout</span>
             </button>
           </div>

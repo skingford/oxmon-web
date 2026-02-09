@@ -1,12 +1,15 @@
 'use client'
 
 import React, { useState } from 'react'
+import { I18nProvider, useI18n } from '@/contexts/I18nContext'
+import LanguageSwitcher from './LanguageSwitcher'
 
 interface LoginProps {
   onLogin: () => void
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const LoginInner: React.FC<LoginProps> = ({ onLogin }) => {
+  const { t } = useI18n()
   const [email, setEmail] = useState('admin@oxmon.com')
   const [password, setPassword] = useState('password')
   const [isLoading, setIsLoading] = useState(false)
@@ -23,6 +26,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-100/50 blur-3xl -z-10"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-100/50 blur-3xl -z-10"></div>
 
+      <div className="absolute top-6 right-6">
+        <LanguageSwitcher />
+      </div>
+
       <div className="w-full max-w-[400px] bg-white rounded-2xl shadow-xl p-10 flex flex-col gap-8 border border-white/50 backdrop-blur-sm animate-fade-in-up">
         <div className="flex flex-col items-center gap-4">
           <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-primary to-blue-400 flex items-center justify-center shadow-lg shadow-primary/20 text-white mb-2">
@@ -30,13 +37,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
           <div className="text-center space-y-1">
             <h1 className="text-text-main text-2xl font-bold tracking-tight">Oxmon Admin</h1>
-            <p className="text-secondary text-sm font-medium">Infrastructure Monitoring & Certificates</p>
+            <p className="text-secondary text-sm font-medium">{t('login.subtitle')}</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="space-y-2">
-            <label className="text-text-main text-sm font-medium ml-1" htmlFor="username">Username</label>
+            <label className="text-text-main text-sm font-medium ml-1" htmlFor="username">{t('login.username')}</label>
             <div className="relative group">
               <input
                 id="username"
@@ -54,8 +61,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
-              <label className="text-text-main text-sm font-medium" htmlFor="password">Password</label>
-              <a href="#" className="text-primary hover:text-blue-600 text-xs font-medium transition-colors">Forgot password?</a>
+              <label className="text-text-main text-sm font-medium" htmlFor="password">{t('login.password')}</label>
+              <a href="#" className="text-primary hover:text-blue-600 text-xs font-medium transition-colors">{t('login.forgotPassword')}</a>
             </div>
             <div className="relative group">
               <input
@@ -81,7 +88,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
             ) : (
                 <>
-                <span>Sign In</span>
+                <span>{t('login.signIn')}</span>
                 <span className="material-symbols-outlined text-[18px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
                 </>
             )}
@@ -90,12 +97,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <div className="pt-4 border-t border-gray-100 flex flex-col items-center gap-2">
           <p className="text-xs text-secondary text-center">
-            Protected by enterprise-grade encryption.<br />
-            <span className="opacity-75">v2.4.0 (Stable)</span>
+            {t('login.protected')}<br />
+            <span className="opacity-75">{t('login.version')}</span>
           </p>
         </div>
       </div>
     </div>
+  )
+}
+
+const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  return (
+    <I18nProvider>
+      <LoginInner onLogin={onLogin} />
+    </I18nProvider>
   )
 }
 

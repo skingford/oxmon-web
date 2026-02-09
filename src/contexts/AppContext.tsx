@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import type { Agent, Certificate, Alert, TeamMember, AppPreferences, LogEntry } from '@/lib/types'
 import { MOCK_AGENTS, MOCK_CERTS, MOCK_ALERTS, MOCK_TEAM, DEFAULT_PREFERENCES } from '@/lib/constants'
 import { getFromLocalStorage, setToLocalStorage } from '@/lib/localStorage'
+import { useI18n } from '@/contexts/I18nContext'
 
 interface AppContextType {
   agents: Agent[]
@@ -56,6 +57,7 @@ export function useAppContext() {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { localizeToast } = useI18n()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
@@ -132,8 +134,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = Math.random().toString(36).substr(2, 9)
-    setToasts((prev) => [...prev, { id, message, type }])
-  }, [])
+    const localizedMessage = localizeToast(message)
+    setToasts((prev) => [...prev, { id, message: localizedMessage, type }])
+  }, [localizeToast])
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))

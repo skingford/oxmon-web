@@ -64,6 +64,7 @@ src/
 - 📊 **Audit Logs** - Live trace with AI-generated logs
 - 🔧 **Config Forge** - IaC generator with AI hardening
 - 🎤 **Live Assistant** - Voice AI (Gemini Native Audio)
+- 🌍 **Bilingual UI** - English / 中文 language switch with persisted preference
 
 ## 📦 Migration & Optimization Complete
 

@@ -3,10 +3,12 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppContext } from '@/contexts/AppContext'
+import { useI18n } from '@/contexts/I18nContext'
 
 const GlobalSearch: React.FC = () => {
   const router = useRouter()
   const { agents, certificates, alerts } = useAppContext()
+  const { t } = useI18n()
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -27,6 +29,12 @@ const GlobalSearch: React.FC = () => {
     ...alerts.filter(a => a.message.toLowerCase().includes(searchTerm.toLowerCase()) || a.source.toLowerCase().includes(searchTerm.toLowerCase())).map(a => ({ type: 'Alert', id: a.id, label: a.source, sub: a.message }))
   ]
 
+  const resultTypeLabel: Record<string, string> = {
+    Agent: t('search.type.agent'),
+    Certificate: t('search.type.certificate'),
+    Alert: t('search.type.alert'),
+  }
+
   const handleResultClick = (type: string) => {
     const route = type === 'Agent' ? '/agents' : type === 'Certificate' ? '/certificates' : '/alerts'
     router.push(route)
@@ -39,7 +47,7 @@ const GlobalSearch: React.FC = () => {
       <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#C1C1C1] text-[20px]">search</span>
       <input
         type="text"
-        placeholder="Global Grep..."
+        placeholder={t('search.placeholder')}
         value={searchTerm}
         onChange={(e) => { setSearchTerm(e.target.value); setIsSearchFocused(true) }}
         onFocus={() => setIsSearchFocused(true)}
@@ -55,10 +63,10 @@ const GlobalSearch: React.FC = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-black uppercase tracking-tight truncate">{result.label}</p>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[#86868B] mt-1 opacity-60">{result.type} • {result.sub}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#86868B] mt-1 opacity-60">{resultTypeLabel[result.type] ?? result.type} • {result.sub}</p>
                 </div>
               </button>
-            )) : <div className="p-12 text-center text-[#86868B] text-[10px] font-black uppercase tracking-widest opacity-40">No matching assets identified.</div>}
+            )) : <div className="p-12 text-center text-[#86868B] text-[10px] font-black uppercase tracking-widest opacity-40">{t('search.noResults')}</div>}
           </div>
         </div>
       )}
