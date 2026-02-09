@@ -1,9 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
-import { LogEntry } from '@/lib/types';
+import { useState, useEffect, useRef, memo } from 'react';
+import type { LogEntry } from '@/lib/types';
 import { generateLiveLog } from '@/actions/ai';
-import { BarChart, Bar, ResponsiveContainer } from 'recharts';
+import { BarChart } from 'recharts/lib/chart/BarChart';
+import { Bar } from 'recharts/lib/cartesian/Bar';
+import { ResponsiveContainer } from 'recharts/lib/component/ResponsiveContainer';
 
 interface LogsProps {
   logs: LogEntry[];

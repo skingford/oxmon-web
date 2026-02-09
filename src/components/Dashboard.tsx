@@ -1,9 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
-import { Agent, Certificate, Alert } from '@/lib/types';
-import { GoogleGenAI } from "@google/genai";
+import { useState, useEffect, memo } from 'react';
+import { AreaChart } from 'recharts/lib/chart/AreaChart';
+import { Area } from 'recharts/lib/cartesian/Area';
+import { ResponsiveContainer } from 'recharts/lib/component/ResponsiveContainer';
+import { Tooltip } from 'recharts/lib/component/Tooltip';
+import type { Agent, Certificate, Alert } from '@/lib/types';
+import { generateBriefingVideo } from '@/actions/ai';
 
 interface DashboardProps {
   onChangeView: (view: string) => void;
@@ -78,38 +81,18 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const handleGenerateBriefingVideo = async () => {
-    // Check for API key selection for Veo models
-    // @ts-ignore
-    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-        // @ts-ignore
-        await window.aistudio.openSelectKey();
-    }
-
     setIsVideoLoading(true);
     setVideoUrl(null);
     setVideoStatusMsg('Compiling global cluster telemetry...');
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
-        const prompt = `A high-fidelity cinematic 3D macro shot of a blue glowing holographic server core in a dark, high-tech SRE facility. Data streams pulse through fibers. 8K, photorealistic, moody atmosphere.`;
-
         setVideoStatusMsg('Rendering neural frames...');
-        let operation = await ai.models.generateVideos({
-            model: 'veo-3.1-fast-generate-preview',
-            prompt: prompt,
-            config: { numberOfVideos: 1, resolution: '1080p', aspectRatio: '16:9' }
-        });
+        const result = await generateBriefingVideo();
 
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 8000));
-            operation = await ai.operations.getVideosOperation({ operation: operation });
-        }
-
-        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (downloadLink) {
-            const response = await fetch(`${downloadLink}&key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`);
-            const blob = await response.blob();
-            setVideoUrl(URL.createObjectURL(blob));
+        if (result.videoUrl) {
+            setVideoUrl(result.videoUrl);
+        } else {
+            setVideoStatusMsg(result.error || 'Neural synthesis link failed.');
         }
     } catch (err: any) {
         setVideoStatusMsg('Neural synthesis link failed.');

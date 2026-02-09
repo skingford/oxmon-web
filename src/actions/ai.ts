@@ -1,10 +1,12 @@
 'use server'
 
+import { cache } from 'react'
 import { GoogleGenAI, Type } from "@google/genai"
 
-function getAI() {
+// Apply server-cache-react pattern: Cache AI client instance per request
+const getAI = cache(() => {
   return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' })
-}
+})
 
 export async function generateSystemSummary(agentsCount: number, criticalAlerts: number): Promise<string> {
   try {
@@ -96,6 +98,43 @@ export async function simulateNodeFailure(nodeName: string, nodeIp: string): Pro
     return response.text || 'Simulation link timeout.'
   } catch {
     throw new Error('Neural sim interrupted.')
+  }
+}
+
+export async function generateBriefingVideo(): Promise<{ videoUrl: string | null, error?: string }> {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return { videoUrl: null, error: 'API key not configured' }
+    }
+
+    const ai = getAI()
+    const prompt = `A high-fidelity cinematic 3D macro shot of a blue glowing holographic server core in a dark, high-tech SRE facility. Data streams pulse through fibers. 8K, photorealistic, moody atmosphere.`
+
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: prompt,
+      config: { numberOfVideos: 1, resolution: '1080p', aspectRatio: '16:9' }
+    })
+
+    // Poll for completion
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 8000))
+      operation = await ai.operations.getVideosOperation({ operation: operation })
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri
+    if (downloadLink) {
+      const response = await fetch(`${downloadLink}&key=${apiKey}`)
+      const blob = await response.blob()
+      const buffer = await blob.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
+      return { videoUrl: `data:video/mp4;base64,${base64}` }
+    }
+
+    return { videoUrl: null, error: 'Video generation failed' }
+  } catch (error: any) {
+    return { videoUrl: null, error: error.message || 'Neural synthesis link failed' }
   }
 }
 

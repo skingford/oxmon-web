@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import { memo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -24,9 +24,48 @@ const navItems = [
   { path: '/logs', label: 'Audit Stream', icon: 'list_alt' },
   { path: '/tools', label: 'Config Forge', icon: 'construction' },
   { path: '/help', label: 'Knowledge Hub', icon: 'help' },
-]
+] as const
 
-const Sidebar: React.FC<SidebarProps> = ({
+// Apply rerender-memo pattern: Extract NavItem component
+interface NavItemProps {
+  path: string
+  label: string
+  icon: string
+  isActive: boolean
+  badge?: number
+  badgeType?: 'warning' | 'critical'
+  onClick: () => void
+}
+
+const NavItem = memo<NavItemProps>(({ path, label, icon, isActive, badge, badgeType, onClick }) => {
+  const navItemClass = `flex items-center justify-between px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all duration-300 cursor-pointer group ${
+    isActive
+      ? 'bg-[#0071E3]/10 text-[#0071E3] shadow-inner'
+      : 'text-[#86868B] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
+  }`
+
+  const iconClass = `material-symbols-outlined text-[20px] ${isActive ? 'filled' : ''} group-hover:scale-110 transition-transform`
+
+  return (
+    <Link href={path} onClick={onClick} className={navItemClass}>
+      <div className="flex items-center gap-4">
+        <span className={iconClass}>{icon}</span>
+        <span>{label}</span>
+      </div>
+      {badge && badge > 0 && (
+        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black ${
+          badgeType === 'critical'
+            ? 'bg-[#FF3B30] text-white shadow-lg shadow-[#FF3B30]/30 animate-pulse'
+            : 'bg-[#FF9F0A]/10 text-[#FF9F0A] border border-[#FF9F0A]/20'
+        }`}>
+          {badge}
+        </span>
+      )}
+    </Link>
+  )
+})
+
+const Sidebar = memo<SidebarProps>(({
   onLogout,
   isOpen,
   onClose,
@@ -34,18 +73,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   stats = { criticalAlerts: 0, offlineAgents: 0 }
 }) => {
   const pathname = usePathname()
-
-  const isActive = (path: string) => pathname === path
-
-  const navItemClass = (path: string) =>
-    `flex items-center justify-between px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all duration-300 cursor-pointer group ${
-      isActive(path)
-        ? 'bg-[#0071E3]/10 text-[#0071E3] shadow-inner'
-        : 'text-[#86868B] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
-    }`
-
-  const iconClass = (path: string) =>
-    `material-symbols-outlined text-[20px] ${isActive(path) ? 'filled' : ''} group-hover:scale-110 transition-transform`
 
   const handleNavClick = () => {
     if (window.innerWidth < 1024) {
@@ -78,28 +105,32 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <nav className="flex flex-col gap-1.5 flex-1 overflow-y-auto mt-4 custom-scrollbar">
-            {navItems.map(item => (
-              <Link key={item.path} href={item.path} onClick={handleNavClick} className={navItemClass(item.path)}>
-                <div className="flex items-center gap-4">
-                  <span className={iconClass(item.path)}>{item.icon}</span>
-                  <span>{item.label}</span>
-                </div>
-                {item.path === '/agents' && stats.offlineAgents > 0 && (
-                  <span className="px-2 py-0.5 rounded-lg bg-[#FF9F0A]/10 text-[#FF9F0A] text-[9px] font-black border border-[#FF9F0A]/20">{stats.offlineAgents}</span>
-                )}
-                {item.path === '/alerts' && stats.criticalAlerts > 0 && (
-                  <span className="px-2 py-0.5 rounded-lg bg-[#FF3B30] text-white text-[9px] font-black shadow-lg shadow-[#FF3B30]/30 animate-pulse">{stats.criticalAlerts}</span>
-                )}
-              </Link>
-            ))}
+            {navItems.map(item => {
+              const badge = item.path === '/agents' ? stats.offlineAgents : item.path === '/alerts' ? stats.criticalAlerts : undefined
+              const badgeType = item.path === '/alerts' ? 'critical' : 'warning'
+
+              return (
+                <NavItem
+                  key={item.path}
+                  path={item.path}
+                  label={item.label}
+                  icon={item.icon}
+                  isActive={pathname === item.path}
+                  badge={badge}
+                  badgeType={badgeType}
+                  onClick={handleNavClick}
+                />
+              )
+            })}
 
             <div className="mt-6 pt-6 border-t border-[#E5E5EA]">
-              <Link href="/settings" onClick={handleNavClick} className={navItemClass('/settings')}>
-                <div className="flex items-center gap-4">
-                  <span className={iconClass('/settings')}>settings</span>
-                  <span>Governance</span>
-                </div>
-              </Link>
+              <NavItem
+                path="/settings"
+                label="Governance"
+                icon="settings"
+                isActive={pathname === '/settings'}
+                onClick={handleNavClick}
+              />
             </div>
 
             {onOpenAssistant && (
@@ -131,6 +162,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       </aside>
     </>
   )
-}
+})
+
+Sidebar.displayName = 'Sidebar'
 
 export default Sidebar

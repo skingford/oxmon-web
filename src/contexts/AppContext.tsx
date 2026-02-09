@@ -1,8 +1,9 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { Agent, Certificate, Alert, TeamMember, AppPreferences, LogEntry } from '@/lib/types'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import type { Agent, Certificate, Alert, TeamMember, AppPreferences, LogEntry } from '@/lib/types'
 import { MOCK_AGENTS, MOCK_CERTS, MOCK_ALERTS, MOCK_TEAM, DEFAULT_PREFERENCES } from '@/lib/constants'
+import { getFromLocalStorage, setToLocalStorage } from '@/lib/localStorage'
 
 interface AppContextType {
   agents: Agent[]
@@ -80,20 +81,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false)
 
   // Load from localStorage after hydration (client-side only)
+  // Apply client-localstorage-schema pattern with versioning
   useEffect(() => {
     setIsHydrated(true)
 
-    const savedAgents = localStorage.getItem('ox_agents')
-    const savedCerts = localStorage.getItem('ox_certs')
-    const savedTeam = localStorage.getItem('ox_team')
-    const savedPrefs = localStorage.getItem('ox_prefs')
-    const savedAlerts = localStorage.getItem('ox_alerts')
-
-    if (savedAgents) setAgents(JSON.parse(savedAgents))
-    if (savedCerts) setCertificates(JSON.parse(savedCerts))
-    if (savedTeam) setTeamMembers(JSON.parse(savedTeam))
-    if (savedPrefs) setPreferences(JSON.parse(savedPrefs))
-    if (savedAlerts) setAlerts(JSON.parse(savedAlerts))
+    // Load data with version checking
+    setAgents(getFromLocalStorage('ox_agents', MOCK_AGENTS))
+    setCertificates(getFromLocalStorage('ox_certs', MOCK_CERTS))
+    setTeamMembers(getFromLocalStorage('ox_team', MOCK_TEAM))
+    setPreferences(getFromLocalStorage('ox_prefs', DEFAULT_PREFERENCES))
+    setAlerts(getFromLocalStorage('ox_alerts', MOCK_ALERTS))
 
     // Generate fresh API key
     setApiKey('ox_live_' + Math.random().toString(36).substr(2, 24))
@@ -107,29 +104,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Save to localStorage when data changes (skip on first render)
+  // Apply client-localstorage-schema pattern with versioning
   useEffect(() => {
     if (!isHydrated) return
-    localStorage.setItem('ox_agents', JSON.stringify(agents))
+    setToLocalStorage('ox_agents', agents)
   }, [agents, isHydrated])
 
   useEffect(() => {
     if (!isHydrated) return
-    localStorage.setItem('ox_certs', JSON.stringify(certificates))
+    setToLocalStorage('ox_certs', certificates)
   }, [certificates, isHydrated])
 
   useEffect(() => {
     if (!isHydrated) return
-    localStorage.setItem('ox_team', JSON.stringify(teamMembers))
+    setToLocalStorage('ox_team', teamMembers)
   }, [teamMembers, isHydrated])
 
   useEffect(() => {
     if (!isHydrated) return
-    localStorage.setItem('ox_prefs', JSON.stringify(preferences))
+    setToLocalStorage('ox_prefs', preferences)
   }, [preferences, isHydrated])
 
   useEffect(() => {
     if (!isHydrated) return
-    localStorage.setItem('ox_alerts', JSON.stringify(alerts))
+    setToLocalStorage('ox_alerts', alerts)
   }, [alerts, isHydrated])
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -151,26 +149,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast(`Incident ${id} resolved via voice link.`, 'success')
   }, [showToast])
 
+  // Memoize context value to prevent unnecessary re-renders (rerender-memo pattern)
+  const contextValue = useMemo(() => ({
+    agents, setAgents,
+    certificates, setCertificates,
+    alerts, setAlerts,
+    teamMembers, setTeamMembers,
+    preferences, setPreferences,
+    logs, setLogs,
+    apiKey, setApiKey,
+    toasts, showToast, removeToast,
+    aiSummary, setAiSummary,
+    isAiLoading, setIsAiLoading,
+    logAnalysis, setLogAnalysis,
+    isLogAnalyzing, setIsLogAnalyzing,
+    predictiveData, setPredictiveData,
+    terminalInjection, setTerminalInjection,
+    handleUpdateAgentStatus,
+    handleAcknowledgeAlert,
+    isAuthenticated, setIsAuthenticated,
+  }), [
+    agents, certificates, alerts, teamMembers, preferences, logs, apiKey,
+    toasts, showToast, removeToast,
+    aiSummary, isAiLoading, logAnalysis, isLogAnalyzing,
+    predictiveData, terminalInjection,
+    handleUpdateAgentStatus, handleAcknowledgeAlert,
+    isAuthenticated
+  ])
+
   return (
-    <AppContext.Provider value={{
-      agents, setAgents,
-      certificates, setCertificates,
-      alerts, setAlerts,
-      teamMembers, setTeamMembers,
-      preferences, setPreferences,
-      logs, setLogs,
-      apiKey, setApiKey,
-      toasts, showToast, removeToast,
-      aiSummary, setAiSummary,
-      isAiLoading, setIsAiLoading,
-      logAnalysis, setLogAnalysis,
-      isLogAnalyzing, setIsLogAnalyzing,
-      predictiveData, setPredictiveData,
-      terminalInjection, setTerminalInjection,
-      handleUpdateAgentStatus,
-      handleAcknowledgeAlert,
-      isAuthenticated, setIsAuthenticated,
-    }}>
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   )

@@ -1,8 +1,10 @@
 'use client'
 
-import React, { useState } from 'react';
-import { Alert } from '@/lib/types';
-import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { useState, memo } from 'react';
+import type { Alert } from '@/lib/types';
+import { AreaChart } from 'recharts/lib/chart/AreaChart';
+import { Area } from 'recharts/lib/cartesian/Area';
+import { ResponsiveContainer } from 'recharts/lib/component/ResponsiveContainer';
 
 interface AlertsProps {
   alerts: Alert[];

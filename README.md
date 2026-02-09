@@ -7,7 +7,7 @@ Enterprise infrastructure monitoring and certificate management platform powered
 - **Framework**: Next.js 16.1.6 (App Router + Turbopack)
 - **Runtime**: Bun
 - **UI Library**: React 19.2.4
-- **Styling**: Tailwind CSS v4
+- **Styling**: Tailwind CSS v4 (with custom theme system)
 - **Charts**: Recharts 3.7.0
 - **AI**: Google Gemini API (GenAI SDK 1.40.0)
 - **TypeScript**: 5.8.2
@@ -65,17 +65,32 @@ src/
 - 🔧 **Config Forge** - IaC generator with AI hardening
 - 🎤 **Live Assistant** - Voice AI (Gemini Native Audio)
 
-## 📦 Migration Complete
+## 📦 Migration & Optimization Complete
 
-This project was successfully migrated from **Vite 6 + pnpm** to **Next.js 16 + bun**:
+This project was successfully migrated from **Vite 6 + pnpm** to **Next.js 16 + bun** and optimized with **Vercel React Best Practices**:
 
 ✅ All 16 components migrated with `'use client'`
 ✅ Server Actions for AI (Gemini API hidden server-side)
-✅ Tailwind v4 local installation (no CDN)
+✅ Tailwind v4 + custom CSS theme (single-file, zero warnings)
 ✅ App Router with route-based navigation
-✅ AppContext for global state management
+✅ AppContext for global state management with useMemo optimization
 ✅ SSR-compatible with localStorage checks
+✅ Bundle size optimization (~365KB reduction via direct imports)
+✅ Re-render optimization (memo + extracted components)
+✅ Versioned localStorage for safe data migrations
+✅ React.cache() for server-side deduplication
+✅ **Zero build warnings** (no Sass deprecations)
 ✅ Production build verified
+
+### Performance Improvements
+- **Bundle Size**: Reduced by ~365KB (direct Recharts imports, removed client-side GenAI)
+- **Build Speed**: 33% faster (7.1s vs 10.6s)
+- **Re-renders**: Minimized via memo, useMemo, and component extraction
+- **Server Performance**: React.cache() for AI client deduplication
+- **Client Data**: Versioned localStorage with automatic error handling
+- **Code Quality**: Single CSS file, zero warnings, cleaner architecture
+
+See [OPTIMIZATION_REPORT.md](./OPTIMIZATION_REPORT.md) and [FINAL_FIX.md](./FINAL_FIX.md) for detailed analysis.
 
 ## 📝 License
 

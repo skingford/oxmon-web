@@ -1,9 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Agent } from '@/lib/types';
+import { useState, useEffect, useRef, memo } from 'react';
+import type { Agent } from '@/lib/types';
 import { executeTerminalCommand } from '@/actions/ai';
-import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { AreaChart } from 'recharts/lib/chart/AreaChart';
+import { Area } from 'recharts/lib/cartesian/Area';
+import { ResponsiveContainer } from 'recharts/lib/component/ResponsiveContainer';
 
 interface AgentsProps {
   agents: Agent[];
