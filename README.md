@@ -1,4 +1,4 @@
-# Oxmon Admin - Next.js Migration ✅
+# Oxmon Admin✅
 
 Enterprise infrastructure monitoring and certificate management platform powered by Next.js 16 + React 19 + AI.
 
