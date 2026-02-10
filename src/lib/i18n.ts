@@ -267,6 +267,13 @@ const UI_TEXT_MAP: Record<string, string> = {
   'Time': '时间',
   'Progress': '进度',
   'Up to date': '已是最新',
+  'Metrics': '指标',
+  'High CPU usage detected (92%) - Exceeds threshold > 90%': '检测到 CPU 使用率过高（92%）- 超过阈值 > 90%',
+  'Memory usage is high (78%) - Monitoring required': '内存使用率较高（78%）- 需要持续监控',
+  'Scheduled disk cleanup completed successfully': '计划磁盘清理已成功完成',
+  '2 mins ago': '2 分钟前',
+  '15 mins ago': '15 分钟前',
+  '1 hr ago': '1 小时前',
 
   'Americas': '美洲',
   'Europe': '欧洲',

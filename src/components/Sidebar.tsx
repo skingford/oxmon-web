@@ -1,85 +1,30 @@
 'use client'
 
 import { memo } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { useI18n } from '@/contexts/I18nContext'
-import { buildLocalePath, stripLocalePrefix } from '@/lib/locale'
 
 interface SidebarProps {
-  onLogout: () => void
   isOpen: boolean
   onClose: () => void
-  stats?: {
-    criticalAlerts: number
-    offlineAgents: number
-  }
 }
 
-interface NavItemConfig {
-  path: string
+interface NavItem {
   icon: string
   label: string
-  badgeCount?: number
-  badgeTone?: 'critical' | 'default'
+  active?: boolean
+  badge?: number
 }
 
-interface NavItemProps {
-  href: string
-  icon: string
-  label: string
-  isActive: boolean
-  badgeCount?: number
-  badgeTone?: 'critical' | 'default'
-  onClick: () => void
-}
+const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
+  const { t, tr } = useI18n()
 
-const NavItem = memo<NavItemProps>(({ href, icon, label, isActive, badgeCount, badgeTone = 'default', onClick }) => {
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-        isActive ? 'bg-[#0073e6]/10 text-[#0073e6]' : 'text-slate-600 hover:bg-black/[0.03]'
-      }`}
-    >
-      <span className={`material-symbols-outlined text-[20px] ${isActive ? 'filled' : ''}`}>{icon}</span>
-      <span>{label}</span>
-      {badgeCount !== undefined && badgeCount > 0 && (
-        <span
-          className={`ml-auto px-2 py-0.5 rounded-full text-xs font-bold ${
-            badgeTone === 'critical'
-              ? 'bg-red-100 text-red-600'
-              : 'bg-slate-100 text-slate-500'
-          }`}
-        >
-          {badgeCount}
-        </span>
-      )}
-    </Link>
-  )
-})
-
-NavItem.displayName = 'NavItem'
-
-const Sidebar = memo<SidebarProps>(({ onLogout, isOpen, onClose, stats = { criticalAlerts: 0, offlineAgents: 0 } }) => {
-  const pathname = usePathname()
-  const { locale, t } = useI18n()
-  const normalizedPath = stripLocalePrefix(pathname || '/dashboard')
-
-  const navItems: NavItemConfig[] = [
-    { path: '/dashboard', icon: 'dashboard', label: t('view.dashboard') },
-    { path: '/agents', icon: 'dns', label: t('view.agents') },
-    { path: '/infrastructure', icon: 'monitoring', label: 'Metrics' },
-    { path: '/alerts', icon: 'warning', label: t('view.alerts'), badgeCount: stats.criticalAlerts, badgeTone: 'critical' },
-    { path: '/certificates', icon: 'verified_user', label: t('view.certificates') },
+  const navItems: NavItem[] = [
+    { icon: 'dashboard', label: t('view.dashboard'), active: true },
+    { icon: 'dns', label: t('view.agents') },
+    { icon: 'monitoring', label: tr('Metrics') },
+    { icon: 'warning', label: t('view.alerts'), badge: 3 },
+    { icon: 'verified_user', label: t('view.certificates') },
   ]
-
-  const handleNavClick = () => {
-    if (window.innerWidth < 1024) {
-      onClose()
-    }
-  }
 
   return (
     <>
@@ -118,18 +63,17 @@ const Sidebar = memo<SidebarProps>(({ onLogout, isOpen, onClose, stats = { criti
 
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
           {navItems.map((item) => (
-            <NavItem
-              key={item.path}
-              href={buildLocalePath(locale, item.path)}
-              icon={item.icon}
-              label={item.label}
-              isActive={normalizedPath === item.path}
-              badgeCount={item.badgeCount}
-              badgeTone={item.badgeTone}
-              onClick={handleNavClick}
-            />
+            <div
+              key={item.label}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
+                item.active ? 'bg-[#0073e6]/10 text-[#0073e6]' : 'text-slate-600'
+              }`}
+            >
+              <span className={`material-symbols-outlined text-[20px] ${item.active ? 'filled' : ''}`}>{item.icon}</span>
+              <span>{item.label}</span>
+              {item.badge ? <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-600">{item.badge}</span> : null}
+            </div>
           ))}
-
         </nav>
 
         <div className="p-4 border-t border-[#E5E5EA]">
@@ -148,7 +92,6 @@ const Sidebar = memo<SidebarProps>(({ onLogout, isOpen, onClose, stats = { criti
           </div>
           <button
             type="button"
-            onClick={onLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[#E5E5EA] text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">logout</span>
