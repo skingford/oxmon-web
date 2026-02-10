@@ -1,344 +1,163 @@
 'use client'
 
-import { useState, useEffect, memo } from 'react';
-import { AreaChart } from 'recharts/lib/chart/AreaChart';
-import { Area } from 'recharts/lib/cartesian/Area';
-import { ResponsiveContainer } from 'recharts/lib/component/ResponsiveContainer';
-import { Tooltip } from 'recharts/lib/component/Tooltip';
-import type { Agent, Certificate, Alert } from '@/lib/types';
-import { generateBriefingVideo } from '@/actions/ai';
-import { useI18n } from '@/contexts/I18nContext';
+import type { Alert, Agent, Certificate } from '@/lib/types'
+import { useI18n } from '@/contexts/I18nContext'
 
 interface DashboardProps {
-  onChangeView: (view: string) => void;
-  agents: Agent[];
-  certificates: Certificate[];
-  alerts: Alert[];
-  aiSummary: string;
-  isAiLoading: boolean;
-  onGenerateAiSummary: () => void;
-  onGenerateFullReport: () => void;
-  predictiveData: string | null;
-  onRunPredictiveScan: () => void;
+  onChangeView: (view: string) => void
+  agents: Agent[]
+  certificates: Certificate[]
+  alerts: Alert[]
+  aiSummary: string
+  isAiLoading: boolean
+  onGenerateAiSummary: () => void
+  onGenerateFullReport: () => void
+  predictiveData: string | null
+  onRunPredictiveScan: () => void
 }
 
-const Dashboard: React.FC<DashboardProps> = ({
-  onChangeView,
-  agents,
-  certificates,
-  alerts,
-  aiSummary,
-  isAiLoading,
-  onGenerateAiSummary,
-  onGenerateFullReport,
-  predictiveData,
-  onRunPredictiveScan
-}) => {
-  const { tr } = useI18n();
-  const [securityScore, setSecurityScore] = useState(100);
-  const [throughputData, setThroughputData] = useState<any[]>([]);
-  const [isVideoLoading, setIsVideoLoading] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoStatusMsg, setVideoStatusMsg] = useState('');
-  const [isScanningPredictive, setIsScanningPredictive] = useState(false);
+const ALERT_SEVERITY_ORDER: Record<Alert['severity'], number> = {
+  Critical: 0,
+  Warning: 1,
+  Info: 2,
+  Resolved: 3,
+}
 
-  const [regionalMetrics, setRegionalMetrics] = useState([
-    { region: 'US-East', ping: 24, load: 45, color: '#0071E3', trend: 'down' },
-    { region: 'EU-West', ping: 38, load: 62, color: '#34C759', trend: 'up' },
-    { region: 'Asia-South', ping: 124, load: 28, color: '#FF9F0A', trend: 'stable' },
-    { region: 'BR-East', ping: 82, load: 55, color: '#FF3B30', trend: 'down' },
-  ]);
+function getSeverityClass(severity: Alert['severity']) {
+  if (severity === 'Critical') {
+    return 'bg-red-50 text-red-700 border border-red-100'
+  }
 
-  useEffect(() => {
-    let score = 100;
-    score -= alerts.filter(a => a.severity === 'Critical').length * 12;
-    score -= alerts.filter(a => a.severity === 'Warning').length * 4;
-    score -= certificates.filter(c => c.status === 'Expired').length * 15;
-    score -= agents.filter(a => a.status === 'Offline').length * 8;
-    setSecurityScore(Math.max(5, score));
-  }, [alerts, certificates, agents]);
+  if (severity === 'Warning') {
+    return 'bg-orange-50 text-orange-700 border border-orange-100'
+  }
 
-  useEffect(() => {
-    const initialData = Array.from({ length: 30 }).map((_, i) => ({
-      time: i,
-      val: 40 + Math.random() * 20
-    }));
-    setThroughputData(initialData);
+  if (severity === 'Info') {
+    return 'bg-blue-50 text-blue-700 border border-blue-100'
+  }
 
-    const timer = setInterval(() => {
-      setThroughputData(prev => [...prev.slice(1), { time: prev.length, val: 40 + Math.random() * 30 }]);
-      setRegionalMetrics(prev => prev.map(r => ({
-          ...r,
-          ping: Math.max(10, r.ping + (Math.random() * 6 - 3)),
-          load: Math.max(5, Math.min(95, r.load + (Math.random() * 4 - 2)))
-      })));
-    }, 3000);
-    return () => clearInterval(timer);
-  }, []);
+  return 'bg-slate-100 text-slate-600 border border-slate-200'
+}
 
-  const handlePredictiveScan = async () => {
-    setIsScanningPredictive(true);
-    await onRunPredictiveScan();
-    setIsScanningPredictive(false);
-  };
+export default function Dashboard({ onChangeView, agents, alerts }: DashboardProps) {
+  const { tr } = useI18n()
 
-  const handleGenerateBriefingVideo = async () => {
-    setIsVideoLoading(true);
-    setVideoUrl(null);
-    setVideoStatusMsg(tr('Compiling global cluster telemetry...'));
+  const totalAgents = agents.length
+  const onlineAgents = agents.filter((agent) => agent.status === 'Online').length
+  const onlineRate = totalAgents > 0 ? Math.round((onlineAgents / totalAgents) * 100) : 0
 
-    try {
-        setVideoStatusMsg(tr('Rendering neural frames...'));
-        const result = await generateBriefingVideo();
-
-        if (result.videoUrl) {
-            setVideoUrl(result.videoUrl);
-        } else {
-            setVideoStatusMsg(tr(result.error || 'Neural synthesis link failed.'));
-        }
-    } catch (err: any) {
-        setVideoStatusMsg(tr('Neural synthesis link failed.'));
-    } finally {
-        setIsVideoLoading(false);
-    }
-  };
+  const visibleAlerts = alerts
+    .slice()
+    .sort((a, b) => ALERT_SEVERITY_ORDER[a.severity] - ALERT_SEVERITY_ORDER[b.severity])
+    .slice(0, 3)
 
   return (
-    <div className="space-y-10 animate-fade-in pb-24">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <div className="space-y-3">
-            <h2 className="text-5xl font-black text-text-main tracking-tighter uppercase flex items-center gap-5">
-                {tr('Executive Overview')}
-                <div className="hidden sm:flex items-center gap-2.5 px-5 py-2 bg-primary/5 rounded-full border border-primary/10">
-                    <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shadow-lg shadow-primary/40"></span>
-                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.25em]">{tr('Oxmon Sentinel v4.0')}</span>
-                </div>
-            </h2>
-            <p className="text-secondary text-base font-medium max-w-2xl">{tr('High-fidelity visualization of global infrastructure reach, distributed cluster health, and neural security metrics.')}</p>
+    <div className="space-y-8 pb-8 animate-fade-in">
+      <section>
+        <h3 className="text-2xl font-bold text-slate-900 mb-1">{tr('Welcome back, Administrator')}</h3>
+        <p className="text-slate-500">{tr("Here's what's happening with your infrastructure today.")}</p>
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <article className="h-40 bg-white rounded-xl p-6 border border-[#E5E5EA] shadow-card flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">{tr('Agent Online Rate')}</p>
+              <h4 className="mt-2 text-3xl font-bold text-slate-900">
+                {onlineAgents}/{totalAgents}{' '}
+                <span className="text-lg font-medium text-slate-400">({onlineRate}%)</span>
+              </h4>
+            </div>
+            <div className="p-2 rounded-lg bg-blue-50 text-[#0073e6]">
+              <span className="material-symbols-outlined">cloud_done</span>
+            </div>
+          </div>
+          <div className="w-full">
+            <div className="flex items-center justify-between mb-1.5 text-xs font-medium text-slate-500">
+              <span>{tr('Progress')}</span>
+              <span>{onlineRate}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-2 rounded-full bg-[#0073e6]" style={{ width: `${onlineRate}%` }} />
+            </div>
+          </div>
+        </article>
+
+        <article className="h-40 bg-white rounded-xl p-6 border border-[#E5E5EA] shadow-card flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">{tr('Service Version')}</p>
+              <h4 className="mt-2 text-3xl font-bold text-slate-900">v0.1.0</h4>
+            </div>
+            <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
+              <span className="material-symbols-outlined">deployed_code</span>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-sm text-green-600">
+            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+            <span>{tr('Up to date')}</span>
+          </div>
+        </article>
+
+        <article className="h-40 bg-white rounded-xl p-6 border border-[#E5E5EA] shadow-card flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">{tr('System Uptime')}</p>
+              <h4 className="mt-2 text-3xl font-bold text-slate-900">3 {tr('Days')}</h4>
+            </div>
+            <div className="p-2 rounded-lg bg-green-50 text-green-600">
+              <span className="material-symbols-outlined">timer</span>
+            </div>
+          </div>
+          <div className="mt-4 text-sm text-slate-500">{tr('Since last maintenance')}</div>
+        </article>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-slate-900">{tr('Recent Alerts')}</h3>
+          <button
+            type="button"
+            onClick={() => onChangeView('alerts')}
+            className="text-sm font-medium text-[#0073e6] hover:text-blue-700 transition-colors"
+          >
+            {tr('View all alerts')}
+          </button>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-            <button onClick={handleGenerateBriefingVideo} disabled={isVideoLoading} className="group flex items-center gap-3 px-8 py-3.5 bg-white border border-border hover:border-primary/30 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-soft transition-all">
-                <span className={`material-symbols-outlined text-[22px] text-primary ${isVideoLoading ? 'animate-spin' : 'filled'}`}>movie_filter</span>
-                <span>{isVideoLoading ? tr('Synthesizing...') : tr('AI Visual Briefing')}</span>
-            </button>
-            <button onClick={onGenerateAiSummary} disabled={isAiLoading} className="flex items-center gap-3 px-10 py-3.5 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-primary/20 hover:bg-primary-hover active:scale-95 transition-all disabled:opacity-70">
-                <span className={`material-symbols-outlined text-[22px] ${isAiLoading ? 'animate-spin' : ''}`}>neurology</span>
-                <span>{isAiLoading ? tr('Analyzing...') : tr('Neural Cluster Audit')}</span>
-            </button>
+
+        <div className="bg-white rounded-xl border border-[#E5E5EA] shadow-card overflow-hidden">
+          <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 border-b border-[#E5E5EA] text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <div className="col-span-2 md:col-span-1">{tr('Severity')}</div>
+            <div className="col-span-4 md:col-span-2">{tr('Source')}</div>
+            <div className="col-span-6 md:col-span-7">{tr('Message')}</div>
+            <div className="hidden md:block col-span-2 text-right">{tr('Time')}</div>
+          </div>
+
+          <div className="divide-y divide-[#E5E5EA]">
+            {visibleAlerts.map((alert) => (
+              <button
+                key={alert.id}
+                type="button"
+                onClick={() => onChangeView('alerts')}
+                className="w-full grid grid-cols-12 gap-4 px-6 py-4 items-center text-left hover:bg-slate-50 transition-colors"
+              >
+                <div className="col-span-2 md:col-span-1">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${getSeverityClass(alert.severity)}`}>
+                    {tr(alert.severity)}
+                  </span>
+                </div>
+                <div className="col-span-4 md:col-span-2 font-medium text-slate-900 truncate">{alert.source}</div>
+                <div className="col-span-6 md:col-span-7 text-sm text-slate-600 truncate">{alert.message}</div>
+                <div className="hidden md:block col-span-2 text-right text-xs text-slate-400 font-medium">{alert.time}</div>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
 
-      {(isVideoLoading || videoUrl) && (
-        <div className="bg-[#020617] rounded-[3.5rem] p-12 border border-white/5 shadow-2xl animate-fade-in-up relative overflow-hidden group ring-1 ring-white/10">
-            <div className="absolute top-0 right-0 p-16 opacity-5 pointer-events-none group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-[220px] text-white">videocam</span></div>
-            <div className="flex items-center justify-between mb-12 relative z-10">
-                <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-indigo-500 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-indigo-500/40">
-                        <span className="material-symbols-outlined text-4xl filled">play_circle</span>
-                    </div>
-                    <div>
-                        <h3 className="text-white font-black text-base uppercase tracking-[0.3em]">{tr('Sentinel Visual Dispatch')}</h3>
-                        <p className="text-indigo-400 text-[11px] font-black uppercase tracking-widest mt-2">{videoStatusMsg}</p>
-                    </div>
-                </div>
-                <button onClick={() => { setVideoUrl(null); setIsVideoLoading(false); }} className="w-12 h-12 flex items-center justify-center text-gray-500 hover:text-white transition-colors bg-white/5 rounded-2xl border border-white/10">
-                    <span className="material-symbols-outlined">close</span>
-                </button>
-            </div>
-            <div className="relative rounded-[3rem] overflow-hidden bg-black aspect-video shadow-2xl border border-white/10 group/player">
-                {isVideoLoading ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center space-y-10">
-                        <div className="relative">
-                            <div className="w-24 h-24 border-4 border-indigo-500/10 rounded-full"></div>
-                            <div className="absolute inset-0 w-24 h-24 border-t-4 border-indigo-500 rounded-full animate-spin"></div>
-                        </div>
-                        <p className="text-indigo-100 font-mono text-xs uppercase tracking-[0.5em] animate-pulse">{tr('Forging Neural Frames')}</p>
-                    </div>
-                ) : (
-                    <video src={videoUrl!} controls autoPlay className="w-full h-full object-cover" />
-                )}
-            </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-          <div className="bg-white rounded-[3rem] p-12 shadow-soft border border-border flex flex-col items-center justify-center relative overflow-hidden group">
-              <div className="absolute top-12 left-12"><span className="text-[11px] font-black text-secondary uppercase tracking-[0.4em]">{tr('Global Health Index')}</span></div>
-              <div className="relative w-56 h-56 flex items-center justify-center">
-                  <svg className="w-full h-full transform -rotate-90 scale-110">
-                      <circle cx="112" cy="112" r="100" stroke="#F5F5F7" strokeWidth="16" fill="transparent" />
-                      <circle cx="112" cy="112" r="100" stroke="currentColor" strokeWidth="16" fill="transparent" strokeDasharray={628} strokeDashoffset={628 - (628 * securityScore) / 100} strokeLinecap="round" className={`transition-all duration-1000 ${securityScore > 85 ? 'text-primary' : securityScore > 70 ? 'text-warning' : 'text-danger'}`} />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-7xl font-black text-text-main tracking-tighter leading-none">{securityScore}</span>
-                      <span className="text-[11px] font-black text-secondary uppercase tracking-widest mt-4">{tr('Optimized')}</span>
-                  </div>
-              </div>
-          </div>
-
-          <div className="lg:col-span-2 bg-white rounded-[3rem] p-12 shadow-soft border border-border flex flex-col group">
-              <div className="flex items-center justify-between mb-12">
-                  <span className="text-[11px] font-black text-secondary uppercase tracking-[0.4em]">{tr('Global Mesh Throughput')}</span>
-                  <div className="flex gap-8">
-                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-primary shadow-lg shadow-primary/30 animate-pulse"></span><span className="text-[10px] font-black uppercase tracking-[0.2em]">{tr('Live Traffic')}</span></div>
-                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-gray-200"></span><span className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary">{tr('Historical')}</span></div>
-                  </div>
-              </div>
-              <div className="flex-1 h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={throughputData}>
-                          <defs>
-                              <linearGradient id="colorPulse" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#0071E3" stopOpacity={0.25}/>
-                                  <stop offset="95%" stopColor="#0071E3" stopOpacity={0}/>
-                              </linearGradient>
-                          </defs>
-                          <Tooltip
-                            contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', padding: '16px' }}
-                            cursor={{ stroke: '#0071E3', strokeWidth: 2, strokeDasharray: '6 6' }}
-                          />
-                          <Area type="monotone" dataKey="val" stroke="#0071E3" strokeWidth={4} fillOpacity={1} fill="url(#colorPulse)" isAnimationActive={false} />
-                      </AreaChart>
-                  </ResponsiveContainer>
-              </div>
-          </div>
-
-          <div className="bg-white rounded-[3rem] p-12 shadow-soft border border-border flex flex-col justify-between">
-              <span className="text-[11px] font-black text-secondary uppercase tracking-[0.4em]">{tr('Regional Latency')}</span>
-              <div className="space-y-10">
-                  {regionalMetrics.map(reg => (
-                      <div key={reg.region} className="group/reg">
-                          <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                  <span className="text-[11px] font-black uppercase tracking-widest text-secondary group-hover/reg:text-text-main transition-colors">{reg.region}</span>
-                                  <span className={`material-symbols-outlined text-[16px] ${reg.trend === 'up' ? 'text-danger' : reg.trend === 'down' ? 'text-success' : 'text-secondary opacity-40'}`}>
-                                    {reg.trend === 'up' ? 'trending_up' : reg.trend === 'down' ? 'trending_down' : 'trending_flat'}
-                                  </span>
-                              </div>
-                              <span className="text-xs font-black tracking-tight" style={{ color: reg.color }}>{Math.round(reg.ping)}ms</span>
-                          </div>
-                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner">
-                              <div className="h-full transition-all duration-1000 shadow-xl" style={{ width: `${reg.load}%`, backgroundColor: reg.color }}></div>
-                          </div>
-                      </div>
-                  ))}
-              </div>
-          </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-2 space-y-10">
-            <div className="bg-[#0F172A] rounded-[3.5rem] p-16 shadow-2xl relative overflow-hidden group border border-white/5">
-                <div className="absolute top-0 right-0 p-16 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
-                    <span className="material-symbols-outlined text-[200px] text-white">neurology</span>
-                </div>
-                <div className="flex items-center gap-8 mb-16 relative z-10">
-                    <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center text-indigo-400 border border-white/10 shadow-inner">
-                        <span className="material-symbols-outlined text-5xl filled">psychology</span>
-                    </div>
-                    <div>
-                        <h3 className="text-white font-black text-lg uppercase tracking-[0.3em]">{tr('Sentinel Intelligence Synthesis')}</h3>
-                        <p className="text-indigo-500 text-xs font-black uppercase tracking-widest mt-2">{tr('Neural Observation Logic Active')}</p>
-                    </div>
-                </div>
-                <div className="relative z-10">
-                    {isAiLoading ? (
-                        <div className="space-y-6 animate-pulse">
-                            <div className="h-6 bg-white/5 rounded-full w-full"></div>
-                            <div className="h-6 bg-white/5 rounded-full w-[94%]"></div>
-                            <div className="h-6 bg-white/5 rounded-full w-[88%]"></div>
-                        </div>
-                    ) : (
-                        <p className="text-indigo-100/80 text-lg leading-[2.2] whitespace-pre-wrap font-medium">
-                            {aiSummary || tr('Establish link to the Oxmon Sentinel to receive distributed cluster health summaries, systemic risk matrix assessments, and automated remediation forecasts.')}
-                        </p>
-                    )}
-                </div>
-                {aiSummary && (
-                    <div className="mt-12 pt-12 border-t border-white/10 flex gap-6 relative z-10">
-                        <button onClick={onGenerateAiSummary} className="px-8 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-[0.25em] text-indigo-300 hover:bg-white/10 transition-all">{tr('Refresh Neural Audit')}</button>
-                    </div>
-                )}
-            </div>
-
-            <div className="bg-white rounded-[3.5rem] p-16 border border-border shadow-soft relative overflow-hidden group">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-10 mb-16">
-                    <div className="flex items-center gap-8">
-                        <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center text-warning border border-amber-100 shadow-sm">
-                            <span className="material-symbols-outlined text-5xl filled">online_prediction</span>
-                        </div>
-                        <div>
-                            <h3 className="text-text-main font-black text-lg uppercase tracking-[0.3em]">{tr('Neural Health Forecast')}</h3>
-                            <p className="text-secondary text-xs font-black uppercase tracking-widest mt-2">{tr('Predictive Anomaly Detection')}</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={handlePredictiveScan}
-                        disabled={isScanningPredictive}
-                        className={`flex items-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${isScanningPredictive ? 'bg-amber-100 text-warning border-amber-200 animate-pulse' : 'bg-white text-secondary hover:text-text-main border-border shadow-sm hover:shadow-soft'}`}
-                    >
-                        <span className={`material-symbols-outlined text-[22px] ${isScanningPredictive ? 'animate-spin' : ''}`}>sync</span>
-                        {isScanningPredictive ? tr('Executing Scan...') : tr('Execute Forecast')}
-                    </button>
-                </div>
-                <div className="relative min-h-[200px] flex items-center justify-center">
-                    {predictiveData ? (
-                        <div className="w-full p-12 bg-amber-50/40 rounded-[3rem] border border-amber-100/50 animate-fade-in-up">
-                            <div className="flex items-center gap-4 mb-8 text-warning"><span className="material-symbols-outlined text-[26px] filled">bolt</span><span className="text-[11px] font-black uppercase tracking-[0.3em]">{tr('Risk Vector Projection')}</span></div>
-                            <p className="text-amber-950 text-base leading-[2] font-medium whitespace-pre-wrap">
-                                {predictiveData}
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="p-20 border-4 border-dashed border-gray-50 rounded-[4rem] text-center space-y-8 opacity-30 group-hover:opacity-50 transition-all">
-                            <div className="w-20 h-20 bg-gray-50 rounded-full mx-auto flex items-center justify-center text-gray-400">
-                                <span className="material-symbols-outlined text-6xl">query_stats</span>
-                            </div>
-                            <p className="text-[11px] font-black text-secondary uppercase tracking-[0.4em] leading-relaxed max-w-sm mx-auto">
-                                {tr('No active forecast payload.')}<br/>{tr('Initiate neural link to anticipate systemic cluster vulnerabilities.')}
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-[3.5rem] p-12 shadow-soft border border-border flex flex-col group">
-              <div className="flex items-center justify-between mb-16">
-                  <span className="text-[11px] font-black text-secondary uppercase tracking-[0.4em]">{tr('Sentinel Heartbeat')}</span>
-                  <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 rounded-full bg-success animate-pulse shadow-lg shadow-success/40"></div>
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-success">{tr('Optimized')}</span>
-                  </div>
-              </div>
-              <div className="flex-1 space-y-10">
-                  {alerts.slice(0, 6).map(alert => (
-                      <div key={alert.id} className="flex gap-8 group/alert cursor-pointer transition-all hover:translate-x-1" onClick={() => onChangeView('alerts')}>
-                          <div className={`w-16 h-16 rounded-3xl shrink-0 flex items-center justify-center border transition-all ${
-                              alert.severity === 'Critical' ? 'bg-red-50 text-danger border-red-100 shadow-2xl shadow-red-500/10' : 'bg-gray-50 text-secondary border-gray-100 group-hover/alert:border-primary/20'
-                          }`}>
-                              <span className={`material-symbols-outlined text-[28px] ${alert.severity === 'Critical' ? 'animate-pulse' : ''}`}>{alert.severity === 'Critical' ? 'emergency' : 'info'}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-1.5">
-                                <p className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] opacity-60 font-mono truncate">{alert.source}</p>
-                                <span className="text-[10px] font-black text-secondary/40 uppercase tracking-widest">{alert.time}</span>
-                              </div>
-                              <p className="text-sm font-bold text-text-main truncate group-hover/alert:text-primary transition-colors tracking-tight leading-snug">{alert.message}</p>
-                          </div>
-                      </div>
-                  ))}
-              </div>
-              <div className="mt-16 pt-12 border-t border-gray-50">
-                  <button onClick={() => onChangeView('alerts')} className="w-full flex items-center justify-center gap-3 text-[11px] font-black text-primary uppercase tracking-[0.3em] hover:gap-5 transition-all group/btn">
-                      {tr('Sentinel Incident Center')}
-                      <span className="material-symbols-outlined text-[20px] transition-transform group-hover/btn:translate-x-1">arrow_right_alt</span>
-                  </button>
-              </div>
-          </div>
-      </div>
+      <footer className="pt-6 mt-8 border-t border-[#E5E5EA] text-center text-xs text-slate-400">
+        <p>© 2023 Oxmon Inc. Infrastructure Monitoring Dashboard.</p>
+      </footer>
     </div>
-  );
-};
-
-export default Dashboard;
+  )
+}

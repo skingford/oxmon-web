@@ -15,7 +15,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const params = useParams<{ locale: Locale }>()
   const locale = params?.locale ?? 'en'
   const {
-    isAuthenticated,
     setIsAuthenticated,
     toasts,
     removeToast,
@@ -42,7 +41,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#FBFBFD] overflow-hidden text-[#1D1D1F] font-sans selection:bg-[#0071E3]/10">
+    <div className="flex h-screen w-full bg-[#f5f7f8] overflow-hidden text-[#1D1D1F] font-sans selection:bg-[#0071E3]/10">
       <Sidebar
         onLogout={() => {
           setIsAuthenticated(false)
@@ -51,13 +50,12 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         }}
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
-        onOpenAssistant={() => setIsAssistantOpen(true)}
         stats={stats}
       />
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         <Header />
-        <div className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-gradient-to-b from-white to-[#FBFBFD]">
-          <div className="max-w-7xl mx-auto h-full">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+          <div className="max-w-6xl mx-auto h-full">
             {children}
           </div>
         </div>
