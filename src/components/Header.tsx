@@ -45,6 +45,14 @@ const ROUTE_TITLE_MAP: Record<string, { title: string; subtitle: string }> = {
     title: 'Agent: web-01',
     subtitle: 'Detailed infrastructure metrics and health status for production web server.',
   },
+  'oxmon-ssl-certificate-status': {
+    title: 'Certificate Monitoring',
+    subtitle: 'Track certificate status, risk level, and trust issuer health across domains.',
+  },
+  'certificate-detail-view-example-com': {
+    title: 'example.com',
+    subtitle: 'SSL/TLS Certificate details and verification status.',
+  },
 }
 
 const Header: React.FC = () => {
@@ -57,7 +65,12 @@ const Header: React.FC = () => {
     return ROUTE_TITLE_MAP[view] ?? ROUTE_TITLE_MAP.dashboard
   }, [pathname])
 
-  if (pathname?.includes('/agents') || pathname?.includes('/agent-detailed-metrics-web-01')) {
+  if (
+    pathname?.includes('/agents')
+    || pathname?.includes('/agent-detailed-metrics-web-01')
+    || pathname?.includes('/oxmon-ssl-certificate-status')
+    || pathname?.includes('/certificate-detail-view-example-com')
+  ) {
     return null
   }
 

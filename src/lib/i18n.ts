@@ -368,6 +368,8 @@ const UI_TEXT_MAP: Record<string, string> = {
   'Discard': '放弃',
   'Enable Monitor': '启用监控',
 
+  'Alert Management': '告警管理',
+  'Alert History': '告警历史',
   'Incident War Room': '事件作战室',
   'Real-time anomaly detection, correlation engine, and neural root-cause diagnostics.': '实时异常检测、关联分析引擎与神经根因诊断。',
   'Grep incident payload...': '检索事件载荷...',

@@ -31,6 +31,7 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
     { key: 'agents', icon: 'dns', label: tr('Agents'), href: `/${locale}/agents` },
     { key: 'certificates', icon: 'verified_user', label: tr('Certificates'), href: `/${locale}/certificates` },
     { key: 'alerts', icon: 'notifications', label: tr('Alerts'), href: `/${locale}/alerts`, badge: 3 },
+    { key: 'alert-history-log', icon: 'history', label: tr('Alert History'), href: `/${locale}/alert-history-log` },
     { key: 'settings', icon: 'settings', label: tr('Settings'), href: `/${locale}/settings` },
   ]
 
