@@ -76,6 +76,36 @@ export const PAGE_METADATA = {
       description: '通过 AI 工具生成并校验配置产物。',
     },
   },
+  'metrics-time-series-query': {
+    en: {
+      title: 'Metrics Explorer | Oxmon Admin',
+      description: 'Analyze infrastructure performance and visualize time-series telemetry data.',
+    },
+    zh: {
+      title: '指标查询 | Oxmon Admin',
+      description: '分析基础设施性能并可视化时序指标数据。',
+    },
+  },
+  'agent-detailed-metrics-web-01': {
+    en: {
+      title: 'Agent web-01 Metrics | Oxmon Admin',
+      description: 'Detailed infrastructure metrics and health status for production web server web-01.',
+    },
+    zh: {
+      title: '节点 web-01 指标 | Oxmon Admin',
+      description: '生产 Web 节点 web-01 的详细基础设施指标与健康状态。',
+    },
+  },
+  'alert-history-log': {
+    en: {
+      title: 'Alert History | Oxmon Admin',
+      description: 'Monitor infrastructure health and review historical alert logs.',
+    },
+    zh: {
+      title: '告警历史 | Oxmon Admin',
+      description: '监控基础设施健康状态并查看历史告警日志。',
+    },
+  },
   help: {
     en: {
       title: 'Help Center | Oxmon Admin',

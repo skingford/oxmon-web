@@ -1,9 +1,18 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
-import { Inter } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'] })
+const inter = localFont({
+  src: [
+    {
+      path: './fonts/Inter-Latin.woff2',
+      weight: '300 700',
+      style: 'normal',
+    },
+  ],
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Oxmon Admin',

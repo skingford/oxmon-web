@@ -1,11 +1,11 @@
 import { Agent, Certificate, Alert, TeamMember, AppPreferences } from './types';
 
 export const MOCK_AGENTS: Agent[] = [
-  { id: 'ag_82937x92', name: 'AWS US-East Production Node', status: 'Online', ip: '192.168.1.10', version: 'v1.2.4', lastReported: '2 mins ago' },
-  { id: 'ag_19284a22', name: 'GCP Europe West Database', status: 'Online', ip: '192.168.1.12', version: 'v1.2.4', lastReported: '4 hours ago' },
-  { id: 'ag_77382b01', name: 'Azure US-Central Worker 01', status: 'Offline', ip: '10.0.0.5', version: 'v1.2.5', lastReported: 'Just now' },
-  { id: 'ag_55190x88', name: 'Internal Monitoring Proxy', status: 'Online', ip: '10.0.0.8', version: 'v1.2.3', lastReported: '5 mins ago' },
-  { id: 'ag_99214k33', name: 'Local Development Cluster', status: 'Maintenance', ip: '192.168.1.15', version: 'v1.2.4', lastReported: '1 day ago' },
+  { id: 'ox-agent-001', name: 'ox-agent-001', status: 'Online', ip: '192.168.1.10', version: 'v1.2.4', lastReported: '2 mins ago' },
+  { id: 'ox-agent-002', name: 'ox-agent-002', status: 'Offline', ip: '192.168.1.12', version: 'v1.2.4', lastReported: '4 hours ago' },
+  { id: 'ox-agent-003', name: 'ox-agent-003', status: 'Online', ip: '10.0.0.5', version: 'v1.2.5', lastReported: 'Just now' },
+  { id: 'ox-agent-004', name: 'ox-agent-004', status: 'Online', ip: '10.0.0.8', version: 'v1.2.3', lastReported: '5 mins ago' },
+  { id: 'ox-agent-005', name: 'ox-agent-005', status: 'Maintenance', ip: '192.168.1.15', version: 'v1.2.4', lastReported: '1 day ago' },
 ];
 
 export const MOCK_CERTS: Certificate[] = [

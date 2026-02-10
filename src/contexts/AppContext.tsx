@@ -52,7 +52,10 @@ const AppContext = createContext<AppContextType | null>(null)
 
 export function useAppContext() {
   const ctx = useContext(AppContext)
-  if (!ctx) throw new Error('useAppContext must be used within AppProvider')
+  if (!ctx) {
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+    throw new Error(`useAppContext must be used within AppProvider (pathname: ${pathname})`)
+  }
   return ctx
 }
 

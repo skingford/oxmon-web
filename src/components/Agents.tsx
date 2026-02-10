@@ -1,250 +1,394 @@
 'use client'
 
-import { useState, useEffect, useRef, memo } from 'react';
-import type { Agent } from '@/lib/types';
-import { executeTerminalCommand } from '@/actions/ai';
-import { AreaChart } from 'recharts/lib/chart/AreaChart';
-import { Area } from 'recharts/lib/cartesian/Area';
-import { ResponsiveContainer } from 'recharts/lib/component/ResponsiveContainer';
-import { useI18n } from '@/contexts/I18nContext';
+import { useEffect, useMemo, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import type { Agent } from '@/lib/types'
+import { useI18n } from '@/contexts/I18nContext'
 
 interface AgentsProps {
-  agents: Agent[];
-  onAddAgent: (agent: Agent) => void;
-  onDeleteAgent: (id: string) => void;
-  onUpdateStatus: (id: string) => void;
-  onShowToast: (message: string, type: 'success' | 'error' | 'info') => void;
-  initialInjection?: { agent: Agent, command: string } | null;
-  clearInjection?: () => void;
+  agents: Agent[]
+  onAddAgent: (agent: Agent) => void
+  onDeleteAgent: (id: string) => void
+  onUpdateStatus: (id: string) => void
+  onShowToast: (message: string, type: 'success' | 'error' | 'info') => void
+  initialInjection?: { agent: Agent; command: string } | null
+  clearInjection?: () => void
 }
 
-const TelemetryChart: React.FC<{ color: string }> = ({ color }) => {
-    const [data, setData] = useState(Array.from({ length: 20 }).map((_, i) => ({ time: i, val: 20 + Math.random() * 50 })));
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setData(prev => [...prev.slice(1), { time: prev.length, val: 20 + Math.random() * 50 }]);
-        }, 3000);
-        return () => clearInterval(interval);
-    }, []);
+interface AgentListRow {
+  id: string
+  status: Agent['status']
+  ip: string
+  version: string
+  lastReported: string
+}
 
-    return (
-        <div className="h-24 w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data}>
-                    <defs>
-                        <linearGradient id={`grad-${color}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={color} stopOpacity={0.15}/>
-                            <stop offset="95%" stopColor={color} stopOpacity={0}/>
-                        </linearGradient>
-                    </defs>
-                    <Area type="monotone" dataKey="val" stroke={color} strokeWidth={2} fillOpacity={1} fill={`url(#grad-${color})`} isAnimationActive={false} />
-                </AreaChart>
-            </ResponsiveContainer>
-        </div>
-    );
-};
+const FALLBACK_ROWS: AgentListRow[] = [
+  { id: 'ox-agent-001', status: 'Online', ip: '192.168.1.10', version: 'v1.2.4', lastReported: '2 mins ago' },
+  { id: 'ox-agent-002', status: 'Offline', ip: '192.168.1.12', version: 'v1.2.4', lastReported: '4 hours ago' },
+  { id: 'ox-agent-003', status: 'Online', ip: '10.0.0.5', version: 'v1.2.5', lastReported: 'Just now' },
+  { id: 'ox-agent-004', status: 'Online', ip: '10.0.0.8', version: 'v1.2.3', lastReported: '5 mins ago' },
+  { id: 'ox-agent-005', status: 'Maintenance', ip: '192.168.1.15', version: 'v1.2.4', lastReported: '1 day ago' },
+]
 
-const Agents: React.FC<AgentsProps> = ({ agents, onAddAgent, onDeleteAgent, onUpdateStatus, onShowToast, initialInjection, clearInjection }) => {
-  const { tr } = useI18n();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
-  const [selectedAgentTerminal, setSelectedAgentTerminal] = useState<Agent | null>(null);
-  const [terminalOutput, setTerminalOutput] = useState<{ type: 'cmd' | 'resp', text: string }[]>([]);
-  const [currentInput, setCurrentInput] = useState('');
-  const [isCommandExecuting, setIsCommandExecuting] = useState(false);
-  const terminalBottomRef = useRef<HTMLDivElement>(null);
-  const [detailAgent, setDetailAgent] = useState<Agent | null>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newAgent, setNewAgent] = useState({ name: '', ip: '', version: 'v1.2.6' });
-
-  useEffect(() => {
-    if (initialInjection) {
-        setSelectedAgentTerminal(initialInjection.agent);
-        setIsTerminalOpen(true);
-        setTerminalOutput([{ type: 'resp', text: `${tr('Initiating smart session for')} ${initialInjection.agent.name}...` }]);
-        setTimeout(() => executeCommand(initialInjection.command, initialInjection.agent), 800);
-        clearInjection?.();
+function statusBadge(status: Agent['status']) {
+  if (status === 'Online') {
+    return {
+      wrap: 'bg-green-100 text-green-700 border border-green-200',
+      dot: 'bg-green-500',
     }
-  }, [initialInjection, clearInjection, tr]);
+  }
+
+  if (status === 'Maintenance') {
+    return {
+      wrap: 'bg-amber-100 text-amber-700 border border-amber-200',
+      dot: 'bg-amber-500',
+    }
+  }
+
+  return {
+    wrap: 'bg-gray-100 text-gray-700 border border-gray-200',
+    dot: 'bg-gray-400',
+  }
+}
+
+export default function Agents({
+  agents,
+  onAddAgent,
+  onDeleteAgent,
+  onUpdateStatus,
+  onShowToast,
+  initialInjection,
+  clearInjection,
+}: AgentsProps) {
+  const { tr } = useI18n()
+  const router = useRouter()
+  const params = useParams<{ locale?: string }>()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [activeTab, setActiveTab] = useState<'list' | 'whitelist'>('list')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+
+  const locale = params?.locale === 'zh' || params?.locale === 'en' ? params.locale : 'en'
 
   useEffect(() => {
-    if (terminalBottomRef.current) terminalBottomRef.current.scrollIntoView({ behavior: 'smooth' });
-  }, [terminalOutput]);
+    if (!initialInjection) return
 
-  const executeCommand = async (cmd: string, agent: Agent) => {
-    if (!cmd.trim() || isCommandExecuting) return;
-    setTerminalOutput(prev => [...prev, { type: 'cmd', text: cmd }]);
-    setIsCommandExecuting(true);
-    try {
-        const response = await executeTerminalCommand(agent.name, agent.os || 'Linux', cmd);
-        setTerminalOutput(prev => [...prev, { type: 'resp', text: response }]);
-    } catch (err) {
-        setTerminalOutput(prev => [...prev, { type: 'resp', text: tr('Connection interrupt. Node heartbeat lost.') }]);
-    } finally { setIsCommandExecuting(false); }
-  };
+    setSearchTerm(initialInjection.agent.id)
+    onShowToast(`${tr('Initiating smart session for')} ${initialInjection.agent.id}...`, 'info')
+    clearInjection?.()
+  }, [clearInjection, initialInjection, onShowToast, tr])
 
-  const handleAddSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const agent: Agent = {
-          id: 'ag_' + Math.random().toString(36).substr(2, 9),
-          name: newAgent.name,
-          ip: newAgent.ip,
-          version: newAgent.version,
-          status: 'Online',
-          lastReported: 'Just now'
-      };
-      onAddAgent(agent);
-      setIsAddModalOpen(false);
-      setNewAgent({ name: '', ip: '', version: 'v1.2.6' });
-      onShowToast(`Node ${agent.name} deployed.`, 'success');
-  };
+  const rows = useMemo<AgentListRow[]>(() => {
+    if (agents.length === 0) return FALLBACK_ROWS
 
-  const filteredAgents = agents.filter(agent =>
-    agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    agent.ip.includes(searchTerm)
-  );
+    return agents
+      .slice()
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((agent) => ({
+        id: agent.id,
+        status: agent.status,
+        ip: agent.ip,
+        version: agent.version,
+        lastReported: agent.lastReported,
+      }))
+  }, [agents])
+
+  const filteredRows = useMemo(() => {
+    const keyword = searchTerm.trim().toLowerCase()
+    if (!keyword) return rows
+
+    return rows.filter((row) => {
+      return (
+        row.id.toLowerCase().includes(keyword)
+        || row.ip.toLowerCase().includes(keyword)
+        || row.status.toLowerCase().includes(keyword)
+      )
+    })
+  }, [rows, searchTerm])
+
+  const visibleRows = filteredRows.slice(0, 5)
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selectedIds.includes(row.id))
+  const totalResults = 42
+
+  const setRowSelection = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      if (checked) {
+        if (prev.includes(id)) return prev
+        return [...prev, id]
+      }
+
+      return prev.filter((selectedId) => selectedId !== id)
+    })
+  }
+
+  const setAllVisibleSelection = (checked: boolean) => {
+    if (!checked) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleRows.some((row) => row.id === id)))
+      return
+    }
+
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      visibleRows.forEach((row) => next.add(row.id))
+      return Array.from(next)
+    })
+  }
+
+  const handleAddAgent = () => {
+    const nextIndex = rows.length + 1
+    const nextId = `ox-agent-${String(nextIndex).padStart(3, '0')}`
+
+    onAddAgent({
+      id: nextId,
+      name: nextId,
+      status: 'Online',
+      ip: `10.0.1.${nextIndex}`,
+      version: 'v1.2.6',
+      lastReported: 'Just now',
+    })
+
+    onShowToast(`Node ${nextId} deployed.`, 'success')
+  }
 
   return (
-    <div className="space-y-10 animate-fade-in relative pb-16">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+    <div className="flex flex-col gap-6 pt-6 animate-fade-in">
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-3xl font-black text-text-main tracking-tight uppercase">{tr('Infrastructure Grid')}</h2>
-          <p className="text-secondary text-sm font-medium mt-1">{tr('Operational state and compute telemetry for the distributed cluster.')}</p>
+          <h2 className="text-2xl font-bold tracking-tight text-[#1D1D1F]">{tr('Agent Management')}</h2>
+          <p className="mt-1 text-sm text-[#86868b]">{tr('Manage and monitor your infrastructure agents.')}</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="relative group">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-[20px]">search</span>
-            <input type="text" placeholder={tr('Grep nodes...')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2.5 bg-white border border-border rounded-2xl text-sm w-64 shadow-soft focus:ring-4 focus:ring-primary/5 transition-all outline-none font-bold" />
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-[#86868b] transition-all hover:border-gray-200 hover:bg-white hover:text-[#1D1D1F] hover:shadow-sm"
+            aria-label={tr('Refresh')}
+          >
+            <span className="material-symbols-outlined">refresh</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleAddAgent}
+            className="flex items-center gap-2 rounded-lg bg-[#0073e6] px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-[#0073e6]/20 transition-all hover:bg-[#005bb5] active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            <span>{tr('New Agent')}</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="inline-flex rounded-lg bg-gray-200/50 p-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab('list')}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+              activeTab === 'list' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868b] hover:text-[#1D1D1F]'
+            }`}
+          >
+            {tr('Agent List')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('whitelist')}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+              activeTab === 'whitelist' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868b] hover:text-[#1D1D1F]'
+            }`}
+          >
+            {tr('Whitelist')}
+          </button>
+        </div>
+
+        <div className="group relative w-full sm:w-80">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <span className="material-symbols-outlined text-gray-400 transition-colors group-focus-within:text-[#0073e6]">search</span>
           </div>
-          <button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:bg-primary-hover active:scale-95 transition-all">{tr('Deploy Node')}</button>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder={tr('Search by ID, IP, or tag...')}
+            className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-3 text-sm leading-5 text-[#1D1D1F] placeholder-gray-400 outline-none transition-all focus:border-[#0073e6] focus:ring-2 focus:ring-[#0073e6]/50"
+          />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {filteredAgents.map((agent) => (
-          <div key={agent.id} className="bg-white rounded-[2.5rem] p-10 border border-border shadow-soft group hover:border-primary/20 transition-all flex flex-col cursor-pointer" onClick={() => setDetailAgent(agent)}>
-            <div className="flex items-center justify-between mb-8">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${agent.status === 'Online' ? 'bg-green-50 text-success' : 'bg-red-50 text-danger'}`}>
-                <span className="material-symbols-outlined text-[28px]">{agent.status === 'Online' ? 'dns' : 'emergency_home'}</span>
+      {activeTab === 'whitelist' ? (
+        <section className="rounded-xl border border-gray-100 bg-white p-10 text-center shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
+          <h3 className="text-lg font-semibold text-[#1D1D1F]">{tr('Whitelist')}</h3>
+          <p className="mt-2 text-sm text-[#86868b]">{tr('No matching assets identified.')}</p>
+        </section>
+      ) : (
+        <>
+          <section className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-100">
+                <thead>
+                  <tr className="bg-gray-50/50">
+                    <th scope="col" className="w-12 px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[#86868b]">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={(event) => setAllVisibleSelection(event.target.checked)}
+                        className="rounded border-gray-300 bg-white text-[#0073e6] focus:ring-[#0073e6]/50"
+                      />
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[#86868b]">
+                      <div className="group inline-flex cursor-pointer items-center gap-1 hover:text-[#0073e6]">
+                        {tr('Agent ID')}
+                        <span className="material-symbols-outlined text-[16px] opacity-0 transition-opacity group-hover:opacity-100">arrow_drop_down</span>
+                      </div>
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[#86868b]">{tr('Status')}</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[#86868b]">{tr('IP Address')}</th>
+                    <th scope="col" className="hidden px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[#86868b] md:table-cell">{tr('Version')}</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[#86868b]">{tr('Last Reported')}</th>
+                    <th scope="col" className="relative px-6 py-4">
+                      <span className="sr-only">{tr('Actions')}</span>
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {visibleRows.map((row) => {
+                    const badge = statusBadge(row.status)
+                    const checked = selectedIds.includes(row.id)
+
+                    return (
+                      <tr key={row.id} className="group transition-colors hover:bg-gray-50/80">
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => setRowSelection(row.id, event.target.checked)}
+                            className="rounded border-gray-300 bg-white text-[#0073e6] focus:ring-[#0073e6]/50"
+                          />
+                        </td>
+
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/${locale}/agent-detailed-metrics-web-01`)}
+                            className="flex items-center gap-2 text-sm font-medium text-[#0073e6] transition-colors hover:text-[#005bb5]"
+                          >
+                            {row.id}
+                            <span className="material-symbols-outlined text-[14px] opacity-0 transition-opacity group-hover:opacity-100">open_in_new</span>
+                          </button>
+                        </td>
+
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <button
+                            type="button"
+                            onClick={() => onUpdateStatus(row.id)}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${badge.wrap}`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} />
+                            {tr(row.status)}
+                          </button>
+                        </td>
+
+                        <td className="whitespace-nowrap px-6 py-4 font-mono text-sm text-[#1D1D1F]">{row.ip}</td>
+                        <td className="hidden whitespace-nowrap px-6 py-4 text-sm text-[#86868b] md:table-cell">{row.version}</td>
+                        <td className="whitespace-nowrap px-6 py-4 text-sm text-[#86868b]">{tr(row.lastReported)}</td>
+
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                          <button
+                            type="button"
+                            onClick={() => onDeleteAgent(row.id)}
+                            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#1D1D1F]"
+                            aria-label={`${tr('Actions')} ${row.id}`}
+                          >
+                            <span className="material-symbols-outlined">more_horiz</span>
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+
+                  {visibleRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-10 text-center text-sm font-medium text-[#86868b]">
+                        {tr('No matching assets identified.')}
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="border-t border-gray-100 bg-gray-50/30 px-6 py-4">
+              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                <p className="text-sm text-[#86868b]">
+                  {tr('Showing')} <span className="font-medium text-[#1D1D1F]">1</span> {tr('to')} <span className="font-medium text-[#1D1D1F]">{visibleRows.length}</span> {tr('of')} <span className="font-medium text-[#1D1D1F]">{totalResults}</span> {tr('results')}
+                </p>
+
+                <nav className="relative z-0 inline-flex -space-x-px rounded-md shadow-sm" aria-label={tr('Pagination')}>
+                  <button type="button" className="relative inline-flex items-center rounded-l-md border border-gray-200 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    <span className="sr-only">{tr('Previous')}</span>
+                    <span className="material-symbols-outlined">chevron_left</span>
+                  </button>
+                  <button type="button" className="relative z-10 inline-flex items-center border border-[#0073e6] bg-[#0073e6]/10 px-4 py-2 text-sm font-medium text-[#0073e6]">1</button>
+                  <button type="button" className="relative inline-flex items-center border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50">2</button>
+                  <button type="button" className="relative hidden items-center border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 md:inline-flex">3</button>
+                  <span className="relative inline-flex items-center border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700">...</span>
+                  <button type="button" className="relative hidden items-center border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 md:inline-flex">8</button>
+                  <button type="button" className="relative inline-flex items-center rounded-r-md border border-gray-200 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    <span className="sr-only">{tr('Next')}</span>
+                    <span className="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </nav>
               </div>
-              <div className="flex flex-col items-end">
-                <span onClick={(e) => { e.stopPropagation(); onUpdateStatus(agent.id); }} className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border cursor-pointer hover:opacity-80 transition-opacity ${agent.status === 'Online' ? 'bg-green-50 text-success border-green-100' : 'bg-red-50 text-danger border-red-100'}`}>{tr(agent.status)}</span>
-                <span className="text-[10px] font-black text-secondary uppercase tracking-widest mt-2">{agent.ip}</span>
+
+              <div className="flex w-full justify-between sm:hidden">
+                <button type="button" className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  {tr('Previous')}
+                </button>
+                <button type="button" className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  {tr('Next')}
+                </button>
               </div>
             </div>
-            <h4 className="text-lg font-black text-text-main group-hover:text-primary transition-colors tracking-tight">{agent.name}</h4>
-            <p className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] mt-1">{agent.version} • {tr('Sync:')} {agent.lastReported}</p>
+          </section>
 
-            {agent.status === 'Online' && <TelemetryChart color="#0071E3" />}
-
-            <div className="mt-8 pt-8 border-t border-gray-50 flex gap-3">
-              <button onClick={(e) => { e.stopPropagation(); setSelectedAgentTerminal(agent); setIsTerminalOpen(true); }} className="flex-1 py-3 bg-gray-50 text-secondary hover:text-primary hover:bg-primary/5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">terminal</span> {tr('Shell')}
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); setDetailAgent(agent); }} className="flex-1 py-3 bg-gray-50 text-secondary hover:text-indigo-500 hover:bg-indigo-50 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">monitoring</span> {tr('Data')}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {isTerminalOpen && selectedAgentTerminal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-[#0F172A]/90 backdrop-blur-xl animate-fade-in" onClick={() => setIsTerminalOpen(false)}></div>
-          <div className="relative bg-[#020617] rounded-[2.5rem] shadow-2xl w-full max-w-4xl h-[700px] flex flex-col border border-white/10 overflow-hidden ring-1 ring-white/5 animate-fade-in-up">
-             <div className="flex items-center justify-between px-10 py-6 bg-white/5 border-b border-white/10">
-                <div className="flex items-center gap-4">
-                   <div className="flex gap-2"><div className="w-3 h-3 rounded-full bg-red-500/20"></div><div className="w-3 h-3 rounded-full bg-amber-500/20"></div><div className="w-3 h-3 rounded-full bg-green-500/20"></div></div>
-                   <h3 className="text-indigo-300 font-mono text-[10px] font-black uppercase tracking-[0.3em]">{tr('Neural Terminal:')} {selectedAgentTerminal.name}</h3>
-                </div>
-                <button onClick={() => setIsTerminalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><span className="material-symbols-outlined">close</span></button>
-             </div>
-             <div className="flex-1 p-10 overflow-y-auto font-mono text-xs text-gray-400 space-y-5 custom-scrollbar">
-                {terminalOutput.map((out, idx) => (
-                    <div key={idx} className={out.type === 'cmd' ? 'text-indigo-400' : 'text-blue-50'}>
-                        {out.type === 'cmd' ? <div className="flex gap-4"><span className="text-indigo-700 font-black">»</span><span>{out.text}</span></div> : <pre className="whitespace-pre-wrap leading-relaxed opacity-80">{out.text}</pre>}
-                    </div>
-                ))}
-                {isCommandExecuting && <div className="flex items-center gap-3 text-indigo-400 animate-pulse text-[10px] font-black uppercase tracking-widest"><span className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>{tr('Synthesizing response...')}</div>}
-                <div ref={terminalBottomRef}></div>
-             </div>
-             <form onSubmit={(e) => { e.preventDefault(); if(currentInput.trim()) { executeCommand(currentInput, selectedAgentTerminal); setCurrentInput(''); } }} className="p-8 bg-white/5 border-t border-white/10 flex items-center gap-6">
-                <span className="text-indigo-600 font-black font-mono">»</span>
-                <input autoFocus type="text" value={currentInput} onChange={(e) => setCurrentInput(e.target.value)} disabled={isCommandExecuting} className="flex-1 bg-transparent border-none outline-none text-white font-mono text-sm placeholder:text-gray-700" placeholder={tr('Awaiting neural command payload...')} />
-             </form>
-          </div>
-        </div>
-      )}
-
-      {detailAgent && (
-        <div className="fixed inset-0 z-[110] flex justify-end">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setDetailAgent(null)}></div>
-            <div className="relative w-full max-w-xl bg-white h-full shadow-2xl border-l border-border p-12 animate-slide-in-right flex flex-col overflow-hidden">
-                <div className="flex justify-between items-start mb-12">
-                    <div>
-                        <h3 className="text-2xl font-black text-text-main tracking-tight uppercase">{tr('Node Insight')}</h3>
-                        <p className="text-[10px] font-mono text-secondary mt-2 tracking-widest uppercase">{detailAgent.id} • {detailAgent.ip}</p>
-                    </div>
-                    <button onClick={() => setDetailAgent(null)} className="p-2 text-secondary hover:text-text-main bg-gray-50 rounded-xl transition-all"><span className="material-symbols-outlined">close</span></button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-12">
-                    <div className="grid grid-cols-2 gap-6">
-                        {[
-                            { label: tr('Platform'), val: 'ARM64-GEN2', icon: 'settings_input_component' },
-                            { label: tr('OS Build'), val: 'UBUNTU 24.04', icon: 'terminal' },
-                            { label: tr('Uptime'), val: '18D 14H', icon: 'schedule' },
-                            { label: tr('Sync Status'), val: tr('NOMINAL'), icon: 'verified' }
-                        ].map(info => (
-                            <div key={info.label} className="p-8 bg-gray-50 rounded-[2.5rem] border border-border group hover:bg-white hover:shadow-soft transition-all">
-                                <div className="flex items-center gap-3 mb-4 text-secondary group-hover:text-primary transition-colors"><span className="material-symbols-outlined text-[20px]">{info.icon}</span><p className="text-[10px] font-black uppercase tracking-widest">{info.label}</p></div>
-                                <p className="text-sm font-black text-text-main">{info.val}</p>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="space-y-6">
-                        <h5 className="text-[10px] uppercase font-black text-secondary tracking-[0.2em]">{tr('Live Heartbeat')}</h5>
-                        <div className="p-10 bg-white border border-border rounded-[2.5rem] shadow-soft">
-                             <div className="flex justify-between items-end mb-8"><p className="text-[10px] font-black text-primary uppercase tracking-widest">{tr('CPU LOAD')}</p><p className="text-2xl font-black text-indigo-950">24.8%</p></div>
-                             <TelemetryChart color="#0071E3" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="pt-10 border-t border-border flex gap-4">
-                    <button onClick={() => { setSelectedAgentTerminal(detailAgent); setIsTerminalOpen(true); }} className="flex-1 py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:bg-primary-hover active:scale-95 transition-all">{tr('Smart Shell')}</button>
-                    <button onClick={() => onDeleteAgent(detailAgent.id)} className="px-8 py-4 border border-border rounded-2xl font-black text-[10px] uppercase tracking-widest text-danger hover:bg-red-50 transition-all">{tr('Decommission')}</button>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-[#0F172A]/80 backdrop-blur-xl animate-fade-in" onClick={() => setIsAddModalOpen(false)}></div>
-          <div className="relative bg-white rounded-[3rem] shadow-2xl w-full max-w-md p-12 animate-fade-in-up border border-white/20">
-            <h3 className="text-2xl font-black text-text-main mb-8 tracking-tight uppercase">{tr('Provision Node')}</h3>
-            <form onSubmit={handleAddSubmit} className="space-y-6">
-              <div className="space-y-2">
-                  <label className="block text-[10px] font-black text-secondary uppercase tracking-widest ml-1">{tr('Node Label')}</label>
-                  <input required type="text" value={newAgent.name} onChange={(e) => setNewAgent({...newAgent, name: e.target.value})} placeholder={tr('e.g. AWS Production Node')} className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-border outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all text-sm font-bold" />
+          <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <article className="flex items-start gap-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="rounded-lg bg-green-50 p-2 text-green-600">
+                <span className="material-symbols-outlined">check_circle</span>
               </div>
-              <div className="space-y-2">
-                  <label className="block text-[10px] font-black text-secondary uppercase tracking-widest ml-1">{tr('IP Address')}</label>
-                  <input required type="text" value={newAgent.ip} onChange={(e) => setNewAgent({...newAgent, ip: e.target.value})} placeholder="0.0.0.0" className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-border outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all text-sm font-bold" />
+              <div>
+                <p className="text-sm font-medium text-[#86868b]">{tr('System Status')}</p>
+                <p className="mt-1 text-xl font-bold text-[#1D1D1F]">98% Online</p>
+                <p className="mt-1 flex items-center gap-1 text-xs text-green-600">
+                  <span className="material-symbols-outlined text-[14px]">trending_up</span>
+                  +2.4% {tr('this week')}
+                </p>
               </div>
-              <div className="flex justify-end gap-3 pt-6">
-                  <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-secondary">{tr('Cancel')}</button>
-                  <button type="submit" className="px-10 py-4 rounded-2xl bg-primary text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-primary/20 active:scale-95 transition-all">{tr('Register Agent')}</button>
+            </article>
+
+            <article className="flex items-start gap-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+                <span className="material-symbols-outlined">update</span>
               </div>
-            </form>
-          </div>
-        </div>
+              <div>
+                <p className="text-sm font-medium text-[#86868b]">{tr('Pending Updates')}</p>
+                <p className="mt-1 text-xl font-bold text-[#1D1D1F]">12 {tr('Agents')}</p>
+                <p className="mt-1 text-xs text-[#86868b]">{tr('Scheduled for 02:00 AM')}</p>
+              </div>
+            </article>
+
+            <article className="flex items-start gap-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="rounded-lg bg-red-50 p-2 text-red-600">
+                <span className="material-symbols-outlined">warning</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[#86868b]">{tr('Critical Alerts')}</p>
+                <p className="mt-1 text-xl font-bold text-[#1D1D1F]">3 {tr('Issues')}</p>
+                <button type="button" className="mt-1 text-xs text-red-600 transition-colors hover:underline">{tr('View details')}</button>
+              </div>
+            </article>
+          </section>
+        </>
       )}
     </div>
-  );
-};
-
-export default Agents;
+  )
+}

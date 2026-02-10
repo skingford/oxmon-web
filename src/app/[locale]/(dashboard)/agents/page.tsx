@@ -17,7 +17,12 @@ export default function AgentsPage() {
       agents={agents}
       onAddAgent={(agent) => setAgents(prev => [...prev, agent])}
       onDeleteAgent={(id) => setAgents(prev => prev.filter(a => a.id !== id))}
-      onUpdateStatus={(id) => setAgents(prev => prev.map(a => a.id === id ? { ...a, status: a.status === 'Maintenance' ? 'Online' : 'Maintenance' } : a))}
+      onUpdateStatus={(id) => setAgents(prev => prev.map((agent) => {
+        if (agent.id !== id) return agent
+        if (agent.status === 'Online') return { ...agent, status: 'Offline' }
+        if (agent.status === 'Offline') return { ...agent, status: 'Maintenance' }
+        return { ...agent, status: 'Online' }
+      }))}
       onShowToast={showToast}
       initialInjection={terminalInjection}
       clearInjection={() => setTerminalInjection(null)}

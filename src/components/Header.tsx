@@ -1,23 +1,83 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
+import { usePathname } from 'next/navigation'
+import { useI18n } from '@/contexts/I18nContext'
+
+const ROUTE_TITLE_MAP: Record<string, { title: string; subtitle: string }> = {
+  dashboard: {
+    title: 'Dashboard Overview',
+    subtitle: "Here's what's happening with your infrastructure today.",
+  },
+  agents: {
+    title: 'Agent Management',
+    subtitle: 'Manage and monitor your infrastructure agents.',
+  },
+  certificates: {
+    title: 'Certificate Management',
+    subtitle: 'Track trust posture and credential lifecycle.',
+  },
+  alerts: {
+    title: 'Alert Center',
+    subtitle: 'Review incident signals and remediation status.',
+  },
+  logs: {
+    title: 'Audit Logs',
+    subtitle: 'Inspect events, drift traces, and access records.',
+  },
+  infrastructure: {
+    title: 'Infrastructure Topology',
+    subtitle: 'Observe distributed nodes and network relationships.',
+  },
+  settings: {
+    title: 'Workspace Settings',
+    subtitle: 'Manage identity, access, and notification policies.',
+  },
+  tools: {
+    title: 'Configuration Tools',
+    subtitle: 'Generate and validate runtime configuration safely.',
+  },
+  help: {
+    title: 'Help Center',
+    subtitle: 'Browse references and guided operator workflows.',
+  },
+  'agent-detailed-metrics-web-01': {
+    title: 'Agent: web-01',
+    subtitle: 'Detailed infrastructure metrics and health status for production web server.',
+  },
+}
 
 const Header: React.FC = () => {
+  const pathname = usePathname()
+  const { tr } = useI18n()
+
+  const routeMeta = useMemo(() => {
+    const segments = pathname?.split('/').filter(Boolean) ?? []
+    const view = segments[1] ?? 'dashboard'
+    return ROUTE_TITLE_MAP[view] ?? ROUTE_TITLE_MAP.dashboard
+  }, [pathname])
+
+  if (pathname?.includes('/agents') || pathname?.includes('/agent-detailed-metrics-web-01')) {
+    return null
+  }
+
   return (
-    <header className="bg-white/80 backdrop-blur-md sticky top-0 z-10 border-b border-[#E5E5EA] px-6 py-4 flex items-center justify-between">
-      <h2 className="text-xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h2>
+    <header className="flex-none bg-[#f5f7f8] px-8 py-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-[#1D1D1F]">{tr(routeMeta.title)}</h2>
+          <p className="mt-1 text-sm text-[#86868b]">{tr(routeMeta.subtitle)}</p>
+        </div>
 
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          className="text-slate-400 hover:text-slate-600 transition-colors"
-          aria-label="Notifications"
-        >
-          <span className="material-symbols-outlined">notifications</span>
-        </button>
-
-        <div className="h-4 w-px bg-slate-300" />
-        <span className="text-sm text-slate-500 font-medium">v0.1.0</span>
+        <div className="hidden items-center gap-3 md:flex">
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-[#86868b] transition-all hover:border-gray-200 hover:bg-white hover:text-[#1D1D1F] hover:shadow-sm"
+            aria-label={tr('Refresh')}
+          >
+            <span className="material-symbols-outlined">refresh</span>
+          </button>
+        </div>
       </div>
     </header>
   )
