@@ -206,6 +206,26 @@ export const PAGE_METADATA = {
       description: '导出前预览证书状态报告，并配置 PDF 内容与格式选项。',
     },
   },
+  'global-notification-channel-settings': {
+    en: {
+      title: 'Global Notification Channels | Oxmon Admin',
+      description: 'Manage global notification behavior and configure Email SMTP and Slack webhook delivery channels.',
+    },
+    zh: {
+      title: '全局通知渠道设置 | Oxmon Admin',
+      description: '管理全局通知行为，并配置 Email SMTP 与 Slack Webhook 投递渠道。',
+    },
+  },
+  'notification-center-drawer': {
+    en: {
+      title: 'Notification Center Drawer | Oxmon Admin',
+      description: 'Review grouped notification events in a right-side drawer with unread indicators and quick actions.',
+    },
+    zh: {
+      title: '通知中心抽屉 | Oxmon Admin',
+      description: '在右侧抽屉中查看分组通知事件，包含未读标记与快速操作。',
+    },
+  },
   help: {
     en: {
       title: 'Help Center | Oxmon Admin',

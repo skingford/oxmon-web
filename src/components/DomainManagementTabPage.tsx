@@ -173,7 +173,7 @@ export default function DomainManagementTabPage() {
                 <table className="w-full min-w-[860px] border-collapse text-left sm:min-w-[930px]">
                 <thead>
                   <tr className="border-b border-[#d7dee6] bg-[#f7f8fa]">
-                    <th className="sticky left-0 z-[4] bg-[#f7f8fa] px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] shadow-[1px_0_0_#d7dee6] sm:static sm:bg-transparent sm:px-[22px] sm:py-[15px] sm:shadow-none">Domain</th>
+                    <th className="sticky left-0 z-[4] w-[192px] bg-[#f7f8fa] px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] shadow-[1px_0_0_#d7dee6] sm:static sm:w-auto sm:bg-transparent sm:px-[22px] sm:py-[15px] sm:shadow-none">Domain</th>
                     <th className="px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] sm:px-[22px] sm:py-[15px]">Port</th>
                     <th className="px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] sm:px-[22px] sm:py-[15px]">Enabled</th>
                     <th className="px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] sm:px-[22px] sm:py-[15px]">Interval</th>
@@ -185,16 +185,16 @@ export default function DomainManagementTabPage() {
                 <tbody className="divide-y divide-[#d9e0e7]">
                   {DOMAIN_ROWS.map((row) => (
                     <tr key={row.domain} className="group transition-colors duration-150 ease-out hover:bg-[#f9fbfd]">
-                      <td className="sticky left-0 z-[3] bg-white px-4 py-[13px] shadow-[1px_0_0_#d9e0e7] group-hover:bg-[#f9fbfd] sm:static sm:bg-transparent sm:px-[22px] sm:py-[15px] sm:shadow-none">
-                        <div className="flex items-center gap-3">
-                          <div className={`flex h-10 w-10 items-center justify-center rounded-full ${row.paused ? 'bg-[#edf1f4]' : 'bg-[#e9f2ff]'}`}>
+                      <td className="sticky left-0 z-[3] w-[192px] bg-white px-4 py-[13px] shadow-[1px_0_0_#d9e0e7] group-hover:bg-[#f9fbfd] sm:static sm:w-auto sm:bg-transparent sm:px-[22px] sm:py-[15px] sm:shadow-none" aria-label={`${row.domain} — ${row.subLabel}`}>
+                        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+                          <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${row.paused ? 'bg-[#edf1f4]' : 'bg-[#e9f2ff]'} sm:h-10 sm:w-10`}>
                             <span className={`material-symbols-outlined relative -top-px text-[18px] leading-none ${row.paused ? 'text-[#7e8896]' : 'text-[#2587e8]'}`}>
                               language
                             </span>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium leading-normal text-[#2e343b]">{row.domain}</p>
-                            <p className="mt-[2px] text-xs font-normal leading-normal text-[#6f8397]">{row.subLabel}</p>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium leading-normal text-[#2e343b] sm:whitespace-normal" title={row.domain} aria-label={row.domain}>{row.domain}</p>
+                            <p className="mt-[2px] truncate text-xs font-normal leading-normal text-[#6f8397] sm:whitespace-normal" title={row.subLabel} aria-label={row.subLabel}>{row.subLabel}</p>
                           </div>
                         </div>
                       </td>
