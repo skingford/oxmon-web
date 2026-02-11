@@ -104,8 +104,8 @@ export default function CertificateExpirationNotificationSettings({ locale }: Ce
   return (
     <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 lg:px-12">
       <div className="mb-6 flex items-center gap-2 text-sm text-[#86868B]">
-        <Link href={`/${locale}/certificates`} className="transition-colors hover:text-[#0071E3]">
-          {isZh ? '证书' : 'Certificates'}
+        <Link href={`/${locale}/domains`} className="transition-colors hover:text-[#0071E3]">
+          {isZh ? '证书' : 'domains'}
         </Link>
         <span className="text-[#D2D2D7]">/</span>
         <span className="font-medium text-[#1D1D1F]">{isZh ? '通知设置' : 'Settings'}</span>
@@ -116,7 +116,7 @@ export default function CertificateExpirationNotificationSettings({ locale }: Ce
         <p className="max-w-2xl text-base leading-relaxed text-[#86868B]">
           {isZh
             ? '配置何时以及如何接收即将过期的 SSL/TLS 证书告警。良好的监控可以避免用户侧宕机和安全警告。'
-            : 'Configure when and how you receive alerts for expiring SSL/TLS certificates. Proper monitoring prevents downtime and security warnings for your users.'}
+            : 'Configure when and how you receive alerts for expiring SSL/TLS domains. Proper monitoring prevents downtime and security warnings for your users.'}
         </p>
       </div>
 

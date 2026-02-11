@@ -1,12 +1,22 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { TeamMember, AppPreferences } from '@/lib/types';
 import { performGovernanceAudit } from '@/actions/ai';
 import { createId } from '@/lib/id';
 import { useI18n } from '@/contexts/I18nContext';
 
 type SettingsTab = 'workspace' | 'team' | 'routing' | 'vault';
+type RoutingPreferenceKey = 'notifEmail' | 'notifSlack' | 'notifWeekly';
+
+interface RoutingRouteItem {
+  key: RoutingPreferenceKey;
+  label: string;
+  sub: string;
+  icon: string;
+  color: string;
+  enabled: boolean;
+}
 
 interface SettingsProps {
     teamMembers: TeamMember[];
@@ -35,6 +45,33 @@ const Settings: React.FC<SettingsProps> = ({
   const [inviteEmail, setInviteEmail] = useState('');
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditReport, setAuditReport] = useState<string | null>(null);
+
+  const routingRoutes = useMemo<RoutingRouteItem[]>(() => ([
+    {
+      key: 'notifEmail',
+      label: tr('SMTP Relay'),
+      sub: tr('Instant alert propagation via verified email infrastructure.'),
+      icon: 'alternate_email',
+      color: 'text-primary bg-primary/5',
+      enabled: preferences.notifEmail,
+    },
+    {
+      key: 'notifSlack',
+      label: tr('Webhooks'),
+      sub: tr('Broadcast critical telemetry to integrated Slack channels.'),
+      icon: 'hub',
+      color: 'text-indigo-500 bg-indigo-50',
+      enabled: preferences.notifSlack,
+    },
+    {
+      key: 'notifWeekly',
+      label: tr('Neural Briefings'),
+      sub: tr('Receive AI-synthesized cluster reports every 7 days.'),
+      icon: 'neurology',
+      color: 'text-amber-500 bg-amber-50',
+      enabled: preferences.notifWeekly,
+    },
+  ]), [preferences.notifEmail, preferences.notifSlack, preferences.notifWeekly, tr]);
 
   const handleVerify = () => {
     setIsVerifying(true);
@@ -69,6 +106,15 @@ const Settings: React.FC<SettingsProps> = ({
       setInviteEmail('');
       onShowToast(`Invite broadcasted to ${inviteEmail}`, 'success');
   };
+
+  const handleToggleRoutingPreference = useCallback((key: RoutingPreferenceKey) => {
+    onUpdatePreferences({ [key]: !preferences[key] });
+  }, [onUpdatePreferences, preferences]);
+
+  const handleCopyApiKey = useCallback(() => {
+    navigator.clipboard.writeText(apiKey);
+    onShowToast(tr('Key copied.'), 'info');
+  }, [apiKey, onShowToast, tr]);
 
   const NavButton = ({ id, label, icon }: { id: SettingsTab; label: string; icon: string }) => (
     <button onClick={() => setActiveTab(id)} className={`w-full text-left px-8 py-5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-5 border ${activeTab === id ? 'bg-white shadow-soft text-primary border-primary/10' : 'text-secondary border-transparent hover:bg-gray-50'}`}>
@@ -153,17 +199,13 @@ const Settings: React.FC<SettingsProps> = ({
                     <p className="text-secondary text-sm font-medium mt-1">{tr('Automated alert routing and high-fidelity reporting protocols.')}</p>
                 </div>
                 <div className="grid grid-cols-1 gap-6">
-                    {[
-                        { key: 'notifEmail', label: tr('SMTP Relay'), sub: tr('Instant alert propagation via verified email infrastructure.'), icon: 'alternate_email', color: 'text-primary bg-primary/5' },
-                        { key: 'notifSlack', label: tr('Webhooks'), sub: tr('Broadcast critical telemetry to integrated Slack channels.'), icon: 'hub', color: 'text-indigo-500 bg-indigo-50' },
-                        { key: 'notifWeekly', label: tr('Neural Briefings'), sub: tr('Receive AI-synthesized cluster reports every 7 days.'), icon: 'neurology', color: 'text-amber-500 bg-amber-50' }
-                    ].map(route => (
+                    {routingRoutes.map((route) => (
                         <div key={route.key} className="flex items-center justify-between p-10 bg-gray-50/50 rounded-[2.5rem] border border-border hover:bg-white hover:shadow-soft transition-all group">
                             <div className="flex items-center gap-8">
                               <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center ${route.color} transition-transform group-hover:scale-110 shadow-sm`}><span className="material-symbols-outlined text-[32px]">{route.icon}</span></div>
                               <div><h4 className="text-base font-black uppercase tracking-tight text-text-main">{route.label}</h4><p className="text-sm text-secondary font-medium mt-1 leading-relaxed">{route.sub}</p></div>
                             </div>
-                            <Toggle checked={(preferences as any)[route.key]} onChange={() => onUpdatePreferences({ [route.key]: !(preferences as any)[route.key] })} />
+                            <Toggle checked={route.enabled} onChange={() => handleToggleRoutingPreference(route.key)} />
                         </div>
                     ))}
                 </div>
@@ -190,7 +232,7 @@ const Settings: React.FC<SettingsProps> = ({
                        <div className="flex items-center gap-6 p-10 bg-[#0F172A] rounded-[3rem] border border-white/5 shadow-2xl group overflow-hidden relative">
                           <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-8xl text-white">lock</span></div>
                           <span className="text-sm font-mono text-indigo-300 truncate flex-1 tracking-tighter z-10">{apiKey}</span>
-                          <button onClick={() => { navigator.clipboard.writeText(apiKey); onShowToast(tr('Key copied.'), 'info'); }} className="p-4 text-gray-500 hover:text-white transition-all bg-white/5 rounded-2xl z-10 shadow-inner"><span className="material-symbols-outlined text-[24px]">content_copy</span></button>
+                          <button onClick={handleCopyApiKey} className="p-4 text-gray-500 hover:text-white transition-all bg-white/5 rounded-2xl z-10 shadow-inner"><span className="material-symbols-outlined text-[24px]">content_copy</span></button>
                        </div>
                        <button onClick={() => onRegenerateKey()} className="flex items-center gap-4 px-8 py-4 bg-red-50 text-danger border border-red-100 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-danger hover:text-white transition-all shadow-sm">
                         <span className="material-symbols-outlined text-[20px]">cached</span>

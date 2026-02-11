@@ -10,7 +10,7 @@ interface LiveAssistantProps {
   onClose: () => void;
   agents: Agent[];
   alerts: Alert[];
-  certificates: Certificate[];
+  domains: Certificate[];
   onUpdateAgentStatus: (id: string) => void;
   onAcknowledgeAlert: (id: string) => void;
 }
@@ -20,7 +20,7 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
   onClose,
   agents,
   alerts,
-  certificates,
+  domains,
   onUpdateAgentStatus,
   onAcknowledgeAlert
 }) => {

@@ -12,8 +12,8 @@ type AgentCommandInjection = { agent: Agent; command: string } | null
 interface AppDataContextType {
   agents: Agent[]
   setAgents: React.Dispatch<React.SetStateAction<Agent[]>>
-  certificates: Certificate[]
-  setCertificates: React.Dispatch<React.SetStateAction<Certificate[]>>
+  domains: Certificate[]
+  setdomains: React.Dispatch<React.SetStateAction<Certificate[]>>
   alerts: Alert[]
   setAlerts: React.Dispatch<React.SetStateAction<Alert[]>>
   teamMembers: TeamMember[]
@@ -105,7 +105,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize with defaults first (SSR compatible)
   const [agents, setAgents] = useState<Agent[]>(MOCK_AGENTS)
-  const [certificates, setCertificates] = useState<Certificate[]>(MOCK_CERTS)
+  const [domains, setdomains] = useState<Certificate[]>(MOCK_CERTS)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(MOCK_TEAM)
   const [preferences, setPreferences] = useState<AppPreferences>(DEFAULT_PREFERENCES)
   const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS)
@@ -124,7 +124,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Load data with version checking
     setAgents(getFromLocalStorage('ox_agents', MOCK_AGENTS))
-    setCertificates(getFromLocalStorage('ox_certs', MOCK_CERTS))
+    setdomains(getFromLocalStorage('ox_certs', MOCK_CERTS))
     setTeamMembers(getFromLocalStorage('ox_team', MOCK_TEAM))
     setPreferences(getFromLocalStorage('ox_prefs', DEFAULT_PREFERENCES))
     setAlerts(getFromLocalStorage('ox_alerts', MOCK_ALERTS))
@@ -147,14 +147,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const timeoutId = window.setTimeout(() => {
       setToLocalStorage('ox_agents', agents)
-      setToLocalStorage('ox_certs', certificates)
+      setToLocalStorage('ox_certs', domains)
       setToLocalStorage('ox_team', teamMembers)
       setToLocalStorage('ox_prefs', preferences)
       setToLocalStorage('ox_alerts', alerts)
     }, 150)
 
     return () => window.clearTimeout(timeoutId)
-  }, [agents, certificates, teamMembers, preferences, alerts, isHydrated])
+  }, [agents, domains, teamMembers, preferences, alerts, isHydrated])
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = createId('toast')
@@ -178,7 +178,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const dataContextValue = useMemo(() => ({
     agents, setAgents,
-    certificates, setCertificates,
+    domains, setdomains,
     alerts, setAlerts,
     teamMembers, setTeamMembers,
     preferences, setPreferences,
@@ -187,7 +187,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     handleUpdateAgentStatus,
     handleAcknowledgeAlert,
   }), [
-    agents, certificates, alerts, teamMembers, preferences, logs, apiKey,
+    agents, domains, alerts, teamMembers, preferences, logs, apiKey,
     handleUpdateAgentStatus, handleAcknowledgeAlert,
   ])
 

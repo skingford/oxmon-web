@@ -8,7 +8,7 @@ import { buildLocalePath } from '@/lib/locale'
 
 const GlobalSearch: React.FC = () => {
   const router = useRouter()
-  const { agents, certificates, alerts } = useAppDataContext()
+  const { agents, domains, alerts } = useAppDataContext()
   const { locale, t } = useI18n()
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
@@ -36,7 +36,7 @@ const GlobalSearch: React.FC = () => {
       ...agents
         .filter((agent) => agent.name.toLowerCase().includes(normalizedTerm) || agent.ip.includes(normalizedTerm))
         .map((agent) => ({ type: 'Agent', id: agent.id, label: agent.name, sub: agent.ip })),
-      ...certificates
+      ...domains
         .filter((certificate) => certificate.domain.toLowerCase().includes(normalizedTerm))
         .map((certificate) => ({ type: 'Certificate', id: certificate.id, label: certificate.domain, sub: certificate.issuer })),
       ...alerts
@@ -45,7 +45,7 @@ const GlobalSearch: React.FC = () => {
     ]
 
     return results.slice(0, 30)
-  }, [agents, certificates, alerts, normalizedTerm])
+  }, [agents, domains, alerts, normalizedTerm])
 
   const resultTypeLabel: Record<string, string> = {
     Agent: t('search.type.agent'),
@@ -54,7 +54,7 @@ const GlobalSearch: React.FC = () => {
   }
 
   const handleResultClick = (type: string) => {
-    const route = type === 'Agent' ? '/agents' : type === 'Certificate' ? '/certificates' : '/alerts'
+    const route = type === 'Agent' ? '/agents' : type === 'Certificate' ? '/domains' : '/alerts'
     router.push(buildLocalePath(locale, route))
     setIsSearchFocused(false)
     setSearchTerm('')

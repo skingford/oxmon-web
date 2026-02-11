@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-type CertificateStatusReportPdfPreviewProps = {
+type domainstatusReportPdfPreviewProps = {
   locale: 'en' | 'zh'
 }
 
@@ -83,7 +83,7 @@ function getStatusClass(status: CertificateRow['status']): string {
   return 'bg-red-50 text-red-700 ring-red-600/20'
 }
 
-export default function CertificateStatusReportPdfPreview({ locale }: CertificateStatusReportPdfPreviewProps) {
+export default function domainstatusReportPdfPreview({ locale }: domainstatusReportPdfPreviewProps) {
   const isZh = locale === 'zh'
 
   return (
@@ -248,7 +248,7 @@ export default function CertificateStatusReportPdfPreview({ locale }: Certificat
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
               <h2 className="text-lg font-bold tracking-tight text-slate-900">Export Options</h2>
               <Link
-                href={`/${locale}/certificates/settings`}
+                href={`/${locale}/domains/settings`}
                 className="text-slate-400 transition-colors hover:text-slate-600"
               >
                 <span className="material-symbols-outlined">close</span>
@@ -330,7 +330,7 @@ export default function CertificateStatusReportPdfPreview({ locale }: Certificat
                 <span>{isZh ? '下载 PDF' : 'Download PDF'}</span>
               </button>
               <Link
-                href={`/${locale}/certificates/settings`}
+                href={`/${locale}/domains/settings`}
                 className="mt-3 block w-full text-center text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
               >
                 {isZh ? '返回通知设置' : 'Back to Settings'}

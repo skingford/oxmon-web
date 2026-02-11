@@ -17,7 +17,7 @@ const ROUTE_TITLE_MAP: Record<string, { title: string; subtitle: string }> = {
     title: 'Metrics Center',
     subtitle: 'Track time-series metrics, trends, and agent telemetry health.',
   },
-  certificates: {
+  domains: {
     title: 'Certificate Management',
     subtitle: 'Track trust posture and credential lifecycle.',
   },
@@ -63,7 +63,7 @@ const Header: React.FC = () => {
 
   if (
     pathname?.includes('/agents')
-    || pathname?.includes('/certificates')
+    || pathname?.includes('/domains')
     || pathname?.includes('/certificate-detail-view-example-com')
   ) {
     return null

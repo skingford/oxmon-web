@@ -46,9 +46,9 @@ export const PAGE_METADATA = {
       description: '查看各节点时序指标、标签上下文与最近样本健康状态。',
     },
   },
-  certificates: {
+  domains: {
     en: {
-      title: 'SSL Certificates | Oxmon Admin',
+      title: 'SSL domains | Oxmon Admin',
       description: 'Manage SSL certificate monitoring domains, check intervals, and status actions in one view.',
     },
     zh: {
@@ -169,7 +169,7 @@ export const PAGE_METADATA = {
   'certificate-expiration-notification-settings': {
     en: {
       title: 'Certificate Expiration Settings | Oxmon Admin',
-      description: 'Configure expiration alert thresholds, delivery channels, recipients, and reminder frequency for certificates.',
+      description: 'Configure expiration alert thresholds, delivery channels, recipients, and reminder frequency for domains.',
     },
     zh: {
       title: '证书过期通知设置 | Oxmon Admin',
@@ -243,8 +243,8 @@ export type PageKey = keyof typeof PAGE_METADATA
 const DEFAULT_PAGE_KEY: PageKey = 'dashboard'
 
 const PAGE_KEY_ALIASES: Partial<Record<string, PageKey>> = {
-  'domain-management-tab': 'certificates',
-  'certificates/settings': 'certificate-expiration-notification-settings',
+  'domain-management-tab': 'domains',
+  'domains/settings': 'certificate-expiration-notification-settings',
 }
 
 function isPageKey(value: string): value is PageKey {

@@ -92,8 +92,8 @@ export default function CertificateChainVisualPath({ locale }: CertificateChainV
       <header className="w-full border-b border-gray-200 bg-white px-6 py-4">
         <div className="mx-auto w-full max-w-5xl">
           <nav className="flex items-center text-sm font-medium text-[#86868b]">
-            <Link href={`/${locale}/certificates`} className="transition-colors hover:text-[#0673e0]">
-              {isZh ? '证书' : 'Certificates'}
+            <Link href={`/${locale}/domains`} className="transition-colors hover:text-[#0673e0]">
+              {isZh ? '证书' : 'domains'}
             </Link>
             <span className="mx-2 text-gray-300">/</span>
             <Link href={`/${locale}/certificate-detail-view-example-com`} className="transition-colors hover:text-[#0673e0]">
@@ -127,7 +127,7 @@ export default function CertificateChainVisualPath({ locale }: CertificateChainV
               </button>
 
               <Link
-                href={`/${locale}/certificates/settings`}
+                href={`/${locale}/domains/settings`}
                 className="rounded-lg bg-[#0673e0] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
               >
                 {isZh ? '通知设置' : 'Settings'}
@@ -192,13 +192,13 @@ export default function CertificateChainVisualPath({ locale }: CertificateChainV
                   <p className="max-w-2xl text-sm leading-relaxed text-[#86868b]">
                     {isZh
                       ? '证书链完整。服务器已提供所有必要的中间证书。链路终止于操作系统信任库中的受信任根证书。通过 OCSP 检测，未发现吊销问题。'
-                      : 'The certificate chain is complete. The server provided all necessary intermediate certificates. The chain terminates at a trusted Root CA found in the OS trust store. No revocation issues detected via OCSP.'}
+                      : 'The certificate chain is complete. The server provided all necessary intermediate domains. The chain terminates at a trusted Root CA found in the OS trust store. No revocation issues detected via OCSP.'}
                   </p>
                 </div>
               </div>
 
               <Link
-                href={`/${locale}/certificates/settings`}
+                href={`/${locale}/domains/settings`}
                 className="flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[#0673e0] px-5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 md:w-auto"
               >
                 <span className="material-symbols-outlined text-[18px]">tune</span>

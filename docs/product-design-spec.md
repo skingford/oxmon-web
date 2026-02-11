@@ -110,7 +110,7 @@
 2. **Agents** — 图标: server/cpu icon
 3. **Metrics** — 图标: line-chart icon
 4. **Alerts** — 图标: bell icon
-5. **Certificates** — 图标: shield/lock icon
+5. **domains** — 图标: shield/lock icon
 
 ### 2.3 顶栏 (Header)
 
@@ -424,9 +424,9 @@ Badge 样式：padding `2px 8px`，圆角 4px，字号 12px / font-weight: 500
 
 ---
 
-### 3.7 证书监控页 (Certificates)
+### 3.7 证书监控页 (domains)
 
-**路由：** `/certificates`
+**路由：** `/domains`
 **Tab 切换：** "域名管理" | "证书状态"
 
 #### Tab: 域名管理
@@ -481,7 +481,7 @@ Badge 样式：padding `2px 8px`，圆角 4px，字号 12px / font-weight: 500
 
 ### 3.8 证书详情页
 
-**路由：** `/certificates/:id`
+**路由：** `/domains/:id`
 
 ```
 ┌──────────────────────────────────────────┐
@@ -609,8 +609,8 @@ Tab 项: padding 12px 24px, 14px/500
 | `/agents/:id` | Agent 详情 | CPU/内存/磁盘/负载指标卡片 |
 | `/metrics` | 指标查询 | Agent+指标选择、时间范围、折线图 |
 | `/alerts` | 告警管理 | 告警规则表格 + 告警历史 Tab（过滤+分页） |
-| `/certificates` | 证书监控 | 域名管理 CRUD + 证书状态 Tab |
-| `/certificates/:id` | 证书详情 | 证书完整信息、SAN、IP、证书链验证 |
+| `/domains` | 证书监控 | 域名管理 CRUD + 证书状态 Tab |
+| `/domains/:id` | 证书详情 | 证书完整信息、SAN、IP、证书链验证 |
 
 ---
 

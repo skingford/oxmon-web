@@ -4,7 +4,7 @@ type CertificateStatusReportPdfPreviewRouteProps = {
   params: Promise<{ locale: string }>
 }
 
-export default async function CertificateStatusReportPdfPreviewRoute({
+export default async function certificateStatusReportPdfPreviewRoute({
   params,
 }: CertificateStatusReportPdfPreviewRouteProps) {
   const { locale } = await params

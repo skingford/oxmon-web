@@ -58,7 +58,7 @@ src/
 │       ├── layout.tsx           # Dashboard layout with sidebar/header
 │       ├── dashboard/           # Main dashboard page
 │       ├── agents/              # Agent management
-│       ├── certificates/        # Certificate monitoring
+│       ├── domains/        # Certificate monitoring
 │       ├── infrastructure/      # Infrastructure topology
 │       ├── alerts/              # Alert management
 │       ├── logs/                # Audit logs
@@ -72,7 +72,7 @@ src/
 │   ├── LiveAssistant.tsx        # Voice AI assistant
 │   ├── Dashboard.tsx            # Dashboard view logic
 │   ├── Agents.tsx               # Agent management UI
-│   ├── Certificates.tsx         # Certificate management UI
+│   ├── domains.tsx         # Certificate management UI
 │   ├── Infrastructure.tsx       # Topology visualization
 │   ├── Alerts.tsx               # Alert management UI
 │   ├── Logs.tsx                 # Audit log viewer
@@ -100,7 +100,7 @@ src/
 
 **AppContext** (`src/contexts/AppContext.tsx`) is the single source of truth for application state. It provides:
 
-- **Core Data:** `agents`, `certificates`, `alerts`, `teamMembers`, `logs`, `preferences`
+- **Core Data:** `agents`, `domains`, `alerts`, `teamMembers`, `logs`, `preferences`
 - **Authentication:** `isAuthenticated`, `setIsAuthenticated`
 - **UI State:** `toasts`, `showToast()`, `removeToast()`
 - **AI State:** `aiSummary`, `isAiLoading`, `logAnalysis`, `isLogAnalyzing`, `predictiveData`

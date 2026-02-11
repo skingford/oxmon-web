@@ -116,7 +116,7 @@ function getStatusBadge(status: CertificateStatus) {
 
 export default function OxmonSslCertificateStatus() {
   return (
-    <div className="flex min-w-0 flex-col pb-6 pt-6">
+    <div className="flex min-w-0 flex-col pb-6">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold leading-tight tracking-tight text-[#12161b] md:text-3xl">Certificate Monitoring</h2>
@@ -174,15 +174,6 @@ export default function OxmonSslCertificateStatus() {
         </div>
 
         <div className="flex flex-col overflow-hidden rounded-xl border border-[#e5e5e5]/60 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_0_rgba(0,0,0,0.03)]">
-          <div className="flex border-b border-[#e5e5e5]/60">
-            <button type="button" className="border-b-2 border-transparent px-6 py-4 text-sm font-medium text-slate-500 transition-colors hover:text-slate-700">
-              Domain Management
-            </button>
-            <button type="button" className="border-b-2 border-[#0073e6] bg-[#0073e6]/5 px-6 py-4 text-sm font-bold text-[#0073e6] transition-colors">
-              Certificate Status
-            </button>
-          </div>
-
           <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4">
             <div className="flex min-w-[280px] flex-1 items-center gap-3">
               <div className="group relative max-w-md flex-1">

@@ -8,7 +8,7 @@ const USER_AVATAR_URL =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuA95vzPTIcGKtPPCsXaD-bkSaGPpARS440ek20nS0MIVRMJP_4b-1mRpgHcCfmtNMI7oaK7wfHD6scc66UlO52IoKD8aJSUMUhR-niv1vqz7UisTNfzqbIYORewTT62EH_E5aD9wvlyQdsjoeem_9akzueRhwXtR6Dqoat1F1L2xRpJOVgljOZoFzoHoEXcla8omG87klynnaej8bQ6DWGt6qvD_dxJoRjm5D2_CuoGwtKa3wh5jpIPT_y8D3307yK_aUtyfXv579c'
 
 const BREADCRUMBS = [
-  { label: 'Certificates', href: '#' },
+  { label: 'domains', href: '#' },
   { label: 'Managed Domains', href: '#' },
 ] as const
 
@@ -89,7 +89,7 @@ export default function CertificateDetailViewExampleCom({ locale }: CertificateD
               Dashboard
             </Link>
             <Link href="#" className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium leading-normal text-[#111827]">
-              Certificates
+              domains
             </Link>
             <Link href="#" className="text-sm font-medium leading-normal text-[#6b7280] transition-colors hover:text-[#0073e6]">
               Infrastructure

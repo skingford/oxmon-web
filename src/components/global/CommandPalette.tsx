@@ -16,7 +16,7 @@ const viewToRoute: Record<string, string> = {
   agents: '/agents',
   metrics: '/metrics',
   infrastructure: '/infrastructure',
-  certificates: '/certificates',
+  domains: '/domains',
   alerts: '/alerts',
   logs: '/logs',
   tools: '/tools',

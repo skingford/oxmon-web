@@ -1,12 +1,19 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { generateConfig } from '@/actions/ai';
 import { createId } from '@/lib/id';
 import { useI18n } from '@/contexts/I18nContext';
 
 interface ConfigForgeProps {
   onShowToast: (message: string, type: 'success' | 'error' | 'info') => void;
+}
+
+interface ForgeHistoryItem {
+  id: string;
+  title: string;
+  code: string;
+  date: string;
 }
 
 const TEMPLATES = [
@@ -23,35 +30,88 @@ const ConfigForge: React.FC<ConfigForgeProps> = ({ onShowToast }) => {
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [isHardeningActive, setIsHardeningActive] = useState(true);
   const [hardeningReport, setHardeningReport] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ id: string, title: string, code: string, date: string }[]>(() => {
+  const [history, setHistory] = useState<ForgeHistoryItem[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('ox_forge_history');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) {
+        return [];
+      }
+
+      try {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
     }
+
     return [];
   });
 
+  const isGenerateDisabled = useMemo(() => isGenerating || !prompt.trim(), [isGenerating, prompt]);
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ox_forge_history', JSON.stringify(history));
+    if (typeof window === 'undefined') {
+      return;
     }
+
+    const timeoutId = window.setTimeout(() => {
+      localStorage.setItem('ox_forge_history', JSON.stringify(history));
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [history]);
 
-  const handleGenerate = async (overriddenPrompt?: string) => {
-    const finalPrompt = overriddenPrompt || prompt;
-    if (!finalPrompt.trim()) return;
+  const handleGenerate = useCallback(async (overriddenPrompt?: string) => {
+    const finalPrompt = (overriddenPrompt || prompt).trim();
+    if (!finalPrompt) return;
+
     setIsGenerating(true);
     setGeneratedCode(null);
     setHardeningReport(null);
+
     try {
       const result = await generateConfig(finalPrompt, isHardeningActive);
 
       setGeneratedCode(result.code);
       setHardeningReport(result.hardeningReport);
-      setHistory(prev => [{ id: createId('forge'), title: finalPrompt.substring(0, 30) + '...', code: result.code, date: new Date().toLocaleTimeString() }, ...prev].slice(0, 10));
+      setHistory((previousHistory) => [
+        {
+          id: createId('forge'),
+          title: `${finalPrompt.slice(0, 30)}...`,
+          code: result.code,
+          date: new Date().toLocaleTimeString(),
+        },
+        ...previousHistory,
+      ].slice(0, 10));
       onShowToast(tr('Object successfully forged.'), 'success');
-    } catch (err) { onShowToast(tr('Neural forge failure.'), 'error'); } finally { setIsGenerating(false); }
-  };
+    } catch {
+      onShowToast(tr('Neural forge failure.'), 'error');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [isHardeningActive, onShowToast, prompt, tr]);
+
+  const handleTemplateSelect = useCallback((templatePrompt: string) => {
+    setPrompt(templatePrompt);
+    void handleGenerate(templatePrompt);
+  }, [handleGenerate]);
+
+  const handleSelectHistoryItem = useCallback((item: ForgeHistoryItem) => {
+    setGeneratedCode(item.code);
+    setPrompt(item.title);
+  }, []);
+
+  const handleCopyGeneratedCode = useCallback(() => {
+    if (!generatedCode) {
+      return;
+    }
+
+    navigator.clipboard.writeText(generatedCode);
+    onShowToast(tr('PEM payload copied.'), 'info');
+  }, [generatedCode, onShowToast, tr]);
 
   return (
     <div className="space-y-10 animate-fade-in h-full flex flex-col pb-16">
@@ -64,7 +124,7 @@ const ConfigForge: React.FC<ConfigForgeProps> = ({ onShowToast }) => {
           {TEMPLATES.map((t) => (
               <button
                 key={t.title}
-                onClick={() => { setPrompt(t.prompt); handleGenerate(t.prompt); }}
+                onClick={() => handleTemplateSelect(t.prompt)}
                 className="p-10 bg-white border border-[#E5E5EA] rounded-[3rem] text-left hover:border-primary hover:shadow-2xl transition-all group flex flex-col gap-8 shadow-soft"
               >
                   <div className="w-16 h-16 bg-[#F5F5F7] rounded-[1.75rem] flex items-center justify-center text-[#C1C1C1] group-hover:bg-primary group-hover:text-white transition-all shadow-inner">
@@ -107,8 +167,8 @@ const ConfigForge: React.FC<ConfigForgeProps> = ({ onShowToast }) => {
                     </button>
                 </div>
                 <button
-                    onClick={() => handleGenerate()}
-                    disabled={isGenerating || !prompt.trim()}
+                    onClick={() => void handleGenerate()}
+                    disabled={isGenerateDisabled}
                     className="w-full py-7 bg-primary text-white rounded-[2.5rem] font-black text-[12px] uppercase tracking-[0.5em] flex items-center justify-center gap-5 shadow-2xl shadow-primary/40 hover:bg-primary-hover active:scale-95 transition-all disabled:opacity-50"
                 >
                     <span className={`material-symbols-outlined text-[28px] ${isGenerating ? 'animate-spin' : ''}`}>autorenew</span>
@@ -121,7 +181,7 @@ const ConfigForge: React.FC<ConfigForgeProps> = ({ onShowToast }) => {
                     <h4 className="text-[10px] font-black text-secondary uppercase tracking-[0.4em] mb-6">{tr('Forge History')}</h4>
                     <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
                         {history.map(item => (
-                            <button key={item.id} onClick={() => { setGeneratedCode(item.code); setPrompt(item.title); }} className="w-full text-left p-6 bg-gray-50 rounded-2xl border border-transparent hover:border-primary/20 hover:bg-white transition-all group flex items-center justify-between">
+                            <button key={item.id} onClick={() => handleSelectHistoryItem(item)} className="w-full text-left p-6 bg-gray-50 rounded-2xl border border-transparent hover:border-primary/20 hover:bg-white transition-all group flex items-center justify-between">
                                 <div className="min-w-0">
                                     <p className="text-[11px] font-bold text-text-main truncate uppercase tracking-tight">{item.title}</p>
                                     <p className="text-[9px] text-secondary font-black uppercase mt-1 opacity-50">{item.date}</p>
@@ -143,7 +203,7 @@ const ConfigForge: React.FC<ConfigForgeProps> = ({ onShowToast }) => {
                         <span className="text-[11px] font-black text-indigo-300 uppercase tracking-[0.6em] font-mono">{tr('Neural PEM Stream')}</span>
                     </div>
                     {generatedCode && (
-                        <button onClick={() => { navigator.clipboard.writeText(generatedCode!); onShowToast(tr('PEM payload copied.'), 'info'); }} className="text-[#86868B] hover:text-white transition-all flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.4em]">
+                        <button onClick={handleCopyGeneratedCode} className="text-[#86868B] hover:text-white transition-all flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.4em]">
                             <span className="material-symbols-outlined text-[22px]">content_copy</span>
                             {tr('Copy Buffer')}
                         </button>

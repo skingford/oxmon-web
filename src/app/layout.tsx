@@ -16,7 +16,7 @@ const inter = localFont({
 
 export const metadata: Metadata = {
   title: 'Oxmon Admin',
-  description: 'Infrastructure Monitoring & Certificates',
+  description: 'Infrastructure Monitoring & domains',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
