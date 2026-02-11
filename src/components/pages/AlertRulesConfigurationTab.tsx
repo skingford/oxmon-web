@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertHistoryLogPanel } from '@/components/AlertHistoryLog'
+import { AlertHistoryLogPanel } from '@/components/features/AlertHistoryLog'
 
 type RuleSeverity = 'Critical' | 'Warning' | 'Info'
 

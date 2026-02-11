@@ -1,4 +1,4 @@
-import ChartMetricTooltipDetail from '@/components/ChartMetricTooltipDetail'
+import ChartMetricTooltipDetail from '@/components/pages/ChartMetricTooltipDetail'
 
 type ChartMetricTooltipDetailRouteProps = {
   params: Promise<{ locale: string }>

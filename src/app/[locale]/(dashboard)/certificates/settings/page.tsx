@@ -1,4 +1,4 @@
-import CertificateExpirationNotificationSettings from '@/components/CertificateExpirationNotificationSettings'
+import CertificateExpirationNotificationSettings from '@/components/pages/CertificateExpirationNotificationSettings'
 
 type CertificateNotificationSettingsRouteProps = {
   params: Promise<{ locale: string }>

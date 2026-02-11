@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { I18nProvider } from '@/contexts/I18nContext'
 import { AppProvider } from '@/contexts/AppContext'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import Sidebar from '@/components/global/Sidebar'
+import Header from '@/components/global/Header'
 
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)

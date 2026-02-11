@@ -1,4 +1,4 @@
-import MultiMetricComparisonChart from '@/components/MultiMetricComparisonChart'
+import MultiMetricComparisonChart from '@/components/pages/MultiMetricComparisonChart'
 
 type MultiMetricComparisonChartRouteProps = {
   params: Promise<{ locale: string }>

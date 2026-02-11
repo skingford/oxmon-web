@@ -1,4 +1,4 @@
-import CertificateDetailViewExampleCom from '@/components/CertificateDetailViewExampleCom'
+import CertificateDetailViewExampleCom from '@/components/pages/CertificateDetailViewExampleCom'
 
 type CertificateDetailViewExampleComRouteProps = {
   params: Promise<{ locale: string }>

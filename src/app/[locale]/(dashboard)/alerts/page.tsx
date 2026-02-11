@@ -1,4 +1,4 @@
-import AlertRulesConfigurationTab from '@/components/AlertRulesConfigurationTab'
+import AlertRulesConfigurationTab from '@/components/pages/AlertRulesConfigurationTab'
 
 type AlertsPageProps = {
   searchParams: Promise<{ tab?: string }>

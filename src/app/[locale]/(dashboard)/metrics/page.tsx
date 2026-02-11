@@ -1,4 +1,4 @@
-import Metrics from '@/components/Metrics'
+import Metrics from '@/components/pages/Metrics'
 
 type MetricsPageProps = {
   params: Promise<{ locale: string }>

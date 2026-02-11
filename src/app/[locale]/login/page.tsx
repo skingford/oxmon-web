@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import Login from '@/components/Login'
+import Login from '@/components/pages/Login'
 import { buildLocalePath, type Locale } from '@/lib/locale'
 
 export default function LoginPage() {

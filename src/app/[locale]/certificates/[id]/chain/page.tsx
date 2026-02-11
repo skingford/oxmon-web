@@ -1,4 +1,4 @@
-import CertificateChainVisualPath from '@/components/CertificateChainVisualPath'
+import CertificateChainVisualPath from '@/components/pages/CertificateChainVisualPath'
 
 type CertificateChainVisualPathRouteProps = {
   params: Promise<{ locale: string }>

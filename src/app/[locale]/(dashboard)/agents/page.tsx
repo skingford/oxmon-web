@@ -1,7 +1,7 @@
 'use client'
 
 import { useAppContext } from '@/contexts/AppContext'
-import Agents from '@/components/Agents'
+import Agents from '@/components/features/Agents'
 
 export default function AgentsPage() {
   const {

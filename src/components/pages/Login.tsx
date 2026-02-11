@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { I18nProvider, useI18n } from '@/contexts/I18nContext'
-import LanguageSwitcher from './LanguageSwitcher'
+import LanguageSwitcher from '@/components/global/LanguageSwitcher'
 
 interface LoginProps {
   onLogin: () => void

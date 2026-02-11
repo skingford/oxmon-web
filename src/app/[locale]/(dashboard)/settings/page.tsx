@@ -1,4 +1,4 @@
-import GlobalNotificationChannelSettings from '@/components/GlobalNotificationChannelSettings'
+import GlobalNotificationChannelSettings from '@/components/pages/GlobalNotificationChannelSettings'
 
 type GlobalNotificationChannelSettingsRouteProps = {
   params: Promise<{ locale: string }>

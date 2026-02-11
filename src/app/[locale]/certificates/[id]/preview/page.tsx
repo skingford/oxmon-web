@@ -1,4 +1,4 @@
-import CertificateStatusReportPdfPreview from '@/components/CertificateStatusReportPdfPreview'
+import CertificateStatusReportPdfPreview from '@/components/pages/CertificateStatusReportPdfPreview'
 
 type CertificateStatusReportPdfPreviewRouteProps = {
   params: Promise<{ locale: string }>

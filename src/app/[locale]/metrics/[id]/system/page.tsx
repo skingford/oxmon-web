@@ -1,4 +1,4 @@
-import FullScreenMetricsChartView from '@/components/FullScreenMetricsChartView'
+import FullScreenMetricsChartView from '@/components/pages/FullScreenMetricsChartView'
 
 type FullScreenMetricsChartViewRouteProps = {
   params: Promise<{ locale: string }>

@@ -1,4 +1,4 @@
-import AgentDetailedMetricsWeb01 from '@/components/AgentDetailedMetricsWeb01'
+import AgentDetailedMetricsWeb01 from '@/components/pages/AgentDetailedMetricsWeb01'
 
 type AgentDetailRouteProps = {
   params: Promise<{ locale: string; id: string }>
