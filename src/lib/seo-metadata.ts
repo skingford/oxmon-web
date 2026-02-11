@@ -38,22 +38,22 @@ export const PAGE_METADATA = {
   },
   certificates: {
     en: {
-      title: 'Certificates | Oxmon Admin',
-      description: 'Track TLS/SSL assets, expiration risk, and trust chain integrity.',
+      title: 'SSL Certificates | Oxmon Admin',
+      description: 'Manage SSL certificate monitoring domains, check intervals, and status actions in one view.',
     },
     zh: {
-      title: '证书 | Oxmon Admin',
-      description: '追踪 TLS/SSL 资产、过期风险与信任链完整性。',
+      title: 'SSL 证书 | Oxmon Admin',
+      description: '集中管理 SSL 监控域名、检测间隔与状态操作。',
     },
   },
   alerts: {
     en: {
-      title: 'Alerts | Oxmon Admin',
-      description: 'Triage incidents in real time, correlate signals, and accelerate response.',
+      title: 'Alert Rules | Oxmon Admin',
+      description: 'Configure threshold and anomaly detection alert rules for infrastructure monitoring.',
     },
     zh: {
-      title: '告警 | Oxmon Admin',
-      description: '实时分诊告警，关联信号并加速事件响应。',
+      title: '告警规则 | Oxmon Admin',
+      description: '配置基础设施监控的阈值与异常检测告警规则。',
     },
   },
   logs: {
@@ -86,26 +86,6 @@ export const PAGE_METADATA = {
       description: '分析基础设施性能并可视化时序指标数据。',
     },
   },
-  'oxmon-ssl-certificate-status': {
-    en: {
-      title: 'SSL Certificate Status | Oxmon Admin',
-      description: 'Monitor certificate validity, expiration risk, issuer details, and renewal priority.',
-    },
-    zh: {
-      title: 'SSL 证书状态 | Oxmon Admin',
-      description: '监控证书有效性、过期风险、签发机构信息与续期优先级。',
-    },
-  },
-  'domain-management-tab': {
-    en: {
-      title: 'Domain Management | Oxmon Admin',
-      description: 'Manage SSL certificate monitoring domains, check intervals, and status actions in one view.',
-    },
-    zh: {
-      title: '域名管理 | Oxmon Admin',
-      description: '集中管理 SSL 监控域名、检测间隔与状态操作。',
-    },
-  },
   'alert-history-log': {
     en: {
       title: 'Alert History | Oxmon Admin',
@@ -116,16 +96,6 @@ export const PAGE_METADATA = {
       description: '监控基础设施健康状态并查看历史告警日志。',
     },
   },
-  'certificate-detail-view-example-com': {
-    en: {
-      title: 'Certificate example.com | Oxmon Admin',
-      description: 'SSL/TLS certificate details, SANs, resolved IPs, and trust-chain verification for example.com.',
-    },
-    zh: {
-      title: '证书详情 example.com | Oxmon Admin',
-      description: '查看 example.com 的 SSL/TLS 证书详情、SAN、解析 IP 与信任链校验状态。',
-    },
-  },
   'alert-rules-configuration-tab': {
     en: {
       title: 'Alert Rules | Oxmon Admin',
@@ -134,6 +104,16 @@ export const PAGE_METADATA = {
     zh: {
       title: '告警规则 | Oxmon Admin',
       description: '配置基础设施监控的阈值与异常检测告警规则。',
+    },
+  },
+  'certificate-detail-view-example-com': {
+    en: {
+      title: 'Certificate example.com | Oxmon Admin',
+      description: 'SSL/TLS certificate details, SANs, resolved IPs, and trust-chain verification for example.com.',
+    },
+    zh: {
+      title: '证书详情 example.com | Oxmon Admin',
+      description: '查看 example.com 的 SSL/TLS 证书详情、SAN、解析 IP 与信任链校验状态。',
     },
   },
   'chart-metric-tooltip-detail': {
@@ -252,14 +232,26 @@ export type PageKey = keyof typeof PAGE_METADATA
 
 const DEFAULT_PAGE_KEY: PageKey = 'dashboard'
 
+const PAGE_KEY_ALIASES: Partial<Record<string, PageKey>> = {
+  'domain-management-tab': 'certificates',
+  'certificates/settings': 'certificate-expiration-notification-settings',
+}
+
 function isPageKey(value: string): value is PageKey {
   return value in PAGE_METADATA
 }
 
 export function getPageMetaForPath(pathname: string, locale: Locale): PageMeta {
-  const firstSegment = pathname.split('/').filter(Boolean)[0]
-  const candidatePageKey = !firstSegment || firstSegment === DEFAULT_PAGE_KEY ? DEFAULT_PAGE_KEY : firstSegment
-  const normalizedPageKey: PageKey = isPageKey(candidatePageKey) ? candidatePageKey : DEFAULT_PAGE_KEY
+  const segments = pathname.split('/').filter(Boolean)
+  const firstSegment = segments[0]
+  const nestedSegment = segments.length > 1 ? `${segments[0]}/${segments[1]}` : null
+
+  const candidatePageKey = nestedSegment && (nestedSegment in PAGE_KEY_ALIASES || isPageKey(nestedSegment))
+    ? nestedSegment
+    : (!firstSegment || firstSegment === DEFAULT_PAGE_KEY ? DEFAULT_PAGE_KEY : firstSegment)
+
+  const aliasedPageKey = PAGE_KEY_ALIASES[candidatePageKey] ?? candidatePageKey
+  const normalizedPageKey: PageKey = isPageKey(aliasedPageKey) ? aliasedPageKey : DEFAULT_PAGE_KEY
 
   return PAGE_METADATA[normalizedPageKey][locale]
 }

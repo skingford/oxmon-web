@@ -15,6 +15,11 @@ interface NavItem {
   label: string
   href: string
   badge?: number
+  children?: {
+    key: string
+    label: string
+    href: string
+  }[]
 }
 
 const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
@@ -25,13 +30,30 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
   const segments = pathname?.split('/').filter(Boolean) ?? []
   const locale = segments[0] === 'zh' || segments[0] === 'en' ? segments[0] : 'en'
   const currentView = segments[1] ?? 'dashboard'
+  const currentSubView = segments[2] ?? ''
 
   const navItems: NavItem[] = [
     { key: 'dashboard', icon: 'dashboard', label: tr('Dashboard'), href: `/${locale}/dashboard` },
     { key: 'agents', icon: 'dns', label: tr('Agents'), href: `/${locale}/agents` },
-    { key: 'certificates', icon: 'verified_user', label: tr('Certificates'), href: `/${locale}/certificates` },
-    { key: 'alert-rules-configuration-tab', icon: 'notifications', label: tr('Alerts'), href: `/${locale}/alert-rules-configuration-tab` },
-    { key: 'alert-history-log', icon: 'history', label: tr('Alert History'), href: `/${locale}/alert-history-log` },
+    {
+      key: 'certificates',
+      icon: 'verified_user',
+      label: tr('Certificates'),
+      href: `/${locale}/certificates`,
+      children: [
+        {
+          key: 'monitoring',
+          label: locale === 'zh' ? '监控' : 'Monitoring',
+          href: `/${locale}/certificates`,
+        },
+        {
+          key: 'settings',
+          label: locale === 'zh' ? '通知设置' : 'Settings',
+          href: `/${locale}/certificates/settings`,
+        },
+      ],
+    },
+    { key: 'alerts', icon: 'notifications', label: tr('Alerts'), href: `/${locale}/alerts` },
     { key: 'settings', icon: 'settings', label: tr('Settings'), href: `/${locale}/settings` },
   ]
 
@@ -71,25 +93,63 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
         </div>
 
         <nav className="flex-1 px-4 py-4 flex flex-col gap-1 overflow-y-auto">
-          {navItems.map((item) => (
-            <button
-              type="button"
-              key={item.key}
-              onClick={() => {
-                router.push(item.href)
-                onClose()
-              }}
-              className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 ${
-                currentView === item.key
-                  ? 'bg-[#0073e6]/10 text-[#0073e6]'
-                  : 'text-[#86868b] hover:bg-gray-50 hover:text-[#1D1D1F]'
-              }`}
-            >
-              <span className={`material-symbols-outlined text-[20px] ${currentView === item.key ? 'filled' : 'group-hover:text-[#0073e6] transition-colors'}`}>{item.icon}</span>
-              <span className={`text-sm ${currentView === item.key ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
-              {item.badge ? <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{item.badge}</span> : null}
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const isItemActive = currentView === item.key
+
+            return (
+              <div key={item.key} className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    router.push(item.href)
+                    onClose()
+                  }}
+                  className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 ${
+                    isItemActive
+                      ? 'bg-[#0073e6]/10 text-[#0073e6]'
+                      : 'text-[#86868b] hover:bg-gray-50 hover:text-[#1D1D1F]'
+                  }`}
+                >
+                  <span className={`material-symbols-outlined text-[20px] ${isItemActive ? 'filled' : 'group-hover:text-[#0073e6] transition-colors'}`}>{item.icon}</span>
+                  <span className={`text-sm ${isItemActive ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
+                  {item.badge ? <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{item.badge}</span> : null}
+                </button>
+
+                {isItemActive && item.children?.length
+                  ? (
+                    <div className="ml-8 flex flex-col gap-1 pb-1">
+                      {item.children.map((child) => {
+                        const isChildActive = currentView === item.key
+                          && (
+                            (child.key === 'monitoring' && currentSubView !== 'settings')
+                            || (child.key !== 'monitoring' && currentSubView === child.key)
+                          )
+
+                        return (
+                          <button
+                            key={`${item.key}-${child.key}`}
+                            type="button"
+                            onClick={() => {
+                              router.push(child.href)
+                              onClose()
+                            }}
+                            className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors duration-200 ${
+                              isChildActive
+                                ? 'bg-[#0073e6]/10 font-semibold text-[#0073e6]'
+                                : 'font-medium text-[#86868b] hover:bg-gray-50 hover:text-[#1D1D1F]'
+                            }`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${isChildActive ? 'bg-[#0073e6]' : 'bg-[#c7c7cc]'}`} />
+                            <span>{child.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    )
+                  : null}
+              </div>
+            )
+          })}
         </nav>
 
         <div className="border-t border-gray-100 p-4">
