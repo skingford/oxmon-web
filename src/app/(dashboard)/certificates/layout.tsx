@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Globe } from "lucide-react";
+import { Shield, Globe, Activity } from "lucide-react";
 
 export default function CertificatesLayout({
   children,
@@ -40,6 +40,12 @@ export default function CertificatesLayout({
             <TabsTrigger value="/certificates/domains" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
               <Globe className="h-4 w-4" />
               Domain Assets
+            </TabsTrigger>
+          </Link>
+          <Link href="/certificates/status">
+            <TabsTrigger value="/certificates/status" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
+              <Activity className="h-4 w-4" />
+              Live Status
             </TabsTrigger>
           </Link>
         </TabsList>

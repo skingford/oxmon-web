@@ -11,10 +11,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw, Activity, Clock, Database, Tag, ShieldCheck, Server } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
 
 export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap params using React.use() or await in async component
@@ -50,63 +52,131 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     fetchMetrics();
   }, [id]);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="p-8 space-y-8"
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" size="icon" asChild>
+          <Button variant="outline" size="icon" asChild className="glass hover:bg-primary/10 hover:text-primary transition-all active:scale-95">
             <Link href="/agents">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Agent: {id}</h2>
-            <p className="text-muted-foreground">
-              Latest metrics from this agent.
+            <div className="flex items-center gap-2 mb-1">
+              <Server className="h-5 w-5 text-primary" />
+              <Badge variant="outline" className="text-[10px] uppercase tracking-widest glass border-white/5 bg-white/5">Compute Node</Badge>
+            </div>
+            <h2 className="text-4xl font-extrabold tracking-tight text-gradient">Agent: {id}</h2>
+            <p className="text-muted-foreground text-sm flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5" /> Real-time telemetry and state synchronization.
             </p>
           </div>
         </div>
-        <Button variant="outline" size="icon" onClick={fetchMetrics}>
+        <Button 
+          variant="outline" 
+          onClick={fetchMetrics} 
+          disabled={loading}
+          className="glass h-11 px-6 gap-2 shadow-lg shadow-black/5"
+        >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Synchronize Data
         </Button>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center h-64 items-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : metrics.length === 0 ? (
-        <div className="text-center text-muted-foreground h-64 flex items-center justify-center">
-          No metrics available.
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {metrics.map((metric, index) => (
-            <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {metric.metric_name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metric.value}</div>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(metric.timestamp).toLocaleString()}
-                </p>
-                {metric.labels && Object.keys(metric.labels).length > 0 && (
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    {Object.entries(metric.labels).map(([k, v]) => (
-                      <span key={k} className="mr-2 px-1 bg-secondary rounded">
-                        {k}: {v}
-                      </span>
-                    ))}
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <motion.div 
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col items-center justify-center h-96 gap-4"
+          >
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground font-medium animate-pulse">Establishing secure handshake...</p>
+          </motion.div>
+        ) : metrics.length === 0 ? (
+          <motion.div 
+            key="empty"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center h-96 flex flex-col items-center justify-center gap-4 bg-muted/20 rounded-3xl border border-dashed border-white/10"
+          >
+            <Activity className="h-12 w-12 text-muted-foreground/20" />
+            <div className="space-y-1">
+              <p className="text-xl font-bold tracking-tight">Telemetry Void</p>
+              <p className="text-muted-foreground text-sm">No performance metrics found for this node.</p>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="content"
+            variants={containerVariants}
+            className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+          >
+            {metrics.map((metric, index) => (
+              <motion.div key={index} variants={itemVariants}>
+                <Card className="glass-card border-none shadow-xl group overflow-hidden relative">
+                  <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                    <Activity size={80} />
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
+                  <CardHeader className="pb-2">
+                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-2 mb-1">
+                        <Activity className="h-3 w-3 text-primary" /> Metric Shard
+                     </span>
+                    <CardTitle className="text-lg font-bold tracking-tight">
+                      {metric.metric_name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-baseline gap-2">
+                       <span className="text-4xl font-black tracking-tighter text-primary">{metric.value}</span>
+                       <span className="text-xs text-muted-foreground font-medium uppercase tracking-tighter">Units</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between py-2 border-y border-white/5">
+                       <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {new Date(metric.timestamp).toLocaleTimeString()}
+                       </div>
+                       <Badge variant="outline" className="text-[9px] glass border-emerald-500/20 text-emerald-500">Normal</Badge>
+                    </div>
+
+                    {metric.labels && Object.keys(metric.labels).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {Object.entries(metric.labels).map(([k, v]) => (
+                          <div key={k} className="flex items-center gap-1 glass px-2 py-0.5 rounded-md border-white/5">
+                            <Tag className="h-2.5 w-2.5 text-primary/70" />
+                            <span className="text-[10px] font-mono text-muted-foreground">{k}:{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

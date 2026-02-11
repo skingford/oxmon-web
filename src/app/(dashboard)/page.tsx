@@ -24,12 +24,17 @@ import {
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<DashboardOverview | null>(null)
+  const [health, setHealth] = useState<any>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const overview = await api.getDashboardOverview()
+        const [overview, healthData] = await Promise.all([
+          api.getDashboardOverview(),
+          api.getHealth()
+        ])
         setData(overview)
+        setHealth(healthData)
       } catch (error) {
         console.error(error)
         toast.error(getApiErrorMessage(error, "Failed to load dashboard data"))
@@ -113,6 +118,22 @@ export default function DashboardPage() {
           <h1 className="text-4xl font-extrabold tracking-tight text-gradient">Dashboard</h1>
           <p className="text-muted-foreground mt-1 text-sm">Real-time overview of your infrastructure health.</p>
         </div>
+        {health && (
+           <div className="flex items-center gap-3 glass px-4 py-2 rounded-xl border-white/5 shadow-inner">
+              <div className="flex flex-col items-end">
+                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Service Health</span>
+                 <span className="text-xs font-mono font-bold text-emerald-500 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Operational
+                 </span>
+              </div>
+              <div className="h-8 w-px bg-white/10" />
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Version</span>
+                 <span className="text-xs font-mono font-bold">v{health.version}</span>
+              </div>
+           </div>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

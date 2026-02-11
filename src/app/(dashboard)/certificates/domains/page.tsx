@@ -22,6 +22,15 @@ import { CertDomain, CertCheckResult } from "@/types/api"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog"
 
 export default function DomainsPage() {
   const [domains, setDomains] = useState<CertDomain[]>([])
@@ -29,6 +38,12 @@ export default function DomainsPage() {
   const [adding, setAdding] = useState(false)
   const [checking, setChecking] = useState<string | null>(null)
   const [newDomain, setNewDomain] = useState("")
+  const [isBatchOpen, setIsBatchOpen] = useState(false)
+  const [batchDomains, setBatchDomains] = useState("")
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [auditHistory, setAuditHistory] = useState<CertCheckResult[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [selectedDomain, setSelectedDomain] = useState<CertDomain | null>(null)
 
   const fetchDomains = async () => {
     try {
@@ -79,16 +94,48 @@ export default function DomainsPage() {
     setChecking(id)
     try {
       const result = await api.checkSingleDomain(id)
-      if (result.valid) {
+      if (result.is_success) {
         toast.success(`Check completed`, { description: `${result.domain} is healthy.` })
       } else {
-        toast.error(`Security Warning`, { description: `${result.domain} validation failed: ${result.reason}` })
+        toast.error(`Security Warning`, { description: `${result.domain} validation failed: ${result.error_message}` })
       }
       fetchDomains()
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Manual check failed"))
     } finally {
       setChecking(null)
+    }
+  }
+
+  const handleBatchAdd = async () => {
+    const domainsList = batchDomains.split(/[\n,]+/).map(d => d.trim()).filter(d => !!d)
+    if (domainsList.length === 0) return
+
+    setAdding(true)
+    try {
+      await api.createDomainsBatch({ domains: domainsList.map(d => ({ domain: d })) })
+      toast.success(`${domainsList.length} domains enrolled`)
+      setBatchDomains("")
+      setIsBatchOpen(false)
+      fetchDomains()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Batch enrollment failed"))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const viewHistory = async (domain: CertDomain) => {
+    setSelectedDomain(domain)
+    setHistoryOpen(true)
+    setLoadingHistory(true)
+    try {
+      const data = await api.getCertCheckHistory(domain.id, { limit: 50 })
+      setAuditHistory(data as any)
+    } catch (error) {
+      toast.error("Failed to load audit trail")
+    } finally {
+      setLoadingHistory(false)
     }
   }
 
@@ -135,10 +182,15 @@ export default function DomainsPage() {
                       required
                       className="glass h-11"
                     />
-                    <Button type="submit" disabled={adding} className="w-full shadow-lg h-11 shadow-primary/20 hover:shadow-primary/40 bg-primary">
-                      {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4 mr-2" />}
-                      Start Surveillance
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button type="submit" disabled={adding} className="flex-1 shadow-lg h-11 shadow-primary/20 hover:shadow-primary/40 bg-primary">
+                        {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4 mr-2" />}
+                        Single
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setIsBatchOpen(true)} className="glass h-11 px-4">
+                        Batch
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </form>
@@ -257,7 +309,13 @@ export default function DomainsPage() {
                           {checking === domain.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                           Audit Now
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-white/5" title="Audit History">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-9 w-9 text-muted-foreground hover:bg-white/5" 
+                          onClick={() => viewHistory(domain)}
+                          title="Audit History"
+                        >
                           <History className="h-4 w-4" />
                         </Button>
                         <Button 
@@ -277,6 +335,72 @@ export default function DomainsPage() {
           </CardContent>
         </Card>
       </motion.div>
+      <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
+        <DialogContent className="glass-card !border-white/10 sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Batch Enrollment</DialogTitle>
+            <DialogDescription>Input multiple domains separated by commas or newlines.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="batch" className="mb-2 block text-xs font-bold uppercase tracking-widest">Domain List</Label>
+            <textarea 
+              id="batch"
+              className="w-full h-48 glass rounded-xl p-4 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary border border-white/5"
+              placeholder="example.com&#10;google.com, github.com"
+              value={batchDomains}
+              onChange={e => setBatchDomains(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsBatchOpen(false)}>Cancel</Button>
+            <Button onClick={handleBatchAdd} disabled={adding} className="bg-primary hover:bg-primary/90 text-white min-w-[120px]">
+              {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              Enroll Assets
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="glass-card !border-white/10 sm:max-w-[600px] max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" /> Audit Trail: <span className="text-foreground">{selectedDomain?.domain}</span>
+            </DialogTitle>
+            <DialogDescription>Historical validation records and security handshake metrics.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto mt-4 rounded-lg border border-white/5">
+             {loadingHistory ? (
+                <div className="py-24 flex flex-col items-center justify-center gap-3">
+                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                   <p className="text-xs text-muted-foreground animate-pulse">Retracing audit steps...</p>
+                </div>
+             ) : auditHistory.length === 0 ? (
+                <div className="py-24 text-center text-muted-foreground italic text-sm">No historical audits recorded for this asset.</div>
+             ) : (
+                <div className="divide-y divide-white/5">
+                   {auditHistory.map((item, i) => (
+                      <div key={i} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                         <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                               <div className={`h-2 w-2 rounded-full ${item.is_success ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                               <span className="text-xs font-bold">{item.is_success ? 'Security Passed' : 'Security Failed'}</span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{new Date(item.checked_at).toLocaleString()}</span>
+                         </div>
+                         {!item.is_success && (
+                            <span className="text-[10px] text-red-500/80 font-medium italic max-w-[200px] truncate">{item.error_message}</span>
+                         )}
+                         {item.certificate_id && (
+                            <Badge variant="outline" className="text-[9px] font-mono glass border-white/5">CERT:{item.certificate_id.slice(0, 8)}</Badge>
+                         )}
+                      </div>
+                   ))}
+                </div>
+             )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

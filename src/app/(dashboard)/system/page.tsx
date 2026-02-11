@@ -10,6 +10,14 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table"
+import { 
   Dialog, 
   DialogContent, 
   DialogDescription, 
@@ -29,6 +37,7 @@ export default function SystemPage() {
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ old_password: "", new_password: "" })
   const [changing, setChanging] = useState(false)
+  const [isPartitionDialogOpen, setIsPartitionDialogOpen] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -235,15 +244,55 @@ export default function SystemPage() {
               </p>
             </div>
           </CardContent>
-          <CardFooter className="pt-6 border-t border-white/5 px-8">
+          <CardFooter className="pt-6 border-t border-white/5 px-8 gap-3">
+            <Dialog open={isPartitionDialogOpen} onOpenChange={setIsPartitionDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex-1 h-12 glass border-white/5 text-xs font-bold uppercase tracking-widest transition-all active:scale-95">
+                  <Database className="h-4 w-4 mr-2" />
+                  View Shards
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="glass-card !border-white/10 sm:max-w-[800px] max-h-[80vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Storage Partitions</DialogTitle>
+                  <DialogDescription>Live catalog of data segments across all agents.</DialogDescription>
+                </DialogHeader>
+                <div className="flex-1 overflow-auto rounded-lg border border-white/5 mt-4">
+                  <Table>
+                    <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                      <TableRow>
+                        <TableHead>Agent</TableHead>
+                        <TableHead>Metric</TableHead>
+                        <TableHead className="text-right">Points</TableHead>
+                        <TableHead className="text-right">Size</TableHead>
+                        <TableHead>Span</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {storage?.partitions.map((p) => (
+                        <TableRow key={p.partition_id} className="border-white/5 group hover:bg-white/5">
+                          <TableCell className="font-mono text-xs">{p.agent_id}</TableCell>
+                          <TableCell className="text-xs font-medium">{p.metric_name}</TableCell>
+                          <TableCell className="text-right text-xs">{(p.points_count ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs">{formatBytes(p.size_bytes ?? 0)}</TableCell>
+                          <TableCell className="text-[10px] text-muted-foreground">
+                            {p.start_time ? new Date(p.start_time).toLocaleDateString() : 'N/A'} - {p.end_time ? new Date(p.end_time).toLocaleDateString() : 'N/A'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </DialogContent>
+            </Dialog>
             <Button 
               variant="destructive" 
-              className="w-full h-12 gap-3 shadow-xl transition-all active:scale-95 text-xs font-bold uppercase tracking-widest" 
+              className="flex-1 h-12 gap-3 shadow-xl transition-all active:scale-95 text-xs font-bold uppercase tracking-widest" 
               onClick={handleCleanup}
               disabled={cleaning}
             >
               {cleaning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              {cleaning ? "Purging Segments..." : "Force Storage Reclamation"}
+              Purge
             </Button>
           </CardFooter>
         </Card>

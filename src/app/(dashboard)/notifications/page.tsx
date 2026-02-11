@@ -52,7 +52,10 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isRecipientsDialogOpen, setIsRecipientsDialogOpen] = useState(false)
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null)
+  const [recipientInput, setRecipientInput] = useState("")
+  const [loadingRecipients, setLoadingRecipients] = useState(false)
   const [channelForm, setChannelForm] = useState<CreateChannelRequest>({
     name: "",
     channel_type: "email",
@@ -124,6 +127,37 @@ export default function NotificationsPage() {
       recipients: []
     })
     setIsDialogOpen(true)
+  }
+
+  const handleOpenRecipients = async (id: string) => {
+    setEditingChannelId(id)
+    setIsRecipientsDialogOpen(true)
+    setLoadingRecipients(true)
+    try {
+      const data = await api.getRecipients(id)
+      setRecipientInput(data.join(", "))
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load recipients"))
+      setIsRecipientsDialogOpen(false)
+    } finally {
+      setLoadingRecipients(false)
+    }
+  }
+
+  const handleUpdateRecipients = async () => {
+    if (!editingChannelId) return
+    setLoadingRecipients(true)
+    try {
+      const list = recipientInput.split(",").map(r => r.trim()).filter(Boolean)
+      await api.setRecipients(editingChannelId, { recipients: list })
+      toast.success("Recipients updated")
+      setIsRecipientsDialogOpen(false)
+      fetchChannels()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Update failed"))
+    } finally {
+      setLoadingRecipients(false)
+    }
   }
 
   const handleOpenEdit = (channel: ChannelOverview) => {
@@ -250,6 +284,46 @@ export default function NotificationsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={isRecipientsDialogOpen} onOpenChange={setIsRecipientsDialogOpen}>
+          <DialogContent className="glass-card !border-white/10 sm:max-w-[400px]">
+             <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                   <Users className="h-5 w-5 text-primary" /> Manage Recipients
+                </DialogTitle>
+                <DialogDescription>Update delivery targets for this channel.</DialogDescription>
+             </DialogHeader>
+             <div className="py-4 space-y-4">
+                {loadingRecipients ? (
+                   <div className="flex flex-col items-center justify-center py-8 gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <span className="text-xs text-muted-foreground">Retrieving registry...</span>
+                   </div>
+                ) : (
+                   <div className="space-y-4">
+                      <div className="space-y-2">
+                         <Label>Recipient List (Comma separated)</Label>
+                         <Textarea 
+                            placeholder="user1@example.com, user2@example.com"
+                            value={recipientInput}
+                            onChange={e => setRecipientInput(e.target.value)}
+                            className="glass-card border-white/5 font-mono text-xs h-32"
+                         />
+                         <p className="text-[10px] text-muted-foreground leading-tight italic">
+                            Duplicates and empty values will be automatically sanitized on sync.
+                         </p>
+                      </div>
+                   </div>
+                )}
+             </div>
+             <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsRecipientsDialogOpen(false)}>Close</Button>
+                <Button onClick={handleUpdateRecipients} disabled={loadingRecipients} className="bg-primary hover:bg-primary/90">
+                   {loadingRecipients ? <Loader2 className="h-4 w-4 animate-spin" /> : "Synchronize Recipients"}
+                </Button>
+             </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card className="glass border-white/10 overflow-hidden">
@@ -344,8 +418,18 @@ export default function NotificationsPage() {
                           size="icon" 
                           onClick={() => handleOpenEdit(channel)}
                           className="h-8 w-8 hover:bg-white/5"
+                          title="Edit Config"
                         >
                           <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleOpenRecipients(channel.id)}
+                          className="h-8 w-8 hover:text-primary hover:bg-primary/10 transition-all"
+                          title="Manage Recipients"
+                        >
+                          <Users className="h-3.5 w-3.5" />
                         </Button>
                         <Button 
                           variant="ghost" 

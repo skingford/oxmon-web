@@ -26,16 +26,21 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function ActiveAlertsPage() {
   const [alerts, setAlerts] = useState<AlertEventResponse[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      const data = await api.getActiveAlerts({ limit: 100 });
-      setAlerts(data);
+      const [alertsData, summaryData] = await Promise.all([
+        api.getActiveAlerts({ limit: 100 }),
+        api.getAlertSummary()
+      ]);
+      setAlerts(alertsData);
+      setSummary(summaryData);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to fetch active alerts");
+      toast.error("Failed to fetch alerts data");
     } finally {
       setLoading(false);
     }
@@ -68,11 +73,29 @@ export default function ActiveAlertsPage() {
     <Card className="glass-card border-none shadow-xl">
       <CardHeader className="pb-4">
         <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Active Alerts</CardTitle>
-            <CardDescription>
-              Real-time unresolved issues requiring attention.
-            </CardDescription>
+          <div className="flex items-center gap-4">
+            <div>
+              <CardTitle>Active Alerts</CardTitle>
+              <CardDescription>
+                Real-time unresolved issues requiring attention.
+              </CardDescription>
+            </div>
+            {summary && (
+              <div className="hidden md:flex items-center gap-2 border-l border-white/10 pl-4 ml-2">
+                <Badge variant="outline" className="glass border-red-500/20 text-red-500 gap-1.5 h-7">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  {summary.critical || 0} Critical
+                </Badge>
+                <Badge variant="outline" className="glass border-amber-500/20 text-amber-500 gap-1.5 h-7">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  {summary.warning || 0} Warning
+                </Badge>
+                <Badge variant="outline" className="glass border-blue-500/20 text-blue-500 gap-1.5 h-7">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  {summary.info || 0} Info
+                </Badge>
+              </div>
+            )}
           </div>
           <Button 
             variant="ghost" 

@@ -37,10 +37,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, RefreshCw, Trash2, Key, Server, ShieldCheck, Search, MoreHorizontal } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Trash2, Key, Server, ShieldCheck, Search, MoreHorizontal, Edit2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function AgentsPage() {
   const [activeTab, setActiveTab] = useState("all-agents");
