@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo } from 'react';
 import type { LogEntry } from '@/lib/types';
 import { generateLiveLog } from '@/actions/ai';
 import { BarChart } from 'recharts/lib/chart/BarChart';
@@ -16,49 +16,112 @@ interface LogsProps {
   onClear?: () => void;
 }
 
+const HISTOGRAM_DATA = Array.from({ length: 15 }, (_, index) => ({
+  time: index,
+  errors: (index * 3 + 1) % 4,
+  warnings: (index * 5 + 2) % 8
+}));
+
 const Logs: React.FC<LogsProps> = ({ logs, onAnalyze, logAnalysis, isAnalyzing, onClear }) => {
   const { tr } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const [isLiveTrace, setIsLiveTrace] = useState(false);
   const [liveLogs, setLiveLogs] = useState<LogEntry[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isPollingRef = useRef(false);
+  const pollingTimeoutRef = useRef<number | null>(null);
+  const liveLogCounterRef = useRef(0);
 
-  const allLogs = [...liveLogs, ...logs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
 
-  const filteredLogs = allLogs.filter(log => {
-    return log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           log.category.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const allLogs = useMemo(
+    () => [...liveLogs, ...logs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+    [liveLogs, logs]
+  );
+
+  const filteredLogs = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return allLogs;
+    }
+
+    return allLogs.filter((log) => {
+      return log.message.toLowerCase().includes(normalizedSearchTerm)
+           || log.category.toLowerCase().includes(normalizedSearchTerm);
+    });
+  }, [allLogs, normalizedSearchTerm]);
 
   useEffect(() => {
-    let interval: any;
-    if (isLiveTrace) {
-      interval = setInterval(async () => {
-        try {
-          const entry = await generateLiveLog();
-          if (entry && entry.message) {
-            const level = (entry.level === 'info' || entry.level === 'warn' || entry.level === 'error') ? entry.level : 'info';
-            const category = (entry.category === 'system' || entry.category === 'auth' || entry.category === 'agent' || entry.category === 'cert') ? entry.category : 'system';
-            const newLog: LogEntry = {
-              id: 'ag_' + Math.random().toString(36).substr(2, 9),
-              timestamp: new Date().toISOString().replace('T', ' ').substr(0, 19),
-              level,
-              category,
-              message: entry.message
-            };
-            setLiveLogs(prev => [newLog, ...prev].slice(0, 100));
-          }
-        } catch (e) { console.error(tr('Trace interrupted.')); }
-      }, 2500);
+    if (!isLiveTrace) {
+      if (pollingTimeoutRef.current !== null) {
+        window.clearTimeout(pollingTimeoutRef.current);
+        pollingTimeoutRef.current = null;
+      }
+
+      isPollingRef.current = false;
+      return;
     }
-    return () => clearInterval(interval);
+
+    let cancelled = false;
+
+    const pollLiveLog = async () => {
+      if (cancelled || isPollingRef.current) {
+        return;
+      }
+
+      isPollingRef.current = true;
+
+      try {
+        const entry = await generateLiveLog();
+
+        if (entry && entry.message) {
+          const level = (entry.level === 'info' || entry.level === 'warn' || entry.level === 'error') ? entry.level : 'info';
+          const category = (entry.category === 'system' || entry.category === 'auth' || entry.category === 'agent' || entry.category === 'cert') ? entry.category : 'system';
+          liveLogCounterRef.current += 1;
+
+          const newLog: LogEntry = {
+            id: `ag_${Date.now()}_${liveLogCounterRef.current}`,
+            timestamp: new Date().toISOString().replace('T', ' ').substr(0, 19),
+            level,
+            category,
+            message: entry.message
+          };
+
+          setLiveLogs((prev) => [newLog, ...prev].slice(0, 100));
+        }
+      } catch {
+        console.error(tr('Trace interrupted.'));
+      } finally {
+        isPollingRef.current = false;
+
+        if (!cancelled) {
+          pollingTimeoutRef.current = window.setTimeout(() => {
+            void pollLiveLog();
+          }, 2500);
+        }
+      }
+    };
+
+    void pollLiveLog();
+
+    return () => {
+      cancelled = true;
+
+      if (pollingTimeoutRef.current !== null) {
+        window.clearTimeout(pollingTimeoutRef.current);
+        pollingTimeoutRef.current = null;
+      }
+
+      isPollingRef.current = false;
+    };
   }, [isLiveTrace, tr]);
 
-  const histogramData = Array.from({ length: 15 }).map((_, i) => ({
-    time: i,
-    errors: Math.floor(Math.random() * 4),
-    warnings: Math.floor(Math.random() * 8)
-  }));
+  useEffect(() => {
+    if (!scrollRef.current || !isLiveTrace) {
+      return;
+    }
+
+    scrollRef.current.scrollTop = 0;
+  }, [liveLogs, isLiveTrace]);
 
   return (
     <div className="space-y-10 animate-fade-in h-full flex flex-col pb-16">
@@ -94,7 +157,7 @@ const Logs: React.FC<LogsProps> = ({ logs, onAnalyze, logAnalysis, isAnalyzing, 
         </div>
         <div className="h-28 relative z-10">
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={histogramData}>
+                <BarChart data={HISTOGRAM_DATA}>
                     <Bar dataKey="errors" fill="#FF3B30" radius={[6, 6, 0, 0]} />
                     <Bar dataKey="warnings" fill="#FF9F0A" radius={[6, 6, 0, 0]} />
                 </BarChart>

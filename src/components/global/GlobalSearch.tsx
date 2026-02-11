@@ -1,18 +1,19 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo, useDeferredValue } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAppContext } from '@/contexts/AppContext'
+import { useAppDataContext } from '@/contexts/AppContext'
 import { useI18n } from '@/contexts/I18nContext'
 import { buildLocalePath } from '@/lib/locale'
 
 const GlobalSearch: React.FC = () => {
   const router = useRouter()
-  const { agents, certificates, alerts } = useAppContext()
+  const { agents, certificates, alerts } = useAppDataContext()
   const { locale, t } = useI18n()
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
+  const deferredSearchTerm = useDeferredValue(searchTerm)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -24,11 +25,27 @@ const GlobalSearch: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const searchResults = searchTerm.trim() === '' ? [] : [
-    ...agents.filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || a.ip.includes(searchTerm)).map(a => ({ type: 'Agent', id: a.id, label: a.name, sub: a.ip })),
-    ...certificates.filter(c => c.domain.toLowerCase().includes(searchTerm.toLowerCase())).map(c => ({ type: 'Certificate', id: c.id, label: c.domain, sub: c.issuer })),
-    ...alerts.filter(a => a.message.toLowerCase().includes(searchTerm.toLowerCase()) || a.source.toLowerCase().includes(searchTerm.toLowerCase())).map(a => ({ type: 'Alert', id: a.id, label: a.source, sub: a.message }))
-  ]
+  const normalizedTerm = deferredSearchTerm.trim().toLowerCase()
+
+  const searchResults = useMemo(() => {
+    if (!normalizedTerm) {
+      return []
+    }
+
+    const results = [
+      ...agents
+        .filter((agent) => agent.name.toLowerCase().includes(normalizedTerm) || agent.ip.includes(normalizedTerm))
+        .map((agent) => ({ type: 'Agent', id: agent.id, label: agent.name, sub: agent.ip })),
+      ...certificates
+        .filter((certificate) => certificate.domain.toLowerCase().includes(normalizedTerm))
+        .map((certificate) => ({ type: 'Certificate', id: certificate.id, label: certificate.domain, sub: certificate.issuer })),
+      ...alerts
+        .filter((alert) => alert.message.toLowerCase().includes(normalizedTerm) || alert.source.toLowerCase().includes(normalizedTerm))
+        .map((alert) => ({ type: 'Alert', id: alert.id, label: alert.source, sub: alert.message }))
+    ]
+
+    return results.slice(0, 30)
+  }, [agents, certificates, alerts, normalizedTerm])
 
   const resultTypeLabel: Record<string, string> = {
     Agent: t('search.type.agent'),

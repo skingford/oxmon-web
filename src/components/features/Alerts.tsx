@@ -15,6 +15,13 @@ interface AlertsProps {
   onRunScript?: (agentName: string, command: string) => void;
 }
 
+const ACTIVITY_DATA = Array.from({ length: 30 }, (_, index) => ({
+  time: index,
+  val: index > 10 && index < 20
+    ? (index * 7 + 3) % 15
+    : (index * 3 + 1) % 5
+}));
+
 const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onDiagnose, onRunScript }) => {
   const { tr } = useI18n();
   const [filter, setFilter] = useState<'All' | 'Critical' | 'Warning' | 'Info' | 'Resolved'>('All');
@@ -41,11 +48,6 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
       const match = text.match(/```(?:bash|sh|shell)?\s*([\s\S]*?)```/);
       return match ? match[1].trim() : null;
   };
-
-  const activityData = Array.from({ length: 30 }).map((_, i) => ({
-    time: i,
-    val: Math.floor(Math.random() * (i > 10 && i < 20 ? 15 : 5))
-  }));
 
   return (
     <div className="space-y-10 animate-fade-in pb-20">
@@ -82,7 +84,7 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
                 </div>
                 <div className="h-40 relative z-10">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={activityData}>
+                        <AreaChart data={ACTIVITY_DATA}>
                             <defs>
                                 <linearGradient id="colorPulse" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#FF3B30" stopOpacity={0.2}/>

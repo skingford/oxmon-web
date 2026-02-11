@@ -10,6 +10,8 @@ interface InfrastructureProps {
     onShowToast: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
+const TELEMETRY_DURATIONS = [1.2, 1.55, 1.9, 2.25, 2.6, 2.95, 1.35, 1.75];
+
 const GlobalNodeMap: React.FC<{ agents: Agent[] }> = ({ agents }) => {
     const { tr } = useI18n();
     const regions = [
@@ -188,7 +190,7 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                             <line x1={centerX} y1={centerY} x2={tx} y2={ty} stroke={isActive ? '#0071E3' : '#E5E5EA'} strokeWidth={isActive ? 5 : 2} className="transition-all duration-1000" strokeDasharray={isTelemetryFlowOn ? "14 7" : "none"} />
                                             {isTelemetryFlowOn && (
                                                 <circle r="5" fill="#0071E3" className="animate-ping opacity-50 shadow-2xl shadow-primary/50">
-                                                    <animateMotion dur={`${1.2 + Math.random() * 1.5}s`} repeatCount="indefinite" path={`M ${centerX} ${centerY} L ${tx} ${ty}`} />
+                                                    <animateMotion dur={`${TELEMETRY_DURATIONS[i % TELEMETRY_DURATIONS.length]}s`} repeatCount="indefinite" path={`M ${centerX} ${centerY} L ${tx} ${ty}`} />
                                                 </circle>
                                             )}
                                         </g>

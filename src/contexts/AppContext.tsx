@@ -4,9 +4,12 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import type { Agent, Certificate, Alert, TeamMember, AppPreferences, LogEntry } from '@/lib/types'
 import { MOCK_AGENTS, MOCK_CERTS, MOCK_ALERTS, MOCK_TEAM, DEFAULT_PREFERENCES } from '@/lib/constants'
 import { getFromLocalStorage, setToLocalStorage } from '@/lib/localStorage'
+import { createId } from '@/lib/id'
 import { useI18n } from '@/contexts/I18nContext'
 
-interface AppContextType {
+type AgentCommandInjection = { agent: Agent; command: string } | null
+
+interface AppDataContextType {
   agents: Agent[]
   setAgents: React.Dispatch<React.SetStateAction<Agent[]>>
   certificates: Certificate[]
@@ -21,6 +24,11 @@ interface AppContextType {
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>
   apiKey: string
   setApiKey: React.Dispatch<React.SetStateAction<string>>
+  handleUpdateAgentStatus: (id: string) => void
+  handleAcknowledgeAlert: (id: string) => void
+}
+
+interface AppUiContextType {
   toasts: ToastMessage[]
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void
   removeToast: (id: string) => void
@@ -34,13 +42,13 @@ interface AppContextType {
   setIsLogAnalyzing: React.Dispatch<React.SetStateAction<boolean>>
   predictiveData: string | null
   setPredictiveData: React.Dispatch<React.SetStateAction<string | null>>
-  terminalInjection: { agent: Agent; command: string } | null
-  setTerminalInjection: React.Dispatch<React.SetStateAction<{ agent: Agent; command: string } | null>>
-  handleUpdateAgentStatus: (id: string) => void
-  handleAcknowledgeAlert: (id: string) => void
+  terminalInjection: AgentCommandInjection
+  setTerminalInjection: React.Dispatch<React.SetStateAction<AgentCommandInjection>>
   isAuthenticated: boolean
   setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>
 }
+
+type AppContextType = AppDataContextType & AppUiContextType
 
 export interface ToastMessage {
   id: string
@@ -48,15 +56,39 @@ export interface ToastMessage {
   type: 'success' | 'error' | 'info'
 }
 
-const AppContext = createContext<AppContextType | null>(null)
+const AppDataContext = createContext<AppDataContextType | null>(null)
+const AppUiContext = createContext<AppUiContextType | null>(null)
+
+function getMissingContextErrorMessage(hookName: string): string {
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+  return `${hookName} must be used within AppProvider (pathname: ${pathname})`
+}
+
+export function useAppDataContext() {
+  const ctx = useContext(AppDataContext)
+
+  if (!ctx) {
+    throw new Error(getMissingContextErrorMessage('useAppDataContext'))
+  }
+
+  return ctx
+}
+
+export function useAppUiContext() {
+  const ctx = useContext(AppUiContext)
+
+  if (!ctx) {
+    throw new Error(getMissingContextErrorMessage('useAppUiContext'))
+  }
+
+  return ctx
+}
 
 export function useAppContext() {
-  const ctx = useContext(AppContext)
-  if (!ctx) {
-    const pathname = typeof window !== 'undefined' ? window.location.pathname : 'unknown'
-    throw new Error(`useAppContext must be used within AppProvider (pathname: ${pathname})`)
-  }
-  return ctx
+  const data = useAppDataContext()
+  const ui = useAppUiContext()
+
+  return useMemo(() => ({ ...data, ...ui }), [data, ui])
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -69,7 +101,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [logAnalysis, setLogAnalysis] = useState<string | null>(null)
   const [isLogAnalyzing, setIsLogAnalyzing] = useState(false)
   const [predictiveData, setPredictiveData] = useState<string | null>(null)
-  const [terminalInjection, setTerminalInjection] = useState<{ agent: Agent; command: string } | null>(null)
+  const [terminalInjection, setTerminalInjection] = useState<AgentCommandInjection>(null)
 
   // Initialize with defaults first (SSR compatible)
   const [agents, setAgents] = useState<Agent[]>(MOCK_AGENTS)
@@ -98,7 +130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAlerts(getFromLocalStorage('ox_alerts', MOCK_ALERTS))
 
     // Generate fresh API key
-    setApiKey('ox_live_' + Math.random().toString(36).substr(2, 24))
+    setApiKey(`ox_live_${createId('key')}`)
 
     // Set current timestamps for logs
     const now = new Date().toISOString().replace('T', ' ').substr(0, 19)
@@ -109,34 +141,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Save to localStorage when data changes (skip on first render)
-  // Apply client-localstorage-schema pattern with versioning
+  // Debounced batch write to reduce frequent sync writes
   useEffect(() => {
     if (!isHydrated) return
-    setToLocalStorage('ox_agents', agents)
-  }, [agents, isHydrated])
 
-  useEffect(() => {
-    if (!isHydrated) return
-    setToLocalStorage('ox_certs', certificates)
-  }, [certificates, isHydrated])
+    const timeoutId = window.setTimeout(() => {
+      setToLocalStorage('ox_agents', agents)
+      setToLocalStorage('ox_certs', certificates)
+      setToLocalStorage('ox_team', teamMembers)
+      setToLocalStorage('ox_prefs', preferences)
+      setToLocalStorage('ox_alerts', alerts)
+    }, 150)
 
-  useEffect(() => {
-    if (!isHydrated) return
-    setToLocalStorage('ox_team', teamMembers)
-  }, [teamMembers, isHydrated])
-
-  useEffect(() => {
-    if (!isHydrated) return
-    setToLocalStorage('ox_prefs', preferences)
-  }, [preferences, isHydrated])
-
-  useEffect(() => {
-    if (!isHydrated) return
-    setToLocalStorage('ox_alerts', alerts)
-  }, [alerts, isHydrated])
+    return () => window.clearTimeout(timeoutId)
+  }, [agents, certificates, teamMembers, preferences, alerts, isHydrated])
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = Math.random().toString(36).substr(2, 9)
+    const id = createId('toast')
     const localizedMessage = localizeToast(message)
     setToasts((prev) => [...prev, { id, message: localizedMessage, type }])
   }, [localizeToast])
@@ -155,8 +176,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast(`Incident ${id} resolved via voice link.`, 'success')
   }, [showToast])
 
-  // Memoize context value to prevent unnecessary re-renders (rerender-memo pattern)
-  const contextValue = useMemo(() => ({
+  const dataContextValue = useMemo(() => ({
     agents, setAgents,
     certificates, setCertificates,
     alerts, setAlerts,
@@ -164,6 +184,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     preferences, setPreferences,
     logs, setLogs,
     apiKey, setApiKey,
+    handleUpdateAgentStatus,
+    handleAcknowledgeAlert,
+  }), [
+    agents, certificates, alerts, teamMembers, preferences, logs, apiKey,
+    handleUpdateAgentStatus, handleAcknowledgeAlert,
+  ])
+
+  const uiContextValue = useMemo(() => ({
     toasts, showToast, removeToast,
     aiSummary, setAiSummary,
     isAiLoading, setIsAiLoading,
@@ -171,21 +199,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isLogAnalyzing, setIsLogAnalyzing,
     predictiveData, setPredictiveData,
     terminalInjection, setTerminalInjection,
-    handleUpdateAgentStatus,
-    handleAcknowledgeAlert,
     isAuthenticated, setIsAuthenticated,
   }), [
-    agents, certificates, alerts, teamMembers, preferences, logs, apiKey,
     toasts, showToast, removeToast,
     aiSummary, isAiLoading, logAnalysis, isLogAnalyzing,
     predictiveData, terminalInjection,
-    handleUpdateAgentStatus, handleAcknowledgeAlert,
-    isAuthenticated
+    isAuthenticated,
   ])
 
   return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
+    <AppDataContext.Provider value={dataContextValue}>
+      <AppUiContext.Provider value={uiContextValue}>
+        {children}
+      </AppUiContext.Provider>
+    </AppDataContext.Provider>
   )
 }

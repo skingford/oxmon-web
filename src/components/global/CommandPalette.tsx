@@ -2,10 +2,9 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAppContext } from '@/contexts/AppContext'
+import { useAppUiContext } from '@/contexts/AppContext'
 import { useI18n } from '@/contexts/I18nContext'
 import { interpretCommand } from '@/actions/ai'
-import { ViewState } from '@/lib/types'
 import { buildLocalePath } from '@/lib/locale'
 
 interface CommandPaletteProps {
@@ -27,7 +26,7 @@ const viewToRoute: Record<string, string> = {
 
 const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose }) => {
   const router = useRouter()
-  const { showToast } = useAppContext()
+  const { showToast } = useAppUiContext()
   const { locale, t } = useI18n()
   const [commandInput, setCommandInput] = useState('')
   const [isCommandExecuting, setIsCommandExecuting] = useState(false)

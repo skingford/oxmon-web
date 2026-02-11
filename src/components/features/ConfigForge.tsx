@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { generateConfig } from '@/actions/ai';
+import { createId } from '@/lib/id';
 import { useI18n } from '@/contexts/I18nContext';
 
 interface ConfigForgeProps {
@@ -47,7 +48,7 @@ const ConfigForge: React.FC<ConfigForgeProps> = ({ onShowToast }) => {
 
       setGeneratedCode(result.code);
       setHardeningReport(result.hardeningReport);
-      setHistory(prev => [{ id: Math.random().toString(36).substr(2, 9), title: finalPrompt.substring(0, 30) + '...', code: result.code, date: new Date().toLocaleTimeString() }, ...prev].slice(0, 10));
+      setHistory(prev => [{ id: createId('forge'), title: finalPrompt.substring(0, 30) + '...', code: result.code, date: new Date().toLocaleTimeString() }, ...prev].slice(0, 10));
       onShowToast(tr('Object successfully forged.'), 'success');
     } catch (err) { onShowToast(tr('Neural forge failure.'), 'error'); } finally { setIsGenerating(false); }
   };

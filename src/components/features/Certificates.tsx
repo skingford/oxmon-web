@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Certificate } from '@/lib/types';
 import { analyzeCertificateTrust } from '@/actions/ai';
+import { createId } from '@/lib/id';
 import { useI18n } from '@/contexts/I18nContext';
 
 interface CertificatesProps {
@@ -40,7 +41,7 @@ const Certificates: React.FC<CertificatesProps> = ({ certificates, onAddCertific
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cert: Certificate = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: createId('cert'),
       domain: newCert.domain,
       issuer: newCert.issuer,
       status: 'Valid',

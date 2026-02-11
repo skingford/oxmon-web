@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import type { Agent } from '@/lib/types'
+import { createHexToken } from '@/lib/id'
 import { useI18n } from '@/contexts/I18nContext'
 
 interface AgentsProps {
@@ -52,6 +53,10 @@ function statusBadge(status: Agent['status']) {
   }
 }
 
+function createAgentAccessToken(): string {
+  return `ox_ag_${createHexToken(72)}`
+}
+
 export default function Agents({
   agents,
   onAddAgent,
@@ -61,12 +66,21 @@ export default function Agents({
   initialInjection,
   clearInjection,
 }: AgentsProps) {
-  const { tr } = useI18n()
+  const { tr, t } = useI18n()
   const router = useRouter()
   const params = useParams<{ locale?: string }>()
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState<'list' | 'whitelist'>('list')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isAddAgentModalOpen, setIsAddAgentModalOpen] = useState(false)
+  const [newAgentId, setNewAgentId] = useState('')
+  const [newAgentDescription, setNewAgentDescription] = useState('')
+  const [addAgentError, setAddAgentError] = useState<string | null>(null)
+  const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
+  const [generatedToken, setGeneratedToken] = useState('')
+  const [generatedTokenAgentId, setGeneratedTokenAgentId] = useState('')
+  const [isTokenCopied, setIsTokenCopied] = useState(false)
+  const [isRegenerateConfirmOpen, setIsRegenerateConfirmOpen] = useState(false)
 
   const locale = params?.locale === 'zh' || params?.locale === 'en' ? params.locale : 'en'
 
@@ -77,6 +91,55 @@ export default function Agents({
     onShowToast(`${tr('Initiating smart session for')} ${initialInjection.agent.id}...`, 'info')
     clearInjection?.()
   }, [clearInjection, initialInjection, onShowToast, tr])
+
+  useEffect(() => {
+    if (!isAddAgentModalOpen) return
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setIsAddAgentModalOpen(false)
+      setNewAgentId('')
+      setNewAgentDescription('')
+      setAddAgentError(null)
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [isAddAgentModalOpen])
+
+  useEffect(() => {
+    if (!isTokenModalOpen) return
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      closeTokenModal()
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [isTokenModalOpen])
+
+  useEffect(() => {
+    if (!isRegenerateConfirmOpen) return
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setIsRegenerateConfirmOpen(false)
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [isRegenerateConfirmOpen])
+
+  useEffect(() => {
+    if (!isTokenCopied) return
+
+    const timeoutId = window.setTimeout(() => {
+      setIsTokenCopied(false)
+    }, 1600)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isTokenCopied])
 
   const rows = useMemo<AgentListRow[]>(() => {
     if (agents.length === 0) return FALLBACK_ROWS
@@ -134,20 +197,87 @@ export default function Agents({
     })
   }
 
-  const handleAddAgent = () => {
+  const closeAddAgentModal = () => {
+    setIsAddAgentModalOpen(false)
+    setNewAgentId('')
+    setNewAgentDescription('')
+    setAddAgentError(null)
+  }
+
+  const handleOpenAddAgentModal = () => {
+    setIsAddAgentModalOpen(true)
+    setAddAgentError(null)
+  }
+
+  const openTokenModal = (agentId: string) => {
+    setGeneratedToken(createAgentAccessToken())
+    setGeneratedTokenAgentId(agentId)
+    setIsTokenModalOpen(true)
+    setIsTokenCopied(false)
+    setIsRegenerateConfirmOpen(false)
+  }
+
+  const closeTokenModal = () => {
+    setIsTokenModalOpen(false)
+    setIsTokenCopied(false)
+    setIsRegenerateConfirmOpen(false)
+  }
+
+  const handleOpenRegenerateConfirm = () => {
+    setIsRegenerateConfirmOpen(true)
+  }
+
+  const handleConfirmRegenerateToken = () => {
+    setGeneratedToken(createAgentAccessToken())
+    setIsTokenCopied(false)
+    setIsRegenerateConfirmOpen(false)
+    onShowToast('Security key rotated.', 'success')
+  }
+
+  const handleCopyGeneratedToken = async () => {
+    if (!generatedToken) return
+
+    try {
+      await navigator.clipboard.writeText(generatedToken)
+      setIsTokenCopied(true)
+      onShowToast(tr('Key copied.'), 'info')
+    } catch {
+      onShowToast(tr('Export failed.'), 'error')
+    }
+  }
+
+  const handleAddAgent = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const normalizedId = newAgentId.trim()
+    const normalizedDescription = newAgentDescription.trim()
+
+    if (!normalizedId) {
+      setAddAgentError(t('agents.modal.error.required'))
+      return
+    }
+
+    const idExists = rows.some((row) => row.id.toLowerCase() === normalizedId.toLowerCase())
+    if (idExists) {
+      setAddAgentError(t('agents.modal.error.duplicate'))
+      return
+    }
+
     const nextIndex = rows.length + 1
-    const nextId = `ox-agent-${String(nextIndex).padStart(3, '0')}`
 
     onAddAgent({
-      id: nextId,
-      name: nextId,
+      id: normalizedId,
+      name: normalizedDescription || normalizedId,
       status: 'Online',
       ip: `10.0.1.${nextIndex}`,
       version: 'v1.2.6',
       lastReported: 'Just now',
     })
 
-    onShowToast(`Node ${nextId} deployed.`, 'success')
+    setActiveTab('list')
+    setSearchTerm(normalizedId)
+    onShowToast(`Node ${normalizedId} deployed.`, 'success')
+    closeAddAgentModal()
   }
 
   return (
@@ -168,7 +298,7 @@ export default function Agents({
           </button>
           <button
             type="button"
-            onClick={handleAddAgent}
+            onClick={handleOpenAddAgentModal}
             className="flex items-center gap-2 rounded-lg bg-[#0073e6] px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-[#0073e6]/20 transition-all hover:bg-[#005bb5] active:scale-95"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
@@ -292,14 +422,25 @@ export default function Agents({
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-[#86868b]">{tr(row.lastReported)}</td>
 
                         <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                          <button
-                            type="button"
-                            onClick={() => onDeleteAgent(row.id)}
-                            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#1D1D1F]"
-                            aria-label={`${tr('Actions')} ${row.id}`}
-                          >
-                            <span className="material-symbols-outlined">more_horiz</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openTokenModal(row.id)}
+                              className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#1D1D1F]"
+                              aria-label={`${t('agents.table.generateToken')} ${row.id}`}
+                            >
+                              <span className="material-symbols-outlined">key</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => onDeleteAgent(row.id)}
+                              className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#1D1D1F]"
+                              aria-label={`${tr('Actions')} ${row.id}`}
+                            >
+                              <span className="material-symbols-outlined">more_horiz</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -389,6 +530,230 @@ export default function Agents({
           </section>
         </>
       )}
+
+      {isAddAgentModalOpen ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={closeAddAgentModal}
+          />
+
+          <div className="relative flex w-full max-w-[520px] transform flex-col overflow-hidden rounded-lg bg-white shadow-2xl ring-1 ring-black/5">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+              <h2 className="text-xl font-bold tracking-tight text-[#111418]">{t('agents.modal.title')}</h2>
+              <button
+                type="button"
+                onClick={closeAddAgentModal}
+                className="text-gray-400 transition-colors hover:text-gray-500 focus:outline-none"
+                aria-label={t('agents.modal.close')}
+              >
+                <span className="material-symbols-outlined text-2xl">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleAddAgent}>
+              <div className="flex flex-col gap-5 px-6 py-6">
+                <div className="space-y-2">
+                  <label htmlFor="agent-id" className="block text-sm font-semibold leading-6 text-[#111418]">
+                    {t('agents.modal.agentId')} <span className="text-xs align-top text-red-500">*</span>
+                  </label>
+
+                  <div className="relative rounded-md shadow-sm">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <span className="material-symbols-outlined text-[20px] text-gray-400">dns</span>
+                    </div>
+                    <input
+                      id="agent-id"
+                      name="agent-id"
+                      type="text"
+                      autoFocus
+                      value={newAgentId}
+                      onChange={(event) => {
+                        setNewAgentId(event.target.value)
+                        if (addAgentError) setAddAgentError(null)
+                      }}
+                      placeholder={t('agents.modal.agentIdPlaceholder')}
+                      className="block w-full rounded-md border-0 py-3 pl-10 text-[#111418] shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 transition-shadow focus:ring-2 focus:ring-inset focus:ring-[#0b73da] sm:text-sm sm:leading-6"
+                    />
+                  </div>
+
+                  {addAgentError ? <p className="mt-1 text-xs text-red-500">{addAgentError}</p> : null}
+                  <p className="mt-1 text-xs text-gray-500">{t('agents.modal.agentIdHint')}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="agent-description" className="block text-sm font-semibold leading-6 text-[#111418]">
+                    {t('agents.modal.description')} <span className="ml-1 text-xs font-normal text-gray-400">({t('agents.modal.optional')})</span>
+                  </label>
+
+                  <div className="relative rounded-md shadow-sm">
+                    <textarea
+                      id="agent-description"
+                      name="agent-description"
+                      rows={4}
+                      value={newAgentDescription}
+                      onChange={(event) => setNewAgentDescription(event.target.value)}
+                      placeholder={t('agents.modal.descriptionPlaceholder')}
+                      className="block w-full resize-none rounded-md border-0 px-3 py-3 text-[#111418] shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 transition-shadow focus:ring-2 focus:ring-inset focus:ring-[#0b73da] sm:text-sm sm:leading-6"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-row-reverse gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
+                <button
+                  type="submit"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#0b73da] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b73da] sm:w-auto"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  <span>{t('agents.modal.addButton')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={closeAddAgentModal}
+                  className="inline-flex w-full justify-center rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-[#0b73da] shadow-sm ring-1 ring-inset ring-[#0b73da]/30 transition-colors hover:bg-gray-50 sm:w-auto"
+                >
+                  {t('agents.modal.cancelButton')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {isTokenModalOpen ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity" onClick={closeTokenModal} />
+
+          <div className="relative w-full max-w-lg transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all sm:my-8">
+            <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+              <div className="sm:flex sm:items-start">
+                <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                  <span className="material-symbols-outlined text-2xl text-green-600">check_circle</span>
+                </div>
+
+                <div className="mt-3 w-full text-center sm:ml-4 sm:mt-0 sm:text-left">
+                  <h3 className="text-xl font-semibold leading-6 text-slate-900">{t('agents.tokenModal.title')}</h3>
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm text-slate-500">{t('agents.tokenModal.subtitle')}</p>
+                    <p className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      {t('agents.tokenModal.agentTag', { id: generatedTokenAgentId })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 py-2 sm:px-6">
+              <div className="mb-5 rounded-lg border border-yellow-200 bg-[#FFF8E1] p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <span aria-hidden="true" className="material-symbols-outlined text-xl text-orange-500">warning</span>
+                  </div>
+
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-orange-800">{t('agents.tokenModal.warningTitle')}</h3>
+                    <div className="mt-1 text-sm text-orange-700">
+                      <p>{t('agents.tokenModal.warningDescription')}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500" htmlFor="token-display">
+                {t('agents.tokenModal.tokenLabel')}
+              </label>
+
+              <div className="relative mb-6 flex items-center">
+                <div className="flex w-full items-center rounded-lg border border-transparent bg-[#F5F5F7] pr-2 transition-colors duration-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#0b73da]">
+                  <div className="flex-1 overflow-x-auto py-3 pl-4 [scrollbar-width:thin]">
+                    <code id="token-display" className="whitespace-nowrap font-mono text-sm text-slate-700 select-all">{generatedToken}</code>
+                  </div>
+
+                  <div className="mx-2 h-8 w-px bg-slate-200" />
+
+                  <button
+                    type="button"
+                    onClick={handleCopyGeneratedToken}
+                    aria-label={t('agents.tokenModal.copyAria')}
+                    className="group relative flex flex-col items-center justify-center rounded-md p-2 transition-colors hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0b73da] focus:ring-offset-2"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-[#0b73da] transition-transform group-hover:scale-110">content_copy</span>
+                    <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      {isTokenCopied ? t('agents.tokenModal.copied') : t('agents.tokenModal.copy')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 bg-slate-50 px-4 py-4 sm:flex sm:flex-row-reverse sm:px-6">
+              <button
+                type="button"
+                onClick={closeTokenModal}
+                className="inline-flex w-full justify-center rounded-lg bg-[#0b73da] px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#0b73da]/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b73da] sm:ml-3 sm:w-auto"
+              >
+                {t('agents.tokenModal.closeButton')}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenRegenerateConfirm}
+                className="mt-3 inline-flex w-full justify-center rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300 sm:mt-0 sm:w-auto"
+              >
+                {t('agents.tokenModal.regenerateButton')}
+              </button>
+
+              <div className="mt-3 flex items-center sm:mr-auto sm:mt-0">
+                <span className="material-symbols-outlined mr-1 text-sm text-slate-400">lock</span>
+                <span className="text-xs text-slate-500">{t('agents.tokenModal.authenticated')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isRegenerateConfirmOpen ? (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[8px]" role="dialog" aria-modal="true">
+          <div
+            className="absolute inset-0"
+            onClick={() => setIsRegenerateConfirmOpen(false)}
+          />
+
+          <div className="relative w-full max-w-[480px] transform overflow-hidden rounded-lg border border-gray-100/10 bg-white shadow-2xl transition-all">
+            <div className="pointer-events-none absolute top-0 left-0 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0b73da]/5 blur-3xl" />
+            <div className="pointer-events-none absolute right-0 bottom-0 h-64 w-64 translate-x-1/3 translate-y-1/3 rounded-full bg-purple-500/5 blur-3xl" />
+
+            <div className="relative flex flex-col items-center p-8 text-center">
+              <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#0b73da]/10">
+                <span className="material-symbols-outlined text-[32px] text-[#0b73da]">sync_lock</span>
+              </div>
+
+              <h2 className="mb-3 text-2xl font-bold tracking-tight text-gray-900">{t('agents.regenerateConfirm.title')}</h2>
+              <p className="mb-8 text-[15px] leading-relaxed text-gray-600">{t('agents.regenerateConfirm.description')}</p>
+
+              <div className="flex w-full flex-col-reverse justify-center gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setIsRegenerateConfirmOpen(false)}
+                  className="h-11 min-w-[120px] flex-1 rounded-lg border border-gray-200 bg-white px-6 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                >
+                  {t('agents.regenerateConfirm.cancelButton')}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmRegenerateToken}
+                  className="h-11 min-w-[120px] flex-1 rounded-lg bg-[#0b73da] px-6 text-sm font-semibold text-white shadow-md transition-all hover:bg-blue-600 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#0b73da]/50"
+                >
+                  {t('agents.regenerateConfirm.confirmButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

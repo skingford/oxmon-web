@@ -1,16 +1,11 @@
 'use client'
 
-import { useAppContext } from '@/contexts/AppContext'
+import { useAppDataContext, useAppUiContext } from '@/contexts/AppContext'
 import Agents from '@/components/features/Agents'
 
 export default function AgentsPage() {
-  const {
-    agents,
-    setAgents,
-    terminalInjection,
-    setTerminalInjection,
-    showToast
-  } = useAppContext()
+  const { agents, setAgents } = useAppDataContext()
+  const { terminalInjection, setTerminalInjection, showToast } = useAppUiContext()
 
   return (
     <Agents

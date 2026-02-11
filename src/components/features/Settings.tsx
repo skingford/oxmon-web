@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { TeamMember, AppPreferences } from '@/lib/types';
 import { performGovernanceAudit } from '@/actions/ai';
+import { createId } from '@/lib/id';
 import { useI18n } from '@/contexts/I18nContext';
 
 type SettingsTab = 'workspace' | 'team' | 'routing' | 'vault';
@@ -58,7 +59,7 @@ const Settings: React.FC<SettingsProps> = ({
       e.preventDefault();
       if (!inviteEmail) return;
       onAddTeamMember({
-          id: 'tm_' + Math.random().toString(36).substr(2, 9),
+          id: createId('tm'),
           name: inviteEmail.split('@')[0],
           email: inviteEmail,
           role: 'Viewer',
