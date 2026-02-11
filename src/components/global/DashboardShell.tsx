@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { I18nProvider } from '@/contexts/I18nContext'
 import { AppProvider } from '@/contexts/AppContext'
 import Sidebar from '@/components/global/Sidebar'
@@ -8,6 +8,10 @@ import Header from '@/components/global/Header'
 
 function DashboardShellInner({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const handleCloseSidebar = useCallback(() => {
+    setIsMobileMenuOpen(false)
+  }, [])
 
   useEffect(() => {
     const handleToggle = () => setIsMobileMenuOpen((prev) => !prev)
@@ -19,7 +23,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full overflow-hidden bg-[#f5f7f8] text-[#1D1D1F] font-sans selection:bg-[#0071E3]/10">
       <Sidebar
         isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
+        onClose={handleCloseSidebar}
       />
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         <Header />

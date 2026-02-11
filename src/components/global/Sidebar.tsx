@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useI18n } from '@/contexts/I18nContext'
 
@@ -27,12 +27,23 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
   const router = useRouter()
   const { tr } = useI18n()
 
-  const segments = pathname?.split('/').filter(Boolean) ?? []
-  const locale = segments[0] === 'zh' || segments[0] === 'en' ? segments[0] : 'en'
-  const currentView = segments[1] ?? 'dashboard'
-  const currentSubView = segments[2] ?? ''
+  const { locale, currentView, currentSubView } = useMemo(() => {
+    const segments = pathname?.split('/').filter(Boolean) ?? []
+    const currentLocale = segments[0] === 'zh' || segments[0] === 'en' ? segments[0] : 'en'
 
-  const navItems: NavItem[] = [
+    return {
+      locale: currentLocale,
+      currentView: segments[1] ?? 'dashboard',
+      currentSubView: segments[2] ?? '',
+    }
+  }, [pathname])
+
+  const handleNavigate = useCallback((href: string) => {
+    router.push(href)
+    onClose()
+  }, [onClose, router])
+
+  const navItems = useMemo<NavItem[]>(() => [
     { key: 'dashboard', icon: 'dashboard', label: tr('Dashboard'), href: `/${locale}/dashboard` },
     { key: 'agents', icon: 'dns', label: tr('Agents'), href: `/${locale}/agents` },
     { key: 'metrics', icon: 'query_stats', label: tr('Metrics'), href: `/${locale}/metrics` },
@@ -56,7 +67,7 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
     },
     { key: 'alerts', icon: 'notifications', label: tr('Alerts'), href: `/${locale}/alerts` },
     { key: 'settings', icon: 'settings', label: tr('Settings'), href: `/${locale}/settings` },
-  ]
+  ], [locale, tr])
 
   return (
     <>
@@ -101,10 +112,7 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
               <div key={item.key} className="flex flex-col gap-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    router.push(item.href)
-                    onClose()
-                  }}
+                  onClick={() => handleNavigate(item.href)}
                   className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 ${
                     isItemActive
                       ? 'bg-[#0073e6]/10 text-[#0073e6]'
@@ -130,10 +138,7 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
                           <button
                             key={`${item.key}-${child.key}`}
                             type="button"
-                            onClick={() => {
-                              router.push(child.href)
-                              onClose()
-                            }}
+                            onClick={() => handleNavigate(child.href)}
                             className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors duration-200 ${
                               isChildActive
                                 ? 'bg-[#0073e6]/10 font-semibold text-[#0073e6]'

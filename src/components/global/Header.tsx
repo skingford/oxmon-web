@@ -55,16 +55,20 @@ const Header: React.FC = () => {
   const pathname = usePathname()
   const { tr } = useI18n()
 
-  const routeMeta = useMemo(() => {
+  const { view, routeMeta } = useMemo(() => {
     const segments = pathname?.split('/').filter(Boolean) ?? []
-    const view = segments[1] ?? 'dashboard'
-    return ROUTE_TITLE_MAP[view] ?? ROUTE_TITLE_MAP.dashboard
+    const nextView = segments[1] ?? 'dashboard'
+
+    return {
+      view: nextView,
+      routeMeta: ROUTE_TITLE_MAP[nextView] ?? ROUTE_TITLE_MAP.dashboard,
+    }
   }, [pathname])
 
   if (
-    pathname?.includes('/agents')
-    || pathname?.includes('/domains')
-    || pathname?.includes('/certificate-detail-view-example-com')
+    view === 'agents'
+    || view === 'domains'
+    || view === 'certificate-detail-view-example-com'
   ) {
     return null
   }

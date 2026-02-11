@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import type { Agent } from '@/lib/types'
 import { createHexToken } from '@/lib/id'
@@ -70,6 +70,7 @@ export default function Agents({
   const router = useRouter()
   const params = useParams<{ locale?: string }>()
   const [searchTerm, setSearchTerm] = useState('')
+  const deferredSearchTerm = useDeferredValue(searchTerm)
   const [activeTab, setActiveTab] = useState<'list' | 'whitelist'>('list')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isAddAgentModalOpen, setIsAddAgentModalOpen] = useState(false)
@@ -82,7 +83,9 @@ export default function Agents({
   const [isTokenCopied, setIsTokenCopied] = useState(false)
   const [isRegenerateConfirmOpen, setIsRegenerateConfirmOpen] = useState(false)
 
-  const locale = params?.locale === 'zh' || params?.locale === 'en' ? params.locale : 'en'
+  const locale = useMemo(() => (
+    params?.locale === 'zh' || params?.locale === 'en' ? params.locale : 'en'
+  ), [params?.locale])
 
   useEffect(() => {
     if (!initialInjection) return
@@ -157,7 +160,7 @@ export default function Agents({
   }, [agents])
 
   const filteredRows = useMemo(() => {
-    const keyword = searchTerm.trim().toLowerCase()
+    const keyword = deferredSearchTerm.trim().toLowerCase()
     if (!keyword) return rows
 
     return rows.filter((row) => {
@@ -167,13 +170,18 @@ export default function Agents({
         || row.status.toLowerCase().includes(keyword)
       )
     })
-  }, [rows, searchTerm])
+  }, [deferredSearchTerm, rows])
 
-  const visibleRows = filteredRows.slice(0, 5)
-  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selectedIds.includes(row.id))
+  const visibleRows = useMemo(() => filteredRows.slice(0, 5), [filteredRows])
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const visibleRowIdSet = useMemo(() => new Set(visibleRows.map((row) => row.id)), [visibleRows])
+  const existingRowIdSet = useMemo(() => new Set(rows.map((row) => row.id.toLowerCase())), [rows])
+  const allVisibleSelected = useMemo(() => (
+    visibleRows.length > 0 && visibleRows.every((row) => selectedIdSet.has(row.id))
+  ), [selectedIdSet, visibleRows])
   const totalResults = 42
 
-  const setRowSelection = (id: string, checked: boolean) => {
+  const setRowSelection = useCallback((id: string, checked: boolean) => {
     setSelectedIds((prev) => {
       if (checked) {
         if (prev.includes(id)) return prev
@@ -182,11 +190,11 @@ export default function Agents({
 
       return prev.filter((selectedId) => selectedId !== id)
     })
-  }
+  }, [])
 
-  const setAllVisibleSelection = (checked: boolean) => {
+  const setAllVisibleSelection = useCallback((checked: boolean) => {
     if (!checked) {
-      setSelectedIds((prev) => prev.filter((id) => !visibleRows.some((row) => row.id === id)))
+      setSelectedIds((prev) => prev.filter((id) => !visibleRowIdSet.has(id)))
       return
     }
 
@@ -195,46 +203,46 @@ export default function Agents({
       visibleRows.forEach((row) => next.add(row.id))
       return Array.from(next)
     })
-  }
+  }, [visibleRowIdSet, visibleRows])
 
-  const closeAddAgentModal = () => {
+  const closeAddAgentModal = useCallback(() => {
     setIsAddAgentModalOpen(false)
     setNewAgentId('')
     setNewAgentDescription('')
     setAddAgentError(null)
-  }
+  }, [])
 
-  const handleOpenAddAgentModal = () => {
+  const handleOpenAddAgentModal = useCallback(() => {
     setIsAddAgentModalOpen(true)
     setAddAgentError(null)
-  }
+  }, [])
 
-  const openTokenModal = (agentId: string) => {
+  const openTokenModal = useCallback((agentId: string) => {
     setGeneratedToken(createAgentAccessToken())
     setGeneratedTokenAgentId(agentId)
     setIsTokenModalOpen(true)
     setIsTokenCopied(false)
     setIsRegenerateConfirmOpen(false)
-  }
+  }, [])
 
-  const closeTokenModal = () => {
+  const closeTokenModal = useCallback(() => {
     setIsTokenModalOpen(false)
     setIsTokenCopied(false)
     setIsRegenerateConfirmOpen(false)
-  }
+  }, [])
 
-  const handleOpenRegenerateConfirm = () => {
+  const handleOpenRegenerateConfirm = useCallback(() => {
     setIsRegenerateConfirmOpen(true)
-  }
+  }, [])
 
-  const handleConfirmRegenerateToken = () => {
+  const handleConfirmRegenerateToken = useCallback(() => {
     setGeneratedToken(createAgentAccessToken())
     setIsTokenCopied(false)
     setIsRegenerateConfirmOpen(false)
     onShowToast('Security key rotated.', 'success')
-  }
+  }, [onShowToast])
 
-  const handleCopyGeneratedToken = async () => {
+  const handleCopyGeneratedToken = useCallback(async () => {
     if (!generatedToken) return
 
     try {
@@ -244,7 +252,7 @@ export default function Agents({
     } catch {
       onShowToast(tr('Export failed.'), 'error')
     }
-  }
+  }, [generatedToken, onShowToast, tr])
 
   const handleAddAgent = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -257,7 +265,7 @@ export default function Agents({
       return
     }
 
-    const idExists = rows.some((row) => row.id.toLowerCase() === normalizedId.toLowerCase())
+    const idExists = existingRowIdSet.has(normalizedId.toLowerCase())
     if (idExists) {
       setAddAgentError(t('agents.modal.error.duplicate'))
       return
@@ -382,7 +390,7 @@ export default function Agents({
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {visibleRows.map((row) => {
                     const badge = statusBadge(row.status)
-                    const checked = selectedIds.includes(row.id)
+                    const checked = selectedIdSet.has(row.id)
 
                     return (
                       <tr key={row.id} className="group transition-colors hover:bg-gray-50/80">

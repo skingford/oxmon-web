@@ -2,6 +2,23 @@
 
 import { useI18n } from '@/contexts/I18nContext'
 
+interface DashboardStatCard {
+  id: string
+  title: string
+  value: string
+  icon: string
+  iconWrapClass: string
+  valueSuffix?: string
+  detail?: string
+  footerType: 'progress' | 'badge' | 'text'
+  footerLabel?: string
+  footerValue?: string
+  progressWidth?: string
+  footerIcon?: string
+  footerText?: string
+  footerClassName?: string
+}
+
 const STATIC_ALERTS = [
   {
     id: 'critical-web-01',
@@ -23,6 +40,42 @@ const STATIC_ALERTS = [
     source: 'web-02',
     message: 'Scheduled disk cleanup completed successfully',
     time: '1 hr ago',
+  },
+] as const
+
+const DASHBOARD_STATS: DashboardStatCard[] = [
+  {
+    id: 'online-rate',
+    title: 'Agent Online Rate',
+    value: '3/5',
+    detail: '(60%)',
+    icon: 'cloud_done',
+    iconWrapClass: 'bg-blue-50 text-[#0073e6]',
+    footerType: 'progress' as const,
+    footerLabel: 'Progress',
+    footerValue: '60%',
+    progressWidth: '60%',
+  },
+  {
+    id: 'service-version',
+    title: 'Service Version',
+    value: 'v0.1.0',
+    icon: 'deployed_code',
+    iconWrapClass: 'bg-purple-50 text-purple-600',
+    footerType: 'badge' as const,
+    footerIcon: 'check_circle',
+    footerText: 'Up to date',
+    footerClassName: 'text-green-600',
+  },
+  {
+    id: 'system-uptime',
+    title: 'System Uptime',
+    value: '3',
+    valueSuffix: 'Days',
+    icon: 'timer',
+    iconWrapClass: 'bg-green-50 text-green-600',
+    footerType: 'text' as const,
+    footerText: 'Since last maintenance',
   },
 ] as const
 
@@ -48,57 +101,46 @@ export default function Dashboard() {
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <article className="h-40 bg-white rounded-xl p-6 border border-[#E5E5EA] shadow-card flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-slate-500">{tr('Agent Online Rate')}</p>
-              <h4 className="mt-2 text-3xl font-bold text-slate-900">
-                3/5 <span className="text-lg font-medium text-slate-400">(60%)</span>
-              </h4>
+        {DASHBOARD_STATS.map((stat) => (
+          <article key={stat.id} className="h-40 bg-white rounded-xl p-6 border border-[#E5E5EA] shadow-card flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-500">{tr(stat.title)}</p>
+                <h4 className="mt-2 text-3xl font-bold text-slate-900">
+                  {stat.value}
+                  {stat.valueSuffix ? ` ${tr(stat.valueSuffix)}` : null}
+                  {stat.detail ? <span className="text-lg font-medium text-slate-400"> {stat.detail}</span> : null}
+                </h4>
+              </div>
+              <div className={`p-2 rounded-lg ${stat.iconWrapClass}`}>
+                <span className="material-symbols-outlined">{stat.icon}</span>
+              </div>
             </div>
-            <div className="p-2 rounded-lg bg-blue-50 text-[#0073e6]">
-              <span className="material-symbols-outlined">cloud_done</span>
-            </div>
-          </div>
-          <div className="w-full">
-            <div className="flex items-center justify-between mb-1.5 text-xs font-medium text-slate-500">
-              <span>{tr('Progress')}</span>
-              <span>60%</span>
-            </div>
-            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-              <div className="h-2 rounded-full bg-[#0073e6]" style={{ width: '60%' }} />
-            </div>
-          </div>
-        </article>
 
-        <article className="h-40 bg-white rounded-xl p-6 border border-[#E5E5EA] shadow-card flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-slate-500">{tr('Service Version')}</p>
-              <h4 className="mt-2 text-3xl font-bold text-slate-900">v0.1.0</h4>
-            </div>
-            <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
-              <span className="material-symbols-outlined">deployed_code</span>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-sm text-green-600">
-            <span className="material-symbols-outlined text-[16px]">check_circle</span>
-            <span>{tr('Up to date')}</span>
-          </div>
-        </article>
+            {stat.footerType === 'progress' ? (
+              <div className="w-full">
+                <div className="flex items-center justify-between mb-1.5 text-xs font-medium text-slate-500">
+                  <span>{tr(stat.footerLabel)}</span>
+                  <span>{stat.footerValue}</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-2 rounded-full bg-[#0073e6]" style={{ width: stat.progressWidth }} />
+                </div>
+              </div>
+            ) : null}
 
-        <article className="h-40 bg-white rounded-xl p-6 border border-[#E5E5EA] shadow-card flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-slate-500">{tr('System Uptime')}</p>
-              <h4 className="mt-2 text-3xl font-bold text-slate-900">3 {tr('Days')}</h4>
-            </div>
-            <div className="p-2 rounded-lg bg-green-50 text-green-600">
-              <span className="material-symbols-outlined">timer</span>
-            </div>
-          </div>
-          <div className="mt-4 text-sm text-slate-500">{tr('Since last maintenance')}</div>
-        </article>
+            {stat.footerType === 'badge' ? (
+              <div className={`mt-4 flex items-center gap-2 text-sm ${stat.footerClassName}`}>
+                <span className="material-symbols-outlined text-[16px]">{stat.footerIcon}</span>
+                <span>{tr(stat.footerText)}</span>
+              </div>
+            ) : null}
+
+            {stat.footerType === 'text' ? (
+              <div className="mt-4 text-sm text-slate-500">{tr(stat.footerText)}</div>
+            ) : null}
+          </article>
+        ))}
       </section>
 
       <section className="space-y-4">

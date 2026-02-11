@@ -93,6 +93,52 @@ const METRIC_RECORDS: MetricRecord[] = [
   },
 ]
 
+const SORTED_METRIC_RECORDS = [...METRIC_RECORDS].sort(
+  (left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime(),
+)
+
+const METRIC_SUMMARY = (() => {
+  const uniqueAgentIds = new Set<string>()
+  const uniqueMetricNames = new Set<string>()
+  let totalValue = 0
+
+  for (const record of METRIC_RECORDS) {
+    uniqueAgentIds.add(record.agent_id)
+    uniqueMetricNames.add(record.metric_name)
+    totalValue += record.value
+  }
+
+  return {
+    totalRecords: METRIC_RECORDS.length,
+    uniqueAgents: uniqueAgentIds.size,
+    uniqueMetricTypes: uniqueMetricNames.size,
+    averageValue: METRIC_RECORDS.length > 0 ? totalValue / METRIC_RECORDS.length : 0,
+  }
+})()
+
+const TIMESTAMP_FORMATTERS = {
+  en: new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'UTC',
+  }),
+  zh: new Intl.DateTimeFormat('zh-CN', {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'UTC',
+  }),
+}
+
+const TIMESTAMP_CACHE = new Map<string, string>()
+
 function formatMetricValue(value: number): string {
   if (value <= 1) {
     return `${(value * 100).toFixed(1)}%`
@@ -102,15 +148,22 @@ function formatMetricValue(value: number): string {
 }
 
 function formatTimestamp(value: string, locale: 'en' | 'zh'): string {
-  return `${new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZone: 'UTC',
-  }).format(new Date(value))} UTC`
+  const cacheKey = `${locale}:${value}`
+  const cached = TIMESTAMP_CACHE.get(cacheKey)
+
+  if (cached) {
+    return cached
+  }
+
+  const formatter = locale === 'zh' ? TIMESTAMP_FORMATTERS.zh : TIMESTAMP_FORMATTERS.en
+  const formattedValue = `${formatter.format(new Date(value))} UTC`
+
+  if (TIMESTAMP_CACHE.size > 1024) {
+    TIMESTAMP_CACHE.clear()
+  }
+
+  TIMESTAMP_CACHE.set(cacheKey, formattedValue)
+  return formattedValue
 }
 
 function getValueClass(value: number): string {
@@ -127,33 +180,26 @@ function getValueClass(value: number): string {
 
 export default function Metrics({ locale }: MetricsProps) {
   const isZh = locale === 'zh'
-  const sortedRecords = [...METRIC_RECORDS].sort(
-    (left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime(),
-  )
-
-  const uniqueAgents = new Set(METRIC_RECORDS.map((record) => record.agent_id)).size
-  const uniqueMetricNames = new Set(METRIC_RECORDS.map((record) => record.metric_name)).size
-  const averageValue = METRIC_RECORDS.reduce((total, record) => total + record.value, 0) / METRIC_RECORDS.length
-  const latestRecord = sortedRecords[0]
+  const latestRecord = SORTED_METRIC_RECORDS[0]
 
   return (
     <div className="flex min-w-0 flex-col pb-6 pt-6">
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-xl border border-[#e5e5e5]/60 bg-white p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_0_rgba(0,0,0,0.03)]">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{isZh ? '数据点' : 'Data Points'}</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{METRIC_RECORDS.length}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{METRIC_SUMMARY.totalRecords}</p>
         </div>
         <div className="rounded-xl border border-[#e5e5e5]/60 bg-white p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_0_rgba(0,0,0,0.03)]">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{isZh ? '活跃节点' : 'Active Agents'}</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{uniqueAgents}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{METRIC_SUMMARY.uniqueAgents}</p>
         </div>
         <div className="rounded-xl border border-[#e5e5e5]/60 bg-white p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_0_rgba(0,0,0,0.03)]">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{isZh ? '指标类型' : 'Metric Types'}</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{uniqueMetricNames}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{METRIC_SUMMARY.uniqueMetricTypes}</p>
         </div>
         <div className="rounded-xl border border-[#e5e5e5]/60 bg-white p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_0_rgba(0,0,0,0.03)]">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{isZh ? '平均值' : 'Average Value'}</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{formatMetricValue(averageValue)}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{formatMetricValue(METRIC_SUMMARY.averageValue)}</p>
         </div>
       </div>
 
@@ -193,7 +239,7 @@ export default function Metrics({ locale }: MetricsProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e5e5e5]/60">
-              {sortedRecords.map((record) => (
+              {SORTED_METRIC_RECORDS.map((record) => (
                 <tr key={record.id} className="transition-colors hover:bg-slate-50">
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-600">
                     {formatTimestamp(record.timestamp, locale)}

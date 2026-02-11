@@ -1,36 +1,111 @@
 'use client'
 
-import React, { useState } from 'react';
-import { searchKnowledgeBase } from '@/actions/ai';
-import { useI18n } from '@/contexts/I18nContext';
+import React, { useCallback, useMemo, useState } from 'react'
+import { searchKnowledgeBase } from '@/actions/ai'
+import { useI18n } from '@/contexts/I18nContext'
+
+type InsightItem = {
+  title: string
+  sub: string
+  icon: string
+}
+
+type GroundingChunk = {
+  web?: {
+    uri?: string
+    title?: string
+  }
+}
+
+const TRENDING_INSIGHTS: InsightItem[] = [
+  {
+    title: 'Nginx Optimization',
+    sub: 'Load balancing strategies for 1M+ RPS clusters.',
+    icon: 'speed',
+  },
+  {
+    title: 'Zero Trust K8s',
+    sub: 'Hardening pod security policies in multi-tenant environments.',
+    icon: 'shield_with_heart',
+  },
+  {
+    title: 'Multi-Region DR',
+    sub: 'Optimizing EBS snapshots for low RTO failover.',
+    icon: 'settings_backup_restore',
+  },
+  {
+    title: 'Neural Observability',
+    sub: 'Integrating AI-driven log correlation pipelines.',
+    icon: 'psychology',
+  },
+]
+
+const QUICK_HINTS = [
+  'Diagnose high CPU wait patterns on DB-01',
+  'Analyze TLS 1.3 trust chain vulnerabilities',
+  'Distributed cluster latency optimization',
+  'Automating remediation for Nginx 504 events',
+]
 
 const HelpCenter: React.FC = () => {
-  const { tr } = useI18n();
-  const [query, setQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [groundingChunks, setGroundingChunks] = useState<any[]>([]);
+  const { tr } = useI18n()
+  const [query, setQuery] = useState('')
+  const [isSearching, setIsSearching] = useState(false)
+  const [answer, setAnswer] = useState<string | null>(null)
+  const [groundingChunks, setGroundingChunks] = useState<GroundingChunk[]>([])
 
-  const TRENDING_INSIGHTS = [
-    { title: "Nginx Optimization", sub: "Load balancing strategies for 1M+ RPS clusters.", icon: "speed" },
-    { title: "Zero Trust K8s", sub: "Hardening pod security policies in multi-tenant environments.", icon: "shield_with_heart" },
-    { title: "Multi-Region DR", sub: "Optimizing EBS snapshots for low RTO failover.", icon: "settings_backup_restore" },
-    { title: "Neural Observability", sub: "Integrating AI-driven log correlation pipelines.", icon: "psychology" }
-  ];
+  const referenceChunks = useMemo(
+    () =>
+      groundingChunks.flatMap((chunk) => {
+        const web = chunk.web
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    setIsSearching(true);
-    setAnswer(null);
-    setGroundingChunks([]);
+        if (!web?.uri) {
+          return []
+        }
+
+        return [{
+          uri: web.uri,
+          title: web.title ?? web.uri,
+        }]
+      }),
+    [groundingChunks],
+  )
+
+  const handleQueryChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(event.target.value)
+  }, [])
+
+  const handleInsightClick = useCallback((insight: InsightItem) => {
+    setQuery(`${tr(insight.title)}: ${tr(insight.sub)}`)
+  }, [tr])
+
+  const handleHintClick = useCallback((hint: string) => {
+    setQuery(hint)
+  }, [])
+
+  const handleSearch = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault()
+
+    const trimmedQuery = query.trim()
+
+    if (!trimmedQuery) {
+      return
+    }
+
+    setIsSearching(true)
+    setAnswer(null)
+    setGroundingChunks([])
 
     try {
-      const result = await searchKnowledgeBase(query);
-      setAnswer(result.answer);
-      setGroundingChunks(result.groundingChunks);
-    } catch (err) { setAnswer(tr("Neural connection to the Knowledge Hub failed.")); } finally { setIsSearching(false); }
-  };
+      const result = await searchKnowledgeBase(trimmedQuery)
+      setAnswer(result.answer)
+      setGroundingChunks((result.groundingChunks ?? []) as GroundingChunk[])
+    } catch {
+      setAnswer(tr('Neural connection to the Knowledge Hub failed.'))
+    } finally {
+      setIsSearching(false)
+    }
+  }, [query, tr])
 
   return (
     <div className="space-y-16 animate-fade-in max-w-6xl mx-auto h-full flex flex-col pb-16">
@@ -42,13 +117,13 @@ const HelpCenter: React.FC = () => {
         <p className="text-secondary max-w-2xl mx-auto leading-[2] text-base font-medium">{tr('Neural advisor for global infrastructure patterns, enterprise DevOps best practices, and Oxmon technical documentation.')}</p>
       </div>
 
-      <div className="bg-white rounded-[4rem] border border-[#E5E5EA] shadow-2xl p-4 relative group focus-within:ring-[14px] focus-within:ring-primary/5 transition-all">
+      <div className="relative group rounded-[4rem] border border-[#E5E5EA] bg-white p-4 shadow-2xl transition-all focus-within:ring-[14px] focus-within:ring-primary/5">
           <form onSubmit={handleSearch} className="flex items-center">
               <span className="material-symbols-outlined ml-8 text-gray-300 group-focus-within:text-primary transition-colors text-[32px]">search</span>
               <input
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={handleQueryChange}
                 placeholder={tr('Consult the SRE Neural Advisor...')}
                 className="flex-1 px-8 py-6 outline-none text-2xl font-bold text-text-main placeholder:text-gray-200"
               />
@@ -71,7 +146,9 @@ const HelpCenter: React.FC = () => {
                   {TRENDING_INSIGHTS.map((insight) => (
                       <button
                         key={insight.title}
-                        onClick={() => { setQuery(tr(insight.title) + ": " + tr(insight.sub)); }}
+                        onClick={() => {
+                          handleInsightClick(insight)
+                        }}
                         className="bg-white p-10 rounded-[3rem] border border-[#E5E5EA] text-left hover:border-primary hover:shadow-soft transition-all group flex flex-col justify-between h-56"
                       >
                           <div className="w-14 h-14 bg-gray-50 rounded-[1.5rem] flex items-center justify-center text-secondary group-hover:bg-primary/5 group-hover:text-primary transition-all">
@@ -85,13 +162,14 @@ const HelpCenter: React.FC = () => {
                   ))}
 
                   <div className="lg:col-span-4 mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 opacity-60">
-                    {[
-                      "Diagnose high CPU wait patterns on DB-01",
-                      "Analyze TLS 1.3 trust chain vulnerabilities",
-                      "Distributed cluster latency optimization",
-                      "Automating remediation for Nginx 504 events"
-                    ].map((hint) => (
-                      <button key={hint} onClick={() => { setQuery(hint); }} className="text-left p-10 bg-white/50 border-2 border-dashed border-[#E5E5EA] rounded-[3rem] text-[11px] font-black uppercase tracking-[0.3em] text-secondary hover:border-primary/40 hover:text-primary hover:bg-white transition-all">
+                    {QUICK_HINTS.map((hint) => (
+                      <button
+                        key={hint}
+                        onClick={() => {
+                          handleHintClick(hint)
+                        }}
+                        className="text-left p-10 bg-white/50 border-2 border-dashed border-[#E5E5EA] rounded-[3rem] text-[11px] font-black uppercase tracking-[0.3em] text-secondary hover:border-primary/40 hover:text-primary hover:bg-white transition-all"
+                      >
                           {tr(hint)}
                       </button>
                     ))}
@@ -122,15 +200,15 @@ const HelpCenter: React.FC = () => {
                       {answer}
                   </div>
 
-                  {groundingChunks.length > 0 && (
+                  {referenceChunks.length > 0 && (
                       <div className="mt-16 pt-12 border-t border-[#F5F5F7] relative z-10">
                           <p className="text-[11px] font-black text-secondary uppercase tracking-[0.4em] mb-10">{tr('Expert Reference Nodes')}</p>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {groundingChunks.map((chunk, i) => chunk.web && (
-                                  <a key={i} href={chunk.web.uri} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-8 bg-[#F5F5F7]/50 rounded-[2.5rem] hover:bg-white hover:shadow-soft border border-transparent hover:border-[#E5E5EA] transition-all group">
+                              {referenceChunks.map((chunk) => (
+                                  <a key={chunk.uri} href={chunk.uri} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-8 bg-[#F5F5F7]/50 rounded-[2.5rem] hover:bg-white hover:shadow-soft border border-transparent hover:border-[#E5E5EA] transition-all group">
                                       <div className="flex items-center gap-6 overflow-hidden">
                                           <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-[#E5E5EA] text-primary group-hover:bg-primary group-hover:text-white transition-all shadow-sm"><span className="material-symbols-outlined text-[20px]">link</span></div>
-                                          <span className="text-sm font-black text-text-main truncate tracking-tight">{chunk.web.title || chunk.web.uri}</span>
+                                          <span className="text-sm font-black text-text-main truncate tracking-tight">{chunk.title}</span>
                                       </div>
                                       <span className="material-symbols-outlined text-[#C1C1C1] group-hover:text-primary text-[24px] group-hover:translate-x-1 transition-all">arrow_outward</span>
                                   </a>
@@ -142,7 +220,7 @@ const HelpCenter: React.FC = () => {
           )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default HelpCenter;
+export default HelpCenter
