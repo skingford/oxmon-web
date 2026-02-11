@@ -86,16 +86,6 @@ export const PAGE_METADATA = {
       description: '分析基础设施性能并可视化时序指标数据。',
     },
   },
-  'agent-detailed-metrics-web-01': {
-    en: {
-      title: 'Agent web-01 Metrics | Oxmon Admin',
-      description: 'Detailed infrastructure metrics and health status for production web server web-01.',
-    },
-    zh: {
-      title: '节点 web-01 指标 | Oxmon Admin',
-      description: '生产 Web 节点 web-01 的详细基础设施指标与健康状态。',
-    },
-  },
   'oxmon-ssl-certificate-status': {
     en: {
       title: 'SSL Certificate Status | Oxmon Admin',

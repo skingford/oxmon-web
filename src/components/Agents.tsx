@@ -268,7 +268,7 @@ export default function Agents({
                         <td className="whitespace-nowrap px-6 py-4">
                           <button
                             type="button"
-                            onClick={() => router.push(`/${locale}/agent-detailed-metrics-web-01`)}
+                            onClick={() => router.push(`/${locale}/agents/${encodeURIComponent(row.id)}`)}
                             className="flex items-center gap-2 text-sm font-medium text-[#0073e6] transition-colors hover:text-[#005bb5]"
                           >
                             {row.id}

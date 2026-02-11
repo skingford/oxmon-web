@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 type AgentDetailedMetricsWeb01PageProps = {
   locale: 'en' | 'zh'
+  agentId: string
 }
 
 const CPU_BARS = ['40%', '35%', '50%', '60%', '55%', '45%', '48%', '52%', '65%', '58%', '50%', '45%'] as const
@@ -33,7 +34,8 @@ const RECENT_ACTIVITY = [
   },
 ] as const
 
-export default function AgentDetailedMetricsWeb01Page({ locale }: AgentDetailedMetricsWeb01PageProps) {
+export default function AgentDetailedMetricsWeb01Page({ locale, agentId }: AgentDetailedMetricsWeb01PageProps) {
+  const displayAgentId = decodeURIComponent(agentId)
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f7f8] font-sans text-slate-900 antialiased">
       <header className="sticky top-0 z-10 w-full border-b border-[#e5e7eb] bg-white">
@@ -65,14 +67,14 @@ export default function AgentDetailedMetricsWeb01Page({ locale }: AgentDetailedM
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <div className="mb-1 flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Agent: web-01</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Agent: {displayAgentId}</h1>
               <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
                 <span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                 Active
               </span>
             </div>
             <p className="max-w-2xl text-sm text-slate-500">
-              Detailed infrastructure metrics and health status for production web server.
+              Detailed infrastructure metrics and health status for {displayAgentId}.
             </p>
           </div>
 
