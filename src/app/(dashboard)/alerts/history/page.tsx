@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { Loader2, RefreshCw, Search, History, Calendar, Filter } from "lucide-react";
 import { toast } from "sonner";
 import {
     Select,
@@ -31,6 +31,7 @@ import {
     SelectTrigger,
     SelectValue,
   } from "@/components/ui/select"
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function AlertHistoryPage() {
   const [alerts, setAlerts] = useState<AlertEventResponse[]>([]);
@@ -69,130 +70,156 @@ export default function AlertHistoryPage() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-            <span>Alert History</span>
-            <Button variant="ghost" size="icon" onClick={fetchHistory}>
-                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-        </CardTitle>
-        <CardDescription>
-          Historical log of all alerts.
-        </CardDescription>
+    <Card className="glass-card border-none shadow-xl overflow-hidden">
+      <CardHeader className="pb-4 bg-muted/20">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+             <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                <History className="h-5 w-5" />
+             </div>
+             <div>
+                <CardTitle>Alert History</CardTitle>
+                <CardDescription>Comprehensive log of past infrastructure events.</CardDescription>
+             </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={fetchHistory}
+            className="glass transition-transform active:scale-95"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-4 items-end flex-wrap">
+      <CardContent className="pt-6 space-y-6">
+        <div className="flex gap-4 items-end flex-wrap glass p-4 rounded-xl border-white/5">
             <div className="grid gap-2">
-                <Label htmlFor="agent-filter">Agent ID</Label>
-                <Input 
-                    id="agent-filter" 
-                    placeholder="Filter by Agent ID" 
-                    value={agentId} 
-                    onChange={(e) => setAgentId(e.target.value)}
-                    className="w-[200px]"
-                />
+                <Label htmlFor="agent-filter" className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Agent ID</Label>
+                <div className="relative">
+                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                   <Input 
+                      id="agent-filter" 
+                      placeholder="e.g. agent-01" 
+                      value={agentId} 
+                      onChange={(e) => setAgentId(e.target.value)}
+                      className="w-[200px] pl-9 glass h-9 border-white/10"
+                   />
+                </div>
             </div>
             <div className="grid gap-2">
-                <Label>Severity</Label>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Severity</Label>
                 <Select value={severity} onValueChange={setSeverity}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[180px] glass h-9 border-white/10">
                         <SelectValue placeholder="Severity" />
                     </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
+                    <SelectContent className="glass">
+                        <SelectItem value="all">All Levels</SelectItem>
                         <SelectItem value="critical">Critical</SelectItem>
                         <SelectItem value="warning">Warning</SelectItem>
                         <SelectItem value="info">Info</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
-            <Button onClick={handleSearch}>
-                <Search className="mr-2 h-4 w-4" /> Search
+            <Button onClick={handleSearch} size="sm" className="h-9 px-6 shadow-md transition-all active:scale-95">
+                <Filter className="mr-2 h-4 w-4" /> Apply Filters
             </Button>
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Severity</TableHead>
-              <TableHead>Message</TableHead>
-              <TableHead>Agent</TableHead>
-              <TableHead>Metric</TableHead>
-              <TableHead>Time</TableHead>
-              <TableHead>Resolved At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader className="bg-muted/30">
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                </TableCell>
+                <TableHead>Severity</TableHead>
+                <TableHead>Event Details</TableHead>
+                <TableHead>Agent</TableHead>
+                <TableHead>Value / Threshold</TableHead>
+                <TableHead>Triggered</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
-            ) : alerts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  No alerts found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              alerts.map((alert) => (
-                <TableRow key={alert.id}>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        alert.severity === "critical"
-                          ? "destructive"
-                          : alert.severity === "warning"
-                          ? "outline" // fallback
-                          : "secondary"
-                      }
-                      className={
-                        alert.severity === "warning"
-                          ? "border-yellow-500 text-yellow-500"
-                          : ""
-                      }
+            </TableHeader>
+            <TableBody>
+              <AnimatePresence mode="popLayout">
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-48 text-center">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                    </TableCell>
+                  </TableRow>
+                ) : alerts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">
+                      No historical alerts found matching your filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  alerts.map((alert, i) => (
+                    <motion.tr 
+                      key={alert.id}
+                      initial={{ opacity: 0, x: -5 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.02 }}
+                      className="hover:bg-muted/30 transition-colors border-b last:border-0"
                     >
-                      {alert.severity}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{alert.message}</TableCell>
-                  <TableCell>{alert.agent_id}</TableCell>
-                  <TableCell>
-                    {alert.metric_name}: {alert.value}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(alert.timestamp).toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    {alert.resolved_at 
-                        ? new Date(alert.resolved_at).toLocaleString() 
-                        : <span className="text-yellow-500 italic">Unresolved</span>}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                      <TableCell>
+                        <Badge
+                          variant={alert.severity === "critical" ? "destructive" : "secondary"}
+                          className={`capitalize ${
+                            alert.severity === "warning" 
+                            ? "bg-amber-500/10 text-amber-600 border-amber-500/20" 
+                            : alert.severity === "info"
+                            ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                            : ""
+                          }`}
+                        >
+                          {alert.severity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate font-medium text-sm">{alert.message}</TableCell>
+                      <TableCell className="font-mono text-xs">{alert.agent_id}</TableCell>
+                      <TableCell className="text-xs">
+                        {alert.value} <span className="text-muted-foreground">/ {alert.threshold}</span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-[11px] font-medium">
+                        {new Date(alert.timestamp).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        {alert.resolved_at 
+                            ? <Badge variant="success" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Resolved</Badge>
+                            : <Badge variant="outline" className="text-amber-500 border-amber-500/50 animate-pulse">Open</Badge>}
+                      </TableCell>
+                    </motion.tr>
+                  ))
+                )}
+              </AnimatePresence>
+            </TableBody>
+          </Table>
+        </div>
 
-        <div className="flex items-center justify-end space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setOffset(Math.max(0, offset - limit))}
-              disabled={offset === 0 || loading}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setOffset(offset + limit)}
-              disabled={alerts.length < limit || loading}
-            >
-              Next
-            </Button>
+        <div className="flex items-center justify-between pt-4">
+            <p className="text-xs text-muted-foreground">
+              Page {Math.floor(offset / limit) + 1}
+            </p>
+            <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOffset(Math.max(0, offset - limit))}
+                  disabled={offset === 0 || loading}
+                  className="h-8"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOffset(offset + limit)}
+                  disabled={alerts.length < limit || loading}
+                  className="h-8"
+                >
+                  Next
+                </Button>
+              </div>
           </div>
       </CardContent>
     </Card>

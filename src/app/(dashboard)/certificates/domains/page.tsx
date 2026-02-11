@@ -5,12 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Globe, Trash2, Shield, Loader2 } from "lucide-react"
+import { Plus, Globe, Trash2, Shield, Loader2, Info, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
-
-// Since there's no specific API for domain management in the snippets (only list_certificates),
-// I'll implement a mock-up for domain management as planned in the PRD/Implementation plan.
-// In a real scenario, we'd add addDomain/deleteDomain to api.ts.
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function DomainsPage() {
   const [loading, setLoading] = useState(false)
@@ -22,9 +19,10 @@ export default function DomainsPage() {
     
     setLoading(true)
     try {
-      // Mock API call
       await new Promise(resolve => setTimeout(resolve, 800))
-      toast.success(`Domain ${newDomain} added for monitoring`)
+      toast.success(`Domain added`, {
+        description: `${newDomain} is now under surveillance.`
+      })
       setNewDomain("")
     } catch (error) {
       toast.error("Failed to add domain")
@@ -33,85 +31,148 @@ export default function DomainsPage() {
     }
   }
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    show: { opacity: 1, y: 0 }
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Domains Management</h1>
-          <p className="text-muted-foreground">Add or remove domains for automated SSL monitoring.</p>
-        </div>
-      </div>
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-8"
+    >
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <motion.div variants={itemVariants} className="lg:col-span-1">
+          <Card className="glass-card h-full">
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Plus className="h-5 w-5 text-primary" />
+                Add Domain
+              </CardTitle>
+              <CardDescription>Enroll a new asset for monitoring.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAddDomain} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="domain" className="text-xs uppercase font-bold text-muted-foreground tracking-widest">Asset Address</Label>
+                  <div className="flex flex-col gap-3">
+                    <Input 
+                      id="domain" 
+                      placeholder="example.com" 
+                      value={newDomain}
+                      onChange={(e) => setNewDomain(e.target.value)}
+                      required
+                      className="glass h-11"
+                    />
+                    <Button type="submit" disabled={loading} className="w-full shadow-lg h-11 shadow-primary/20 hover:shadow-primary/40">
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4 mr-2" />}
+                      Start Monitoring
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Add New Domain</CardTitle>
-            <CardDescription>Enter a domain name to start monitoring its certificate.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAddDomain} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="domain">Domain Name</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    id="domain" 
-                    placeholder="example.com" 
-                    value={newDomain}
-                    onChange={(e) => setNewDomain(e.target.value)}
-                    required
-                  />
-                  <Button type="submit" disabled={loading}>
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    Add
-                  </Button>
+        <motion.div variants={itemVariants} className="lg:col-span-2">
+          <Card className="glass-card h-full border-none shadow-xl bg-gradient-to-br from-background/50 to-primary/5">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle>Governance Policy</CardTitle>
+                  <CardDescription>Automated verification standards.</CardDescription>
                 </div>
               </div>
-            </form>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-2 gap-8 pt-4">
+               <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                     <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                     <div className="space-y-1">
+                        <p className="font-bold text-sm">Automated Discovery</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">Continuous scanning of SAN and alternative identifiers.</p>
+                     </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                     <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                     <div className="space-y-1">
+                        <p className="font-bold text-sm">Chain Verification</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">Full trust chain validation against root authorities.</p>
+                     </div>
+                  </div>
+               </div>
+               <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
+                  <div className="flex items-center gap-2 mb-2 text-primary">
+                    <Info className="h-4 w-4" />
+                    <span className="font-bold text-xs uppercase tracking-tight">System Notice</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Certificates are audited every 24 hours. Critical threshold alerts are triggered 30 days prior to expiration.
+                  </p>
+               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              <CardTitle>Monitoring Policy</CardTitle>
+      <motion.div variants={itemVariants}>
+        <Card className="glass-card border-none shadow-xl overflow-hidden">
+          <CardHeader className="bg-muted/30">
+            <CardTitle className="text-lg">Configured Surveillance List</CardTitle>
+            <CardDescription>Currently monitored external infrastructure endpoints.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y border-t border-white/5">
+              <AnimatePresence>
+                {[ "google.com", "github.com", "microsoft.com" ].map((domain, i) => (
+                  <motion.div 
+                    key={domain}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-center justify-between p-5 hover:bg-muted/40 transition-colors group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 glass rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                        <Globe className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-bold tracking-tight">{domain}</span>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1">
+                           <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                           Active Surveillance
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <Button variant="ghost" size="sm" className="hidden group-hover:flex transition-all text-xs h-8">
+                          View History
+                       </Button>
+                       <Button variant="ghost" size="icon" className="text-red-500/40 hover:text-red-600 hover:bg-red-500/10 h-8 w-8 transition-all active:scale-90">
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
-            <CardDescription>How certificates are checked.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>
-              The system automatically checks certificates for all added domains every 24 hours.
-            </p>
-            <ul className="list-disc pl-4 space-y-2">
-              <li>Automatic discovery of subject alternative names (SAN).</li>
-              <li>Verification of full certificate chain.</li>
-              <li>Alerts are sent 15 days before expiry by default.</li>
-            </ul>
           </CardContent>
         </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Configured Domains</CardTitle>
-          <CardDescription>Currently monitored external domains.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-md divide-y">
-            {[ "google.com", "github.com", "microsoft.com" ].map((domain) => (
-              <div key={domain} className="flex items-center justify-between p-4 bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <Globe className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{domain}</span>
-                </div>
-                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }

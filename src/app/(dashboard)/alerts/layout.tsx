@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion, AnimatePresence } from "framer-motion";
+import { Bell, History, FileText } from "lucide-react";
 
 export default function AlertsLayout({
   children,
@@ -12,30 +14,54 @@ export default function AlertsLayout({
   const pathname = usePathname();
 
   return (
-    <div className="p-8 space-y-8">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-8 space-y-8"
+    >
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Alerts</h2>
-          <p className="text-muted-foreground">
-            Monitor and manage system alerts and rules.
+          <h2 className="text-4xl font-extrabold tracking-tight text-gradient">Alerts Center</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Monitor infrastructure health and manage notification rules.
           </p>
         </div>
       </div>
 
-      <Tabs value={pathname} className="space-y-4">
-        <TabsList>
+      <Tabs value={pathname} className="space-y-6">
+        <TabsList className="bg-muted/50 p-1 glass h-12">
           <Link href="/alerts">
-            <TabsTrigger value="/alerts">Active Alerts</TabsTrigger>
+            <TabsTrigger value="/alerts" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
+              <Bell className="h-4 w-4" />
+              Active Alerts
+            </TabsTrigger>
           </Link>
           <Link href="/alerts/history">
-            <TabsTrigger value="/alerts/history">Alert History</TabsTrigger>
+            <TabsTrigger value="/alerts/history" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
+              <History className="h-4 w-4" />
+              Alert History
+            </TabsTrigger>
           </Link>
           <Link href="/alerts/rules">
-            <TabsTrigger value="/alerts/rules">Alert Rules</TabsTrigger>
+            <TabsTrigger value="/alerts/rules" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
+              <FileText className="h-4 w-4" />
+              Alert Rules
+            </TabsTrigger>
           </Link>
         </TabsList>
-        {children}
+        
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </Tabs>
-    </div>
+    </motion.div>
   );
 }

@@ -37,9 +37,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, RefreshCw, Trash2, Key, Server, ShieldCheck } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Trash2, Key, Server, ShieldCheck, Search, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function AgentsPage() {
   const [activeTab, setActiveTab] = useState("all-agents");
@@ -53,6 +54,11 @@ export default function AgentsPage() {
   // Whitelist State
   const [whitelist, setWhitelist] = useState<AgentWhitelistDetail[]>([]);
   const [loadingWhitelist, setLoadingWhitelist] = useState(true);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Whitelist dialog states
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newAgentId, setNewAgentId] = useState("");
   const [newAgentDesc, setNewAgentDesc] = useState("");
@@ -74,7 +80,7 @@ export default function AgentsPage() {
   const fetchWhitelist = async () => {
     setLoadingWhitelist(true);
     try {
-      const data = await api.getWhitelist({ limit: 100, offset: 0 }); // pagination for whitelist is simpler here
+      const data = await api.getWhitelist({ limit: 100, offset: 0 });
       setWhitelist(data);
     } catch (error) {
       console.error(error);
@@ -101,20 +107,22 @@ export default function AgentsPage() {
         description: newAgentDesc 
       }, token);
       
-      toast.success(`Agent added with token: ${res.token}`);
+      toast.success(`Agent successfully whitelisted`, {
+        description: `Discovery Token: ${res.token}`
+      });
       setIsAddOpen(false);
       setNewAgentId("");
       setNewAgentDesc("");
       fetchWhitelist();
     } catch (error) {
-      toast.error("Failed to add agent to whitelist");
+      toast.error("Failed to whitelist agent");
     } finally {
       setAdding(false);
     }
   };
 
   const handleDeleteWhitelist = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this agent from whitelist?")) return;
+    if (!confirm("Remove this agent from whitelist?")) return;
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No token");
@@ -146,243 +154,309 @@ export default function AgentsPage() {
     }
   };
 
+  const filteredAgents = agents.filter(a => a.agent_id.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredWhitelist = whitelist.filter(a => 
+    a.agent_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (a.description?.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-8 space-y-8"
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Agents Management</h2>
-          <p className="text-muted-foreground">
-            Monitor active agents and manage whitelist permissions.
+          <h2 className="text-4xl font-extrabold tracking-tight text-gradient">Agents Management</h2>
+          <p className="text-muted-foreground mt-1">
+            Active infrastructure monitoring and permission control.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        
+        <div className="flex items-center gap-3">
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Input 
+              placeholder="Search ID or description..." 
+              className="pl-10 w-64 glass h-10 transition-all focus:w-80"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={activeTab === "all-agents" ? fetchAgents : fetchWhitelist}
+            className="glass transition-transform active:scale-95"
+          >
+            <RefreshCw className={`h-4 w-4 ${(loadingAgents || loadingWhitelist) ? "animate-spin" : ""}`} />
+          </Button>
+
           {activeTab === "whitelist" && (
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" /> Add to Whitelist
+                <Button className="shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-shadow">
+                  <Plus className="mr-2 h-4 w-4" /> Add Agent
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="glass shadow-2xl">
                 <DialogHeader>
-                  <DialogTitle>Add Agent to Whitelist</DialogTitle>
+                  <DialogTitle>Register New Agent</DialogTitle>
                   <DialogDescription>
-                    Create a new whitelist entry. You will receive a token upon success.
+                    Provide credentials for a new agent to join the mesh.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleAddAgent}>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="agent-id" className="text-right">
-                        Agent ID
-                      </Label>
+                <form onSubmit={handleAddAgent} className="space-y-6 pt-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="agent-id">Agent ID</Label>
                       <Input
                         id="agent-id"
                         value={newAgentId}
                         onChange={(e) => setNewAgentId(e.target.value)}
-                        className="col-span-3"
                         required
-                        placeholder="e.g. agent-01"
+                        placeholder="e.g. cloud-node-01"
+                        className="glass"
                       />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="desc" className="text-right">
-                        Description
-                      </Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="desc">Description</Label>
                       <Input
                         id="desc"
                         value={newAgentDesc}
                         onChange={(e) => setNewAgentDesc(e.target.value)}
-                        className="col-span-3"
-                        placeholder="Optional description"
+                        placeholder="Purpose or location of the agent"
+                        className="glass"
                       />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={adding}>
-                      {adding ? "Adding..." : "Add Agent"}
+                    <Button type="submit" disabled={adding} className="w-full">
+                      {adding ? <Loader2 className="animate-spin h-4 w-4" /> : "Generate Whitelist Credentials"}
                     </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
           )}
-          <Button variant="outline" size="icon" onClick={activeTab === "all-agents" ? fetchAgents : fetchWhitelist}>
-            <RefreshCw className={`h-4 w-4 ${(loadingAgents || loadingWhitelist) ? "animate-spin" : ""}`} />
-          </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="all-agents" onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all-agents" className="flex items-center gap-2">
+      <Tabs defaultValue="all-agents" onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-muted/50 p-1 glass h-12">
+          <TabsTrigger value="all-agents" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
             <Server className="h-4 w-4" />
             Active Agents
           </TabsTrigger>
-          <TabsTrigger value="whitelist" className="flex items-center gap-2">
+          <TabsTrigger value="whitelist" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
             <ShieldCheck className="h-4 w-4" />
             Whitelist
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all-agents">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Agents</CardTitle>
-              <CardDescription>
-                Live status of agents currently reporting to the system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Agent ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Seen</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingAgents ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ) : agents.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                        No active agents found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    agents.map((agent) => (
-                      <TableRow key={agent.agent_id}>
-                        <TableCell className="font-medium">
-                          {agent.agent_id}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={agent.status === "active" ? "success" : "secondary"}>
-                            {agent.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {agent.last_seen
-                            ? new Date(agent.last_seen).toLocaleString()
-                            : "N/A"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button asChild variant="ghost" size="sm">
-                            <Link href={`/agents/${agent.agent_id}`}>
-                              View Details
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-              <div className="flex items-center justify-end space-x-2 py-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAgentsOffset(Math.max(0, agentsOffset - agentsLimit))}
-                  disabled={agentsOffset === 0 || loadingAgents}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAgentsOffset(agentsOffset + agentsLimit)}
-                  disabled={agents.length < agentsLimit || loadingAgents}
-                >
-                  Next
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <TabsContent value="all-agents" className="mt-0">
+              <Card className="glass-card border-none shadow-xl">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Active Agents</CardTitle>
+                      <CardDescription>Live reporting nodes in your network.</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead>Agent ID</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Seen</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <AnimatePresence mode="popLayout">
+                          {loadingAgents ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="h-32 text-center">
+                                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                              </TableCell>
+                            </TableRow>
+                          ) : filteredAgents.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">
+                                No agents found matching search.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredAgents.map((agent, i) => (
+                              <motion.tr
+                                key={agent.agent_id}
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.03 }}
+                                className="group hover:bg-muted/50 transition-colors border-b last:border-0"
+                              >
+                                <TableCell className="font-mono text-sm py-4">
+                                  {agent.agent_id}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={agent.status === "active" ? "success" : "secondary"} className="capitalize">
+                                    <div className={`h-1.5 w-1.5 rounded-full mr-2 ${agent.status === "active" ? "bg-white animate-pulse" : "bg-muted-foreground"}`} />
+                                    {agent.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">
+                                  {agent.last_seen
+                                    ? new Date(agent.last_seen).toLocaleString()
+                                    : "Never connected"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button asChild variant="ghost" size="sm" className="hover:text-primary transition-colors">
+                                    <Link href={`/agents/${agent.agent_id}`}>
+                                      Details
+                                    </Link>
+                                  </Button>
+                                </TableCell>
+                              </motion.tr>
+                            ))
+                          )}
+                        </AnimatePresence>
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  <div className="flex items-center justify-between py-4 mt-2">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Showing page {Math.floor(agentsOffset / agentsLimit) + 1}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAgentsOffset(Math.max(0, agentsOffset - agentsLimit))}
+                        disabled={agentsOffset === 0 || loadingAgents}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAgentsOffset(agentsOffset + agentsLimit)}
+                        disabled={agents.length < agentsLimit || loadingAgents}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        <TabsContent value="whitelist">
-          <Card>
-            <CardHeader>
-              <CardTitle>Whitelist Management</CardTitle>
-              <CardDescription>
-                Authorized Agent IDs and their security credentials.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Agent ID</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Seen</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingWhitelist ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ) : whitelist.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                        No whitelisted agents discovered.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    whitelist.map((agent) => (
-                      <TableRow key={agent.id}>
-                        <TableCell className="font-medium">
-                          {agent.agent_id}
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">{agent.description || "-"}</TableCell>
-                        <TableCell>
-                          <Badge variant={agent.status === "active" ? "success" : "secondary"}>
-                            {agent.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {agent.last_seen
-                            ? new Date(agent.last_seen).toLocaleString()
-                            : "N/A"}
-                        </TableCell>
-                        <TableCell className="text-right space-x-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleRegenerateToken(agent.id)} 
-                            title="Regenerate Token"
-                          >
-                            <Key className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => handleDeleteWhitelist(agent.id)} 
-                            title="Remove from Whitelist"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            <TabsContent value="whitelist" className="mt-0">
+              <Card className="glass-card border-none shadow-xl">
+                <CardHeader>
+                  <CardTitle>Whitelist Management</CardTitle>
+                  <CardDescription>
+                    Manage discovered Agent IDs and their security tokens.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead>Agent ID</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Credentials</TableHead>
+                          <TableHead>Last Seen</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <AnimatePresence>
+                          {loadingWhitelist ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="h-32 text-center">
+                                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                              </TableCell>
+                            </TableRow>
+                          ) : filteredWhitelist.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">
+                                No whitelisted records found.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredWhitelist.map((agent, i) => (
+                              <motion.tr
+                                key={agent.id}
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ delay: i * 0.03 }}
+                                className="group hover:bg-muted/50 transition-colors border-b last:border-0"
+                              >
+                                <TableCell className="font-mono text-sm py-4">
+                                  {agent.agent_id}
+                                </TableCell>
+                                <TableCell className="max-w-[180px] truncate text-sm text-muted-foreground font-medium">
+                                  {agent.description || "—"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={agent.status === "active" ? "success" : "secondary"}>
+                                    {agent.status === "active" ? "Provisioned" : "Pending"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">
+                                  {agent.last_seen
+                                    ? new Date(agent.last_seen).toLocaleString()
+                                    : "Awaiting registration"}
+                                </TableCell>
+                                <TableCell className="text-right space-x-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => handleRegenerateToken(agent.id)} 
+                                    className="hover:text-primary transition-colors h-8 w-8"
+                                    title="Regenerate Security Token"
+                                  >
+                                    <Key className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="text-red-500/60 hover:text-red-600 hover:bg-red-500/10 h-8 w-8"
+                                    onClick={() => handleDeleteWhitelist(agent.id)} 
+                                    title="Delete Entry"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </motion.tr>
+                            ))
+                          )}
+                        </AnimatePresence>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </motion.div>
+        </AnimatePresence>
       </Tabs>
-    </div>
+    </motion.div>
   );
 }
