@@ -7,8 +7,7 @@ import { getPageMetaForPath } from '@/lib/seo-metadata'
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
 const LEGACY_ROUTE_ALIASES: Record<string, string> = {
-  '/domain-management-tab': '/certificates',
-  '/certificate-expiration-notification-settings': '/certificates/settings',
+
 }
 
 function absoluteUrl(pathname: string): string {

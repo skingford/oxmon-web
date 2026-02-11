@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Agent } from '@/lib/types';
 import { simulateNodeFailure, analyzeHardwareImage } from '@/actions/ai';
 import { useI18n } from '@/contexts/I18nContext';
@@ -11,6 +11,13 @@ interface InfrastructureProps {
 }
 
 const TELEMETRY_DURATIONS = [1.2, 1.55, 1.9, 2.25, 2.6, 2.95, 1.35, 1.75];
+
+function getAgentRegionPosition(agent: Agent): { x: number; y: number } {
+    if (agent.name.includes('US')) return { x: 22, y: 38 };
+    if (agent.name.includes('Europe')) return { x: 48, y: 32 };
+    if (agent.name.includes('Database')) return { x: 78, y: 48 };
+    return { x: 30, y: 68 };
+}
 
 const GlobalNodeMap: React.FC<{ agents: Agent[] }> = ({ agents }) => {
     const { tr } = useI18n();
@@ -42,13 +49,7 @@ const GlobalNodeMap: React.FC<{ agents: Agent[] }> = ({ agents }) => {
             ))}
 
             {agents.map((agent) => {
-                const getPos = (a: Agent) => {
-                    if (a.name.includes('US')) return { x: 22, y: 38 };
-                    if (a.name.includes('Europe')) return { x: 48, y: 32 };
-                    if (a.name.includes('Database')) return { x: 78, y: 48 };
-                    return { x: 30, y: 68 };
-                };
-                const { x, y } = getPos(agent);
+                const { x, y } = getAgentRegionPosition(agent);
                 const isOnline = agent.status === 'Online';
                 return (
                     <div key={agent.id} className="absolute group/node cursor-pointer" style={{ left: `${x}%`, top: `${y}%` }}>
@@ -150,10 +151,26 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
         } catch (err) { onShowToast(tr('Neural Vision handshake failed.'), 'error'); } finally { setIsAnalyzingImage(false); }
     };
 
-    const activeNodes = agents.filter(a => a.status !== 'Offline');
+    const activeNodes = useMemo(() => agents.filter((agent) => agent.status !== 'Offline'), [agents]);
     const centerX = dimensions.width / 2;
     const centerY = dimensions.height / 2;
     const radius = Math.min(dimensions.width, dimensions.height) * 0.38;
+
+    const topologyNodes = useMemo(() => {
+        const totalNodes = activeNodes.length;
+
+        if (totalNodes === 0) {
+            return [] as Array<{ agent: Agent; tx: number; ty: number }>;
+        }
+
+        return activeNodes.map((agent, index) => {
+            const angle = (index / totalNodes) * Math.PI * 2;
+            const tx = centerX + Math.cos(angle) * radius;
+            const ty = centerY + Math.sin(angle) * radius;
+
+            return { agent, tx, ty };
+        });
+    }, [activeNodes, centerX, centerY, radius]);
 
     return (
         <div className="h-full flex flex-col space-y-12 animate-fade-in pb-16">
@@ -180,17 +197,14 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                 </button>
                             </div>
                             <svg className="w-full h-full absolute inset-0">
-                                {activeNodes.map((agent, i) => {
-                                    const angle = (i / activeNodes.length) * Math.PI * 2;
-                                    const tx = centerX + Math.cos(angle) * radius;
-                                    const ty = centerY + Math.sin(angle) * radius;
+                                {topologyNodes.map(({ agent, tx, ty }, index) => {
                                     const isActive = selectedNode?.id === agent.id;
                                     return (
                                         <g key={`mesh-group-${agent.id}`}>
                                             <line x1={centerX} y1={centerY} x2={tx} y2={ty} stroke={isActive ? '#0071E3' : '#E5E5EA'} strokeWidth={isActive ? 5 : 2} className="transition-all duration-1000" strokeDasharray={isTelemetryFlowOn ? "14 7" : "none"} />
                                             {isTelemetryFlowOn && (
                                                 <circle r="5" fill="#0071E3" className="animate-ping opacity-50 shadow-2xl shadow-primary/50">
-                                                    <animateMotion dur={`${TELEMETRY_DURATIONS[i % TELEMETRY_DURATIONS.length]}s`} repeatCount="indefinite" path={`M ${centerX} ${centerY} L ${tx} ${ty}`} />
+                                                    <animateMotion dur={`${TELEMETRY_DURATIONS[index % TELEMETRY_DURATIONS.length]}s`} repeatCount="indefinite" path={`M ${centerX} ${centerY} L ${tx} ${ty}`} />
                                                 </circle>
                                             )}
                                         </g>
@@ -202,10 +216,7 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                     <span className="material-symbols-outlined text-6xl filled group-hover:scale-110 transition-transform">hub</span>
                                 </div>
                             </div>
-                            {activeNodes.map((agent, i) => {
-                                const angle = (i / activeNodes.length) * Math.PI * 2;
-                                const tx = centerX + Math.cos(angle) * radius;
-                                const ty = centerY + Math.sin(angle) * radius;
+                            {topologyNodes.map(({ agent, tx, ty }) => {
                                 return (
                                     <button key={agent.id} onClick={() => setSelectedNode(agent)} className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ${selectedNode?.id === agent.id ? 'scale-125' : 'hover:scale-110'}`} style={{ left: tx, top: ty }}>
                                         <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-2xl border-2 transition-all ${selectedNode?.id === agent.id ? 'bg-primary border-primary text-white' : 'bg-white text-secondary border-[#E5E5EA]'}`}>

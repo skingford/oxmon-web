@@ -37,20 +37,20 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
     { key: 'agents', icon: 'dns', label: tr('Agents'), href: `/${locale}/agents` },
     { key: 'metrics', icon: 'query_stats', label: tr('Metrics'), href: `/${locale}/metrics` },
     {
-      key: 'certificates',
+      key: 'domains',
       icon: 'verified_user',
-      label: tr('Certificates'),
-      href: `/${locale}/certificates`,
+      label: tr('Domains'),
+      href: `/${locale}/domains`,
       children: [
         {
           key: 'monitoring',
           label: locale === 'zh' ? '监控' : 'Monitoring',
-          href: `/${locale}/certificates`,
+          href: `/${locale}/domains`,
         },
         {
           key: 'settings',
           label: locale === 'zh' ? '通知设置' : 'Settings',
-          href: `/${locale}/certificates/settings`,
+          href: `/${locale}/domains/settings`,
         },
       ],
     },

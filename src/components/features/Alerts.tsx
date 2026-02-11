@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, memo } from 'react';
+import { useDeferredValue, useMemo, useState, memo } from 'react';
 import type { Alert } from '@/lib/types';
 import { AreaChart } from 'recharts/lib/chart/AreaChart';
 import { Area } from 'recharts/lib/cartesian/Area';
@@ -26,15 +26,29 @@ const Alerts: React.FC<AlertsProps> = ({ alerts, onAcknowledge, onShowToast, onD
   const { tr } = useI18n();
   const [filter, setFilter] = useState<'All' | 'Critical' | 'Warning' | 'Info' | 'Resolved'>('All');
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
   const [detailAlert, setDetailAlert] = useState<Alert | null>(null);
   const [diagnosingId, setDiagnosingId] = useState<string | null>(null);
   const [diagnosticResult, setDiagnosticResult] = useState<string | null>(null);
 
-  const filteredAlerts = alerts.filter(a => {
-    const matchesFilter = filter === 'All' ? true : a.severity === filter;
-    return matchesFilter && (a.source.toLowerCase().includes(searchTerm.toLowerCase()) || a.message.toLowerCase().includes(searchTerm.toLowerCase()));
-  });
+  const normalizedSearchTerm = deferredSearchTerm.trim().toLowerCase();
+
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((alert) => {
+      const matchesFilter = filter === 'All' ? true : alert.severity === filter;
+      if (!matchesFilter) {
+        return false;
+      }
+
+      if (!normalizedSearchTerm) {
+        return true;
+      }
+
+      return alert.source.toLowerCase().includes(normalizedSearchTerm)
+        || alert.message.toLowerCase().includes(normalizedSearchTerm);
+    });
+  }, [alerts, filter, normalizedSearchTerm]);
 
   const handleDiagnose = async (alert: Alert) => {
     setDiagnosingId(alert.id);
