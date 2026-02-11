@@ -180,3 +180,110 @@ export interface StorageInfo {
   total_partitions: number;
   total_size_bytes: number;
 }
+
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
+}
+
+export interface ChainNode {
+  subject_cn: string | null;
+  issuer_cn: string | null;
+  not_after: string;
+  is_root: boolean;
+  is_trusted: boolean;
+}
+
+export interface CertificateChainInfo {
+  id: string;
+  domain: string;
+  is_valid: boolean;
+  validation_error: string | null;
+  chain: ChainNode[];
+}
+
+export interface CertCheckResult {
+  domain_id: string;
+  domain: string;
+  is_success: boolean;
+  error_message: string | null;
+  checked_at: string;
+  certificate_id: string | null;
+}
+
+export interface CertDomain {
+  id: string;
+  domain: string;
+  enabled: boolean;
+  check_interval_secs: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDomainRequest {
+  domain: string;
+  enabled?: boolean;
+  check_interval_secs?: number;
+}
+
+export interface UpdateDomainRequest {
+  enabled?: boolean;
+  check_interval_secs?: number;
+}
+
+export interface BatchCreateDomainsRequest {
+  domains: CreateDomainRequest[];
+}
+
+export interface MetricDataPointResponse {
+  agent_id: string;
+  metric_name: string;
+  value: number;
+  labels: Record<string, string>;
+  created_at: string;
+}
+
+export interface MetricSummaryResponse {
+  agent_id: string;
+  metric_name: string;
+  min: number;
+  max: number;
+  avg: number;
+  count: number;
+}
+
+export interface CreateChannelRequest {
+  name: string;
+  channel_type: string;
+  description?: string;
+  min_severity?: string;
+  enabled?: boolean;
+  config_json: string;
+  recipients?: string[];
+}
+
+export interface SetRecipientsRequest {
+  recipients: string[];
+}
+
+export interface SilenceWindow {
+  id: string;
+  name: string;
+  agent_pattern: string;
+  metric_pattern: string;
+  start_time: string;
+  end_time: string;
+  created_at: string;
+}
+
+export interface CreateSilenceWindowRequest {
+  name: string;
+  agent_pattern: string;
+  metric_pattern: string;
+  start_time: string;
+  end_time: string;
+}
+
+export interface EnableRequest {
+  enabled: boolean;
+}

@@ -8,13 +8,27 @@ import { toast } from "sonner"
 import { Loader2, Settings, HardDrive, Trash2, Activity, Info, Server, Cpu, Clock, ShieldCheck, Database, Key } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export default function SystemPage() {
   const [config, setConfig] = useState<RuntimeConfig | null>(null)
   const [storage, setStorage] = useState<StorageInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [cleaning, setCleaning] = useState(false)
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ old_password: "", new_password: "" })
+  const [changing, setChanging] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -49,6 +63,24 @@ export default function SystemPage() {
       toast.error(getApiErrorMessage(error, "Failed to initiate cleanup"))
     } finally {
       setCleaning(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.old_password || !passwordForm.new_password) {
+      toast.error("Both passwords are required")
+      return
+    }
+    setChanging(true)
+    try {
+      await api.changePassword(passwordForm)
+      toast.success("Identity credentials updated successfully")
+      setIsPasswordDialogOpen(false)
+      setPasswordForm({ old_password: "", new_password: "" })
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to update password"))
+    } finally {
+      setChanging(false)
     }
   }
 
@@ -214,6 +246,105 @@ export default function SystemPage() {
               {cleaning ? "Purging Segments..." : "Force Storage Reclamation"}
             </Button>
           </CardFooter>
+        </Card>
+      </div>
+      
+      <div className="grid gap-8 md:grid-cols-3">
+        <Card className="glass-card border-none shadow-xl col-span-1 group overflow-hidden">
+          <CardHeader className="bg-muted/20 border-b border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:bg-primary/20 transition-all">
+                <Key className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>Access Control</CardTitle>
+                <CardDescription>Authentication and security vault.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="p-4 glass rounded-xl border-white/5 space-y-3">
+                 <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                    <span>Identity Status</span>
+                    <Badge variant="success" className="bg-emerald-500/10 text-emerald-400 border-none">Verified</Badge>
+                 </div>
+                 <p className="text-xs text-muted-foreground leading-relaxed">Ensure your administrative credentials remain rotated and secure.</p>
+              </div>
+              
+              <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full glass border-white/5 hover:bg-primary/10 hover:text-primary transition-all gap-2 h-11 text-xs font-bold uppercase tracking-widest">
+                    <Key className="h-3.5 w-3.5" /> Rotate Credentials
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="glass-card !border-white/10 sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Rotate Password</DialogTitle>
+                    <DialogDescription>Update the master administrative passphrase for this node.</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-6 py-4">
+                    <div className="space-y-2">
+                       <Label htmlFor="old_pass">Legacy Passphrase</Label>
+                       <Input 
+                        id="old_pass" 
+                        type="password" 
+                        className="glass-card border-white/5"
+                        value={passwordForm.old_password}
+                        onChange={e => setPasswordForm({...passwordForm, old_password: e.target.value})}
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <Label htmlFor="new_pass">New Passphrase</Label>
+                       <Input 
+                        id="new_pass" 
+                        type="password" 
+                        className="glass-card border-white/5"
+                        value={passwordForm.new_password}
+                        onChange={e => setPasswordForm({...passwordForm, new_password: e.target.value})}
+                       />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="ghost" onClick={() => setIsPasswordDialogOpen(false)}>Cancel Action</Button>
+                    <Button onClick={handleChangePassword} disabled={changing} className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
+                      {changing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                      Commit Change
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-none shadow-xl col-span-1 lg:col-span-2 group overflow-hidden flex flex-col">
+          <CardHeader className="bg-muted/20 border-b border-white/5">
+            <div className="flex items-center gap-3">
+               <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                  <Activity className="h-5 w-5" />
+               </div>
+               <div>
+                  <CardTitle>Performance Telemetry</CardTitle>
+                  <CardDescription>Engine diagnostic outputs.</CardDescription>
+               </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6 flex-1 flex flex-col justify-center">
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {[
+                  { label: "Concurrent Checks", value: config?.cert_check_max_concurrent },
+                  { label: "Check Tick", value: `${config?.cert_check_tick_secs}s` },
+                  { label: "Default Interval", value: `${(config?.cert_check_default_interval_secs || 0) / 3600}h` },
+                  { label: "Agg. Window", value: `${config?.notification_aggregation_window_secs}s` }
+                ].map((item, i) => (
+                  <div key={i} className="flex flex-col gap-1">
+                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{item.label}</span>
+                     <span className="text-xl font-black text-primary/80">{item.value}</span>
+                  </div>
+                ))}
+             </div>
+          </CardContent>
         </Card>
       </div>
 

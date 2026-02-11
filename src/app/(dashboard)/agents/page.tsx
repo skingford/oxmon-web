@@ -154,6 +154,28 @@ export default function AgentsPage() {
     }
   };
 
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDesc, setEditDesc] = useState("");
+
+  const handleOpenEdit = (agent: AgentWhitelistDetail) => {
+    setEditingId(agent.id);
+    setEditDesc(agent.description || "");
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateAgent = async () => {
+    if (!editingId) return;
+    try {
+      await api.updateAgent(editingId, { description: editDesc });
+      toast.success("Agent description updated");
+      setIsEditOpen(false);
+      fetchWhitelist();
+    } catch (error) {
+      toast.error("Failed to update agent");
+    }
+  };
+
   const filteredAgents = agents.filter(a => a.agent_id.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredWhitelist = whitelist.filter(a => 
     a.agent_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -428,6 +450,15 @@ export default function AgentsPage() {
                                   <Button 
                                     variant="ghost" 
                                     size="icon" 
+                                    onClick={() => handleOpenEdit(agent)}
+                                    className="hover:text-amber-500 transition-colors h-8 w-8"
+                                    title="Edit Profile"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
                                     onClick={() => handleRegenerateToken(agent.id)} 
                                     className="hover:text-primary transition-colors h-8 w-8"
                                     title="Regenerate Security Token"
@@ -457,6 +488,30 @@ export default function AgentsPage() {
           </motion.div>
         </AnimatePresence>
       </Tabs>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="glass-card !border-white/10 sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Agent Profile</DialogTitle>
+            <DialogDescription>Update the identity details for this registered node.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea 
+                placeholder="e.g. Primary Kubernetes control plane" 
+                value={editDesc}
+                onChange={e => setEditDesc(e.target.value)}
+                className="glass-card border-white/5 h-24"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateAgent} className="bg-primary hover:bg-primary/90 text-white">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

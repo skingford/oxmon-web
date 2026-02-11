@@ -17,6 +17,20 @@ import {
   PaginationParams,
   RuntimeConfig,
   StorageInfo,
+  ChangePasswordRequest,
+  CertificateChainInfo,
+  CertCheckResult,
+  CertDomain,
+  CreateDomainRequest,
+  UpdateDomainRequest,
+  BatchCreateDomainsRequest,
+  MetricDataPointResponse,
+  MetricSummaryResponse,
+  CreateChannelRequest,
+  SetRecipientsRequest,
+  SilenceWindow,
+  CreateSilenceWindowRequest,
+  EnableRequest,
 } from "@/types/api"
 import { clearAuthToken, getAuthToken, normalizeAuthToken } from "@/lib/auth-token"
 
@@ -249,6 +263,119 @@ export const api = {
 
   triggerCleanup: () =>
     request("/v1/system/storage/cleanup", { method: "POST" }),
+
+  // Auth - Security
+  changePassword: (data: ChangePasswordRequest) =>
+    request("/v1/auth/password", { method: "POST", body: data }),
+
+  // Certificates - Advanced
+  getCertificateChain: (id: string) =>
+    request<CertificateChainInfo>(`/v1/certificates/${id}/chain`),
+
+  checkAllDomains: () =>
+    request<CertCheckResult[]>("/v1/certs/check", { method: "POST" }),
+
+  listDomains: (params: PaginationParams & { enabled__eq?: boolean; domain__contains?: string }) =>
+    request<CertDomain[]>(`/v1/certs/domains${buildQueryString(params)}`),
+
+  createDomain: (data: CreateDomainRequest) =>
+    request<CertDomain>("/v1/certs/domains", { method: "POST", body: data }),
+
+  createDomainsBatch: (data: BatchCreateDomainsRequest) =>
+    request<CertDomain[]>("/v1/certs/domains/batch", { method: "POST", body: data }),
+
+  getDomain: (id: string) =>
+    request<CertDomain>(`/v1/certs/domains/${id}`),
+
+  updateDomain: (id: string, data: UpdateDomainRequest) =>
+    request<CertDomain>(`/v1/certs/domains/${id}`, { method: "PUT", body: data }),
+
+  deleteDomain: (id: string) =>
+    request(`/v1/certs/domains/${id}`, { method: "DELETE" }),
+
+  checkSingleDomain: (id: string) =>
+    request<CertCheckResult>(`/v1/certs/domains/${id}/check`, { method: "POST" }),
+
+  getCertCheckHistory: (id: string, params: PaginationParams) =>
+    request(`/v1/certs/domains/${id}/history${buildQueryString(params)}`),
+
+  getCertStatusAll: (params: PaginationParams) =>
+    request<CertCheckResult[]>(`/v1/certs/status${buildQueryString(params)}`),
+
+  getCertStatusByDomain: (domain: string) =>
+    request<CertCheckResult>(`/v1/certs/status/${domain}`),
+
+  getCertSummary: () =>
+    request("/v1/certs/summary"),
+
+  // Metrics - Explorer
+  queryAllMetrics: (params: PaginationParams & { agent_id__eq?: string; metric_name__eq?: string; timestamp__gte?: string; timestamp__lte?: string }) =>
+    request<MetricDataPointResponse[]>(`/v1/metrics${buildQueryString(params)}`),
+
+  getMetricAgents: (params?: { timestamp__gte?: string; timestamp__lte?: string }) =>
+    request<string[]>(`/v1/metrics/agents${buildQueryString(params || {})}`),
+
+  getMetricNames: (params?: { timestamp__gte?: string; timestamp__lte?: string }) =>
+    request<string[]>(`/v1/metrics/names${buildQueryString(params || {})}`),
+
+  getMetricSummary: (params: { agent_id: string; metric_name: string; timestamp__gte?: string; timestamp__lte?: string }) =>
+    request<MetricSummaryResponse>(`/v1/metrics/summary${buildQueryString(params)}`),
+
+  // Notifications - Advanced
+  listChannelConfigs: (params: PaginationParams) =>
+    request<any[]>(`/v1/notifications/channels/config${buildQueryString(params)}`),
+
+  createChannelConfig: (data: CreateChannelRequest) =>
+    request("/v1/notifications/channels/config", { method: "POST", body: data }),
+
+  updateChannelConfig: (id: string, data: any) =>
+    request(`/v1/notifications/channels/config/${id}`, { method: "PUT", body: data }),
+
+  deleteChannelConfig: (id: string) =>
+    request(`/v1/notifications/channels/config/${id}`, { method: "DELETE" }),
+
+  getRecipients: (id: string) =>
+    request<string[]>(`/v1/notifications/channels/${id}/recipients`),
+
+  setRecipients: (id: string, data: SetRecipientsRequest) =>
+    request<string[]>(`/v1/notifications/channels/${id}/recipients`, { method: "PUT", body: data }),
+
+  testChannel: (id: string) =>
+    request(`/v1/notifications/channels/${id}/test`, { method: "POST" }),
+
+  listSilenceWindows: (params: PaginationParams) =>
+    request<SilenceWindow[]>(`/v1/notifications/silence-windows${buildQueryString(params)}`),
+
+  createSilenceWindow: (data: CreateSilenceWindowRequest) =>
+    request("/v1/notifications/silence-windows", { method: "POST", body: data }),
+
+  deleteSilenceWindow: (id: string) =>
+    request(`/v1/notifications/silence-windows/${id}`, { method: "DELETE" }),
+
+  setAlertRuleEnabled: (id: string, data: EnableRequest) =>
+    request<AlertRuleDetailResponse>(`/v1/alerts/rules/${id}/enable`, { method: "PUT", body: data }),
+
+  getAlertRule: (id: string) =>
+    request<AlertRuleDetailResponse>(`/v1/alerts/rules/${id}`),
+
+  updateAlertRule: (id: string, data: any) =>
+    request<AlertRuleDetailResponse>(`/v1/alerts/rules/${id}`, { method: "PUT", body: data }),
+
+  deleteAlertRule: (id: string) =>
+    request(`/v1/alerts/rules/${id}`, { method: "DELETE" }),
+
+  getAlertSummary: () =>
+    request<any>("/v1/alerts/summary"),
+
+  updateAgent: (id: string, data: { description: string | null }, token?: string) =>
+    request<AgentWhitelistDetail>(`/v1/agents/whitelist/${id}`, {
+      method: "PUT",
+      body: data,
+      token,
+    }),
+
+  getHealth: () =>
+    request<any>("/v1/health", { requiresAuth: false }),
 }
 
 export { getApiErrorMessage }

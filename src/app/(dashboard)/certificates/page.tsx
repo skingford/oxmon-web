@@ -18,11 +18,22 @@ import { Loader2, ShieldCheck, ShieldAlert, ExternalLink, Search, RefreshCw, Cal
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog"
+import { ChainNode } from "@/types/api"
 
 export default function CertificatesPage() {
   const [certs, setCerts] = useState<CertificateDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [chain, setChain] = useState<ChainNode[] | null>(null)
+  const [loadingChain, setLoadingChain] = useState(false)
+  const [isChainOpen, setIsChainOpen] = useState(false)
 
   const fetchCerts = async () => {
     setLoading(true)
@@ -34,6 +45,20 @@ export default function CertificatesPage() {
       toast.error(getApiErrorMessage(error, "Failed to load certificates"))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleViewChain = async (id: string) => {
+    setLoadingChain(true)
+    setIsChainOpen(true)
+    try {
+      const data = await api.getCertificateChain(id)
+      setChain(data.chain)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load certificate chain"))
+      setIsChainOpen(false)
+    } finally {
+      setLoadingChain(false)
     }
   }
 
@@ -170,11 +195,22 @@ export default function CertificatesPage() {
                         Last scan: {new Date(cert.last_checked).toLocaleTimeString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-primary transition-all active:scale-95" asChild>
-                          <a href={`https://${cert.domain}`} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 hover:text-primary transition-all active:scale-95"
+                            onClick={() => handleViewChain(cert.id)}
+                            title="View Certificate Chain"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-primary transition-all active:scale-95" asChild>
+                            <a href={`https://${cert.domain}`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          </Button>
+                        </div>
                       </TableCell>
                     </motion.tr>
                   ))
@@ -184,6 +220,51 @@ export default function CertificatesPage() {
           </Table>
         </div>
       </CardContent>
+
+      <Dialog open={isChainOpen} onOpenChange={setIsChainOpen}>
+        <DialogContent className="glass-card !border-white/10 sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-primary" /> Certificate Trust Chain
+            </DialogTitle>
+            <DialogDescription>Full validation hierarchy from Leaf to Root CA.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 overflow-hidden">
+            {loadingChain ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-xs text-muted-foreground animate-pulse">Reconstructing trust hierarchy...</p>
+              </div>
+            ) : chain ? (
+              <div className="space-y-4 relative">
+                <div className="absolute left-[23px] top-4 bottom-4 w-px bg-gradient-to-b from-primary/50 to-transparent" />
+                {chain.map((node, i) => (
+                  <motion.div 
+                    key={i} 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="flex items-start gap-4 relative z-10"
+                  >
+                    <div className="h-12 w-12 rounded-full glass border-white/10 flex items-center justify-center shrink-0 shadow-lg shadow-black/20 bg-background/50">
+                      <ShieldCheck className={`h-5 w-5 ${i === 0 ? "text-primary" : "text-muted-foreground"}`} />
+                    </div>
+                    <div className="flex flex-col gap-1 pt-1">
+                       <span className={`text-sm font-bold ${i === 0 ? "text-primary" : "text-foreground"}`}>{node.subject_cn}</span>
+                       <div className="flex flex-col text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                          <span>Issued by: {node.issuer_cn}</span>
+                          <span className="mt-0.5 text-[9px] opacity-70">Expires: {new Date(node.not_after).toLocaleDateString()}</span>
+                       </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground italic">No chain data available.</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

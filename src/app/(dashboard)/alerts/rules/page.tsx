@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, RefreshCw, Trash2, Settings2, Activity, Zap, ShieldAlert } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Trash2, Settings2, Activity, Zap, ShieldAlert, Info, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 import {
     Select,
@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
+import { Switch } from "@/components/ui/switch";
 
 export default function AlertRulesPage() {
   const [rules, setRules] = useState<AlertRuleDetailResponse[]>([]);
@@ -52,7 +53,8 @@ export default function AlertRulesPage() {
   // Form state
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [newRule, setNewRule] = useState<CreateAlertRuleRequest>({
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [ruleForm, setRuleForm] = useState<CreateAlertRuleRequest>({
     name: "",
     rule_type: "threshold", 
     metric: "",
@@ -79,30 +81,75 @@ export default function AlertRulesPage() {
     fetchRules();
   }, [offset]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingRuleId(null);
+    setRuleForm({
+      name: "",
+      rule_type: "threshold",
+      metric: "",
+      severity: "warning",
+      agent_pattern: "*",
+      silence_secs: 300,
+      config_json: "{}",
+    });
+    setIsSheetOpen(true);
+  };
+
+  const handleOpenEdit = (rule: AlertRuleDetailResponse) => {
+    setEditingRuleId(rule.id);
+    setRuleForm({
+      name: rule.name,
+      rule_type: rule.rule_type,
+      metric: rule.metric,
+      severity: rule.severity,
+      agent_pattern: rule.agent_pattern,
+      silence_secs: rule.silence_secs,
+      config_json: rule.config_json,
+    });
+    setIsSheetOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No token");
       
-      await api.createAlertRule(newRule, token);
-      toast.success("Rule created successfully");
+      if (editingRuleId) {
+        await api.updateAlertRule(editingRuleId, ruleForm);
+        toast.success("Rule updated successfully");
+      } else {
+        await api.createAlertRule(ruleForm, token);
+        toast.success("Rule created successfully");
+      }
       setIsSheetOpen(false);
-      setNewRule({
-        name: "",
-        rule_type: "threshold",
-        metric: "",
-        severity: "warning",
-        agent_pattern: "*",
-        silence_secs: 300,
-        config_json: "{}",
-      });
       fetchRules();
     } catch (error) {
-      toast.error("Failed to create rule");
+      toast.error(editingRuleId ? "Failed to update rule" : "Failed to create rule");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this rule?")) return;
+    try {
+      await api.deleteAlertRule(id);
+      toast.success("Rule deleted");
+      fetchRules();
+    } catch (error) {
+      toast.error("Failed to delete rule");
+    }
+  };
+
+  const handleToggleEnabled = async (id: string, currentlyEnabled: boolean) => {
+    try {
+      await api.setAlertRuleEnabled(id, { enabled: !currentlyEnabled });
+      toast.success(`Rule ${!currentlyEnabled ? "enabled" : "disabled"}`);
+      fetchRules();
+    } catch (error) {
+      toast.error("Failed to toggle rule state");
     }
   };
 
@@ -129,30 +176,28 @@ export default function AlertRulesPage() {
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetTrigger asChild>
-                    <Button className="shadow-lg shadow-primary/20 transition-all hover:shadow-primary/40">
-                        <Plus className="mr-2 h-4 w-4" /> New Rule
-                    </Button>
-                </SheetTrigger>
+                <Button onClick={handleOpenCreate} className="shadow-lg shadow-primary/20 transition-all hover:shadow-primary/40">
+                    <Plus className="mr-2 h-4 w-4" /> New Rule
+                </Button>
                 <SheetContent className="overflow-y-auto glass-card !border-l border-white/10 w-[400px] sm:w-[540px]">
                     <SheetHeader className="pb-6 border-b border-white/5">
                         <SheetTitle className="text-2xl font-bold flex items-center gap-2">
                            <Zap className="h-5 w-5 text-primary" />
-                           Create Alert Rule
+                           {editingRuleId ? "Edit Alert Rule" : "Create Alert Rule"}
                         </SheetTitle>
                         <SheetDescription>
-                            Define a new metric threshold or absence check.
+                            {editingRuleId ? "Modify existing rule parameters." : "Define a new metric threshold or absence check."}
                         </SheetDescription>
                     </SheetHeader>
-                    <form onSubmit={handleCreate} className="space-y-6 py-6">
+                    <form onSubmit={handleSubmit} className="space-y-6 py-6">
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name" className="text-sm font-semibold">Rule Name</Label>
                                 <Input 
                                     id="name" 
                                     placeholder="e.g. High CPU Usage"
-                                    value={newRule.name} 
-                                    onChange={(e) => setNewRule({...newRule, name: e.target.value})}
+                                    value={ruleForm.name} 
+                                    onChange={(e) => setRuleForm({...ruleForm, name: e.target.value})}
                                     required
                                     className="glass"
                                 />
@@ -161,8 +206,8 @@ export default function AlertRulesPage() {
                                <div className="space-y-2">
                                     <Label htmlFor="type" className="text-sm font-semibold">Rule Type</Label>
                                     <Select 
-                                        value={newRule.rule_type} 
-                                        onValueChange={(v) => setNewRule({...newRule, rule_type: v})}
+                                        value={ruleForm.rule_type} 
+                                        onValueChange={(v) => setRuleForm({...ruleForm, rule_type: v})}
                                     >
                                         <SelectTrigger className="glass">
                                             <SelectValue placeholder="Select type" />
@@ -176,8 +221,8 @@ export default function AlertRulesPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="severity" className="text-sm font-semibold">Severity</Label>
                                     <Select 
-                                        value={newRule.severity} 
-                                        onValueChange={(v) => setNewRule({...newRule, severity: v})}
+                                        value={ruleForm.severity} 
+                                        onValueChange={(v) => setRuleForm({...ruleForm, severity: v})}
                                     >
                                         <SelectTrigger className="glass">
                                             <SelectValue placeholder="Select severity" />
@@ -195,8 +240,8 @@ export default function AlertRulesPage() {
                                 <Input 
                                     id="metric" 
                                     placeholder="e.g. system_cpu_utilization"
-                                    value={newRule.metric} 
-                                    onChange={(e) => setNewRule({...newRule, metric: e.target.value})}
+                                    value={ruleForm.metric} 
+                                    onChange={(e) => setRuleForm({...ruleForm, metric: e.target.value})}
                                     required
                                     className="glass"
                                 />
@@ -206,8 +251,8 @@ export default function AlertRulesPage() {
                                 <Input 
                                     id="pattern" 
                                     placeholder="e.g. app-*"
-                                    value={newRule.agent_pattern} 
-                                    onChange={(e) => setNewRule({...newRule, agent_pattern: e.target.value})}
+                                    value={ruleForm.agent_pattern} 
+                                    onChange={(e) => setRuleForm({...ruleForm, agent_pattern: e.target.value})}
                                     className="glass"
                                 />
                             </div>
@@ -216,8 +261,8 @@ export default function AlertRulesPage() {
                                 <Input 
                                     id="silence" 
                                     type="number"
-                                    value={newRule.silence_secs} 
-                                    onChange={(e) => setNewRule({...newRule, silence_secs: parseInt(e.target.value)})}
+                                    value={ruleForm.silence_secs} 
+                                    onChange={(e) => setRuleForm({...ruleForm, silence_secs: parseInt(e.target.value)})}
                                     className="glass"
                                 />
                             </div>
@@ -225,8 +270,8 @@ export default function AlertRulesPage() {
                                 <Label htmlFor="config" className="text-sm font-semibold">Configuration (JSON)</Label>
                                 <Textarea 
                                     id="config" 
-                                    value={newRule.config_json} 
-                                    onChange={(e) => setNewRule({...newRule, config_json: e.target.value})}
+                                    value={ruleForm.config_json} 
+                                    onChange={(e) => setRuleForm({...ruleForm, config_json: e.target.value})}
                                     rows={5}
                                     className="glass font-mono text-xs"
                                 />
@@ -240,7 +285,7 @@ export default function AlertRulesPage() {
                         </div>
                         <SheetFooter className="pt-4">
                             <Button type="submit" disabled={submitting} className="w-full h-11 shadown-xl">
-                                {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : "Deploy Alert Rule"}
+                                {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : editingRuleId ? "Update Rule" : "Deploy Alert Rule"}
                             </Button>
                         </SheetFooter>
                     </form>
@@ -259,19 +304,20 @@ export default function AlertRulesPage() {
                 <TableHead>Severity</TableHead>
                 <TableHead>Pattern</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right px-6">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <AnimatePresence mode="popLayout">
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-48 text-center text-primary">
+                    <TableCell colSpan={6} className="h-48 text-center text-primary">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto" />
                     </TableCell>
                   </TableRow>
                 ) : rules.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic">
+                    <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">
                       No monitoring rules defined yet.
                     </TableCell>
                   </TableRow>
@@ -303,9 +349,36 @@ export default function AlertRulesPage() {
                       </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{rule.agent_pattern}</TableCell>
                       <TableCell>
-                         <Badge variant={rule.enabled ? "success" : "secondary"} className="text-[10px]">
-                            {rule.enabled ? "Operational" : "Standby"}
-                         </Badge>
+                         <div className="flex items-center gap-2">
+                            <Switch 
+                               checked={rule.enabled} 
+                               onCheckedChange={() => handleToggleEnabled(rule.id, rule.enabled)}
+                               className="data-[state=checked]:bg-emerald-500 scale-75"
+                            />
+                            <Badge variant={rule.enabled ? "success" : "secondary"} className="text-[10px] h-5">
+                                {rule.enabled ? "Operational" : "Standby"}
+                            </Badge>
+                         </div>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1">
+                           <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 hover:bg-white/5"
+                              onClick={() => handleOpenEdit(rule)}
+                           >
+                              <Edit2 className="h-3.5 w-3.5" />
+                           </Button>
+                           <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-red-500/60 hover:text-red-600 hover:bg-red-500/10"
+                              onClick={() => handleDelete(rule.id)}
+                           >
+                              <Trash2 className="h-3.5 w-3.5" />
+                           </Button>
+                        </div>
                       </TableCell>
                     </motion.tr>
                   ))
@@ -318,5 +391,3 @@ export default function AlertRulesPage() {
     </Card>
   );
 }
-
-import { Info } from "lucide-react"
