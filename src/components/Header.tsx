@@ -49,6 +49,10 @@ const ROUTE_TITLE_MAP: Record<string, { title: string; subtitle: string }> = {
     title: 'Certificate Monitoring',
     subtitle: 'Track certificate status, risk level, and trust issuer health across domains.',
   },
+  'domain-management-tab': {
+    title: 'SSL Certificates',
+    subtitle: 'Manage and monitor your SSL domains.',
+  },
   'certificate-detail-view-example-com': {
     title: 'example.com',
     subtitle: 'SSL/TLS Certificate details and verification status.',
@@ -69,6 +73,7 @@ const Header: React.FC = () => {
     pathname?.includes('/agents')
     || pathname?.includes('/agent-detailed-metrics-web-01')
     || pathname?.includes('/oxmon-ssl-certificate-status')
+    || pathname?.includes('/domain-management-tab')
     || pathname?.includes('/certificate-detail-view-example-com')
   ) {
     return null

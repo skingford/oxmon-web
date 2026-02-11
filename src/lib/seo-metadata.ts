@@ -106,6 +106,16 @@ export const PAGE_METADATA = {
       description: '监控证书有效性、过期风险、签发机构信息与续期优先级。',
     },
   },
+  'domain-management-tab': {
+    en: {
+      title: 'Domain Management | Oxmon Admin',
+      description: 'Manage SSL certificate monitoring domains, check intervals, and status actions in one view.',
+    },
+    zh: {
+      title: '域名管理 | Oxmon Admin',
+      description: '集中管理 SSL 监控域名、检测间隔与状态操作。',
+    },
+  },
   'alert-history-log': {
     en: {
       title: 'Alert History | Oxmon Admin',
@@ -124,6 +134,46 @@ export const PAGE_METADATA = {
     zh: {
       title: '证书详情 example.com | Oxmon Admin',
       description: '查看 example.com 的 SSL/TLS 证书详情、SAN、解析 IP 与信任链校验状态。',
+    },
+  },
+  'alert-rules-configuration-tab': {
+    en: {
+      title: 'Alert Rules | Oxmon Admin',
+      description: 'Configure threshold and anomaly detection alert rules for infrastructure monitoring.',
+    },
+    zh: {
+      title: '告警规则 | Oxmon Admin',
+      description: '配置基础设施监控的阈值与异常检测告警规则。',
+    },
+  },
+  'chart-metric-tooltip-detail': {
+    en: {
+      title: 'CPU Usage History | Oxmon Admin',
+      description: 'Detailed CPU usage timeline with metric tooltip breakdown and trend summary cards.',
+    },
+    zh: {
+      title: 'CPU 使用历史 | Oxmon Admin',
+      description: '包含指标悬浮提示与趋势汇总卡片的 CPU 使用时间线详情。',
+    },
+  },
+  'multi-metric-comparison-chart': {
+    en: {
+      title: 'Metric Comparison | Oxmon Admin',
+      description: 'Compare multiple infrastructure metrics in a single timeline with live legend and KPI summary.',
+    },
+    zh: {
+      title: '多指标对比 | Oxmon Admin',
+      description: '在单一时间线中对比多个基础设施指标，并查看实时图例与 KPI 汇总。',
+    },
+  },
+  'full-screen-metrics-chart-view': {
+    en: {
+      title: 'Full Screen Metrics | Oxmon Admin',
+      description: 'Analyze system resource metrics in a dedicated full-screen chart workspace with side controls.',
+    },
+    zh: {
+      title: '全屏指标图表 | Oxmon Admin',
+      description: '在专用全屏图表工作区中分析系统资源指标，并配合侧栏控制项。',
     },
   },
   help: {
