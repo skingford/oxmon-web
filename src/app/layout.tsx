@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import localFont from 'next/font/local'
 import './globals.css'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const inter = localFont({
   src: [
@@ -32,7 +33,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className={inter.className} suppressHydrationWarning>
-        {children}
+        <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>
   )

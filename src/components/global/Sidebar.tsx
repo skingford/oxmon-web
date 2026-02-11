@@ -1,17 +1,47 @@
 'use client'
 
 import { memo, useCallback, useMemo } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  ChevronUp,
+  LayoutDashboard,
+  Server,
+  Settings,
+  ShieldCheck,
+  type LucideIcon,
+} from 'lucide-react'
+import { usePathname } from 'next/navigation'
 import { useI18n } from '@/contexts/I18nContext'
-
-interface SidebarProps {
-  isOpen: boolean
-  onClose: () => void
-}
+import { stripLocalePrefix } from '@/lib/locale'
+import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Sidebar as SidebarRoot,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  useSidebar,
+} from '@/components/ui/sidebar'
 
 interface NavItem {
   key: string
-  icon: string
+  icon: LucideIcon
   label: string
   href: string
   badge?: number
@@ -22,34 +52,38 @@ interface NavItem {
   }[]
 }
 
-const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
+function isRouteActive(currentPath: string, href: string): boolean {
+  const targetPath = stripLocalePrefix(href)
+  if (targetPath === '/') {
+    return currentPath === '/'
+  }
+
+  return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`)
+}
+
+const Sidebar = memo(() => {
   const pathname = usePathname()
-  const router = useRouter()
-  const { tr } = useI18n()
+  const { locale, tr } = useI18n()
+  const { isMobile, setOpenMobile } = useSidebar()
 
-  const { locale, currentView, currentSubView } = useMemo(() => {
-    const segments = pathname?.split('/').filter(Boolean) ?? []
-    const currentLocale = segments[0] === 'zh' || segments[0] === 'en' ? segments[0] : 'en'
+  const currentPath = useMemo(() => {
+    const fallbackPath = `/${locale}/dashboard`
+    return stripLocalePrefix(pathname ?? fallbackPath)
+  }, [locale, pathname])
 
-    return {
-      locale: currentLocale,
-      currentView: segments[1] ?? 'dashboard',
-      currentSubView: segments[2] ?? '',
+  const handleNavigate = useCallback(() => {
+    if (isMobile) {
+      setOpenMobile(false)
     }
-  }, [pathname])
-
-  const handleNavigate = useCallback((href: string) => {
-    router.push(href)
-    onClose()
-  }, [onClose, router])
+  }, [isMobile, setOpenMobile])
 
   const navItems = useMemo<NavItem[]>(() => [
-    { key: 'dashboard', icon: 'dashboard', label: tr('Dashboard'), href: `/${locale}/dashboard` },
-    { key: 'agents', icon: 'dns', label: tr('Agents'), href: `/${locale}/agents` },
-    { key: 'metrics', icon: 'query_stats', label: tr('Metrics'), href: `/${locale}/metrics` },
+    { key: 'dashboard', icon: LayoutDashboard, label: tr('Dashboard'), href: `/${locale}/dashboard` },
+    { key: 'agents', icon: Server, label: tr('Agents'), href: `/${locale}/agents` },
+    { key: 'metrics', icon: BarChart3, label: tr('Metrics'), href: `/${locale}/metrics` },
     {
       key: 'domains',
-      icon: 'verified_user',
+      icon: ShieldCheck,
       label: tr('Domains'),
       href: `/${locale}/domains`,
       children: [
@@ -65,117 +99,127 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
         },
       ],
     },
-    { key: 'alerts', icon: 'notifications', label: tr('Alerts'), href: `/${locale}/alerts` },
-    { key: 'settings', icon: 'settings', label: tr('Settings'), href: `/${locale}/settings` },
+    { key: 'alerts', icon: Bell, label: tr('Alerts'), href: `/${locale}/alerts` },
+    { key: 'settings', icon: Settings, label: tr('Settings'), href: `/${locale}/settings` },
   ], [locale, tr])
 
+  const isDomainsSettingsRoute = currentPath === '/domains/settings' || currentPath.startsWith('/domains/settings/')
+
   return (
-    <>
-      <div
-        className={`fixed inset-0 bg-black/40 z-20 lg:hidden transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
-      />
-
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 flex flex-col h-full shrink-0 transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
-      >
-        <div className="p-6 flex items-center gap-3 justify-between lg:justify-start">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#0073e6] to-blue-400 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-              <span className="material-symbols-outlined filled text-2xl">monitoring</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight text-[#1D1D1F]">Oxmon</h1>
-              <p className="text-xs font-medium text-[#86868b]">Admin Console</p>
-            </div>
+    <SidebarRoot collapsible="icon" className="border-r border-gray-200 bg-white text-[#1D1D1F]">
+      <SidebarHeader className="border-b border-gray-100 p-3 group-data-[collapsible=icon]:p-2">
+        <Link
+          href={`/${locale}/dashboard`}
+          onClick={handleNavigate}
+          className="flex items-center gap-3 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-[#f7f9fc] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#0073e6] to-blue-400 text-white shadow-lg shadow-blue-500/20">
+            <Activity className="size-6" />
           </div>
+          <div className="group-data-[collapsible=icon]:hidden">
+            <h1 className="text-lg font-semibold tracking-tight text-[#1D1D1F]">Oxmon</h1>
+            <p className="text-xs font-medium text-[#86868b]">Admin Console</p>
+          </div>
+        </Link>
+      </SidebarHeader>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="lg:hidden text-slate-500 p-1 hover:bg-slate-100 rounded-lg"
-            aria-label="Close sidebar"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </div>
-
-        <nav className="flex-1 px-4 py-4 flex flex-col gap-1 overflow-y-auto">
+      <SidebarContent className="px-2 py-3">
+        <SidebarMenu>
           {navItems.map((item) => {
-            const isItemActive = currentView === item.key
+            const ItemIcon = item.icon
+            const itemActive = isRouteActive(currentPath, item.href)
 
             return (
-              <div key={item.key} className="flex flex-col gap-1">
-                <button
-                  type="button"
-                  onClick={() => handleNavigate(item.href)}
-                  className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 ${
-                    isItemActive
-                      ? 'bg-[#0073e6]/10 text-[#0073e6]'
-                      : 'text-[#86868b] hover:bg-gray-50 hover:text-[#1D1D1F]'
-                  }`}
+              <SidebarMenuItem key={item.key}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={itemActive}
+                  tooltip={item.label}
+                  className="text-[#6e6e73] hover:bg-[#f2f7ff] hover:text-[#1D1D1F] data-[active=true]:bg-[#0073e6]/12 data-[active=true]:text-[#0073e6] data-[active=true]:shadow-[inset_0_0_0_1px_rgba(0,115,230,0.18)] group-data-[collapsible=icon]:justify-center"
                 >
-                  <span className={`material-symbols-outlined text-[20px] ${isItemActive ? 'filled' : 'group-hover:text-[#0073e6] transition-colors'}`}>{item.icon}</span>
-                  <span className={`text-sm ${isItemActive ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
-                  {item.badge ? <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{item.badge}</span> : null}
-                </button>
+                  <Link href={item.href} onClick={handleNavigate}>
+                    <ItemIcon className={cn('size-4 transition-colors', itemActive ? 'text-[#0073e6]' : 'text-[#86868b]')} />
+                    <span className={cn('text-sm group-data-[collapsible=icon]:hidden', itemActive ? 'font-semibold' : 'font-medium')}>
+                      {item.label}
+                    </span>
+                  </Link>
+                </SidebarMenuButton>
 
-                {isItemActive && item.children?.length
+                {item.badge
                   ? (
-                    <div className="ml-8 flex flex-col gap-1 pb-1">
-                      {item.children.map((child) => {
-                        const isChildActive = currentView === item.key
-                          && (
-                            (child.key === 'monitoring' && currentSubView !== 'settings')
-                            || (child.key !== 'monitoring' && currentSubView === child.key)
-                          )
-
-                        return (
-                          <button
-                            key={`${item.key}-${child.key}`}
-                            type="button"
-                            onClick={() => handleNavigate(child.href)}
-                            className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors duration-200 ${
-                              isChildActive
-                                ? 'bg-[#0073e6]/10 font-semibold text-[#0073e6]'
-                                : 'font-medium text-[#86868b] hover:bg-gray-50 hover:text-[#1D1D1F]'
-                            }`}
-                          >
-                            <span className={`h-1.5 w-1.5 rounded-full ${isChildActive ? 'bg-[#0073e6]' : 'bg-[#c7c7cc]'}`} />
-                            <span>{child.label}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
+                      <SidebarMenuBadge className="rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                        {item.badge}
+                      </SidebarMenuBadge>
                     )
                   : null}
-              </div>
+
+                {item.children?.length && itemActive
+                  ? (
+                      <SidebarMenuSub>
+                        {item.children.map((child) => {
+                          const childActive = child.key === 'monitoring'
+                            ? itemActive && !isDomainsSettingsRoute
+                            : isDomainsSettingsRoute
+
+                          return (
+                            <SidebarMenuSubItem key={`${item.key}-${child.key}`}>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={childActive}
+                                size="sm"
+                                className="text-xs font-medium text-[#86868b] hover:bg-[#f7f9fc] hover:text-[#1D1D1F] data-[active=true]:bg-[#0073e6]/10 data-[active=true]:font-semibold data-[active=true]:text-[#0073e6]"
+                              >
+                                <Link href={child.href} onClick={handleNavigate}>
+                                  <span className={cn('h-1.5 w-1.5 rounded-full', childActive ? 'bg-[#0073e6]' : 'bg-[#c7c7cc]')} />
+                                  <span>{child.label}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )
+                        })}
+                      </SidebarMenuSub>
+                    )
+                  : null}
+              </SidebarMenuItem>
             )
           })}
-        </nav>
+        </SidebarMenu>
+      </SidebarContent>
 
-        <div className="border-t border-gray-100 p-4">
-          <button type="button" className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-gray-50">
-            <div className="h-8 w-8 rounded-full bg-gray-200 overflow-hidden shrink-0">
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5F8Dcs3wNWThcZRGAAjFlfnNfVWcMZTTV-v1F_jJ9s0DzxgtaOXhtG4xLBsy5U0zt-_we9BWVW5sAnvPCybjOwe3XNbCK080yggg_knFw0RvUYBEKRFyiEgBYcwxe8SVj2fL3qn6Mpy94ivvgYsOeQVyUYLxAaNOmc3XPSMQQVSgZrm5fogWTnOgfKqva373uAWuxoKd9GVFcO0rwp-9kOGDRSvVD3qP3uBREoaPnL-iIYeAI-l_ZQ0MQmIKcJ2AxD6Jvxck_wGM"
-                alt="User Profile Avatar"
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <p className="truncate text-sm font-medium text-[#1D1D1F]">Alex Morgan</p>
-              <p className="truncate text-xs text-[#86868b]">SysAdmin</p>
-            </div>
-            <span className="material-symbols-outlined ml-auto text-[#86868b]">more_vert</span>
-          </button>
-        </div>
-      </aside>
-    </>
+      <SidebarFooter className="border-t border-gray-100 p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton size="lg" className="h-auto rounded-lg px-2 py-2 hover:bg-[#f7f9fc] group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:p-0">
+                  <div className="h-8 w-8 overflow-hidden rounded-full bg-gray-200">
+                    <img
+                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5F8Dcs3wNWThcZRGAAjFlfnNfVWcMZTTV-v1F_jJ9s0DzxgtaOXhtG4xLBsy5U0zt-_we9BWVW5sAnvPCybjOwe3XNbCK080yggg_knFw0RvUYBEKRFyiEgBYcwxe8SVj2fL3qn6Mpy94ivvgYsOeQVyUYLxAaNOmc3XPSMQQVSgZrm5fogWTnOgfKqva373uAWuxoKd9GVFcO0rwp-9kOGDRSvVD3qP3uBREoaPnL-iIYeAI-l_ZQ0MQmIKcJ2AxD6Jvxck_wGM"
+                      alt="User Profile Avatar"
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
+                    <p className="truncate text-sm font-medium text-[#1D1D1F]">Alex Morgan</p>
+                    <p className="truncate text-xs text-[#86868b]">SysAdmin</p>
+                  </div>
+                  <ChevronUp className="ml-auto size-4 text-[#86868b] group-data-[collapsible=icon]:hidden" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="end" className="min-w-44">
+                <DropdownMenuItem>{locale === 'zh' ? '个人资料' : 'Profile'}</DropdownMenuItem>
+                <DropdownMenuItem>{tr('Settings')}</DropdownMenuItem>
+                <DropdownMenuItem>{locale === 'zh' ? '退出登录' : 'Logout'}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+
+      <SidebarRail />
+    </SidebarRoot>
   )
 })
 

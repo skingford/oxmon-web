@@ -1,3 +1,24 @@
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  ArrowDown,
+  ArrowUp,
+  Bell,
+  Calendar,
+  ChartColumn,
+  ChevronRight,
+  Minus,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  Timer,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react'
+
 type MultiMetricComparisonChartProps = {
   locale: 'en' | 'zh'
 }
@@ -13,10 +34,10 @@ type LegendItem = {
 
 type StatCard = {
   title: string
-  icon: string
+  icon: LucideIcon
   value: string
   trend: string
-  trendIcon: string
+  trendIcon: LucideIcon
   trendClass: string
 }
 
@@ -32,7 +53,15 @@ const NAV_ITEMS = [
 
 const TIME_RANGE_OPTIONS = ['1H', '24H', '7D'] as const
 
-const X_AXIS_LABELS = ['10:00 AM', '10:05 AM', '10:10 AM', '10:15 AM', '10:20 AM', '10:25 AM', '10:30 AM'] as const
+const X_AXIS_LABELS = [
+  '10:00 AM',
+  '10:05 AM',
+  '10:10 AM',
+  '10:15 AM',
+  '10:20 AM',
+  '10:25 AM',
+  '10:30 AM',
+] as const
 
 const LEGEND_ITEMS: LegendItem[] = [
   {
@@ -69,56 +98,68 @@ const LEGEND_ITEMS: LegendItem[] = [
 const STAT_CARDS: StatCard[] = [
   {
     title: 'Total Requests',
-    icon: 'bar_chart',
+    icon: ChartColumn,
     value: '2.4M',
     trend: '12%',
-    trendIcon: 'arrow_upward',
+    trendIcon: ArrowUp,
     trendClass: 'text-green-600',
   },
   {
     title: 'Error Rate',
-    icon: 'warning',
+    icon: TriangleAlert,
     value: '0.02%',
     trend: '0.4%',
-    trendIcon: 'arrow_downward',
+    trendIcon: ArrowDown,
     trendClass: 'text-green-600',
   },
   {
     title: 'Avg Response Time',
-    icon: 'timer',
+    icon: Timer,
     value: '124ms',
     trend: '0%',
-    trendIcon: 'remove',
+    trendIcon: Minus,
     trendClass: 'text-slate-400',
   },
 ]
 
-export default function MultiMetricComparisonChart({ locale }: MultiMetricComparisonChartProps) {
+export default function MultiMetricComparisonChart({
+  locale,
+}: MultiMetricComparisonChartProps) {
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#f5f7f8] text-slate-900 antialiased">
       <header className="sticky top-0 z-50 flex items-center justify-between whitespace-nowrap border-b border-slate-200 bg-white/90 px-10 py-3 backdrop-blur-md transition-colors duration-200">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-4 text-slate-900">
             <div className="size-8 text-[#0673e0]">
-              <svg className="h-full w-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor" />
+              <svg
+                className="h-full w-full"
+                fill="none"
+                viewBox="0 0 48 48"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z"
+                  fill="currentColor"
+                />
               </svg>
             </div>
-            <h2 className="text-xl font-bold leading-tight tracking-tight text-slate-900">Oxmon</h2>
+            <h2 className="text-xl font-bold leading-tight tracking-tight text-slate-900">
+              Oxmon
+            </h2>
           </div>
 
-          <label className="hidden h-10 min-w-40 max-w-64 flex-col md:flex">
+          <Label className="hidden h-10 min-w-40 max-w-64 flex-col md:flex">
             <div className="group relative flex h-full w-full flex-1 items-stretch rounded-lg">
               <div className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[#0673e0]">
-                <span className="material-symbols-outlined text-[20px]">search</span>
+                <Search className="text-[20px]" />
               </div>
-              <input
+              <Input
                 className="form-input h-full w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg border border-slate-200 bg-slate-50 py-0 pr-4 pl-10 text-sm font-normal leading-normal text-slate-900 placeholder:text-slate-400 transition-all focus:border-[#0673e0] focus:ring-2 focus:ring-[#0673e0]/20 focus:outline-none"
                 placeholder="Search resources..."
                 defaultValue=""
               />
             </div>
-          </label>
+          </Label>
         </div>
 
         <div className="flex flex-1 items-center justify-end gap-6">
@@ -127,7 +168,11 @@ export default function MultiMetricComparisonChart({ locale }: MultiMetricCompar
               <a
                 key={item.label}
                 href="#"
-                className={item.active ? 'text-[#0673e0]' : 'transition-colors hover:text-[#0673e0]'}
+                className={
+                  item.active
+                    ? 'text-[#0673e0]'
+                    : 'transition-colors hover:text-[#0673e0]'
+                }
               >
                 {item.label}
               </a>
@@ -137,19 +182,19 @@ export default function MultiMetricComparisonChart({ locale }: MultiMetricCompar
           <div className="hidden h-6 w-px bg-slate-200 lg:block" />
 
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
               className="flex size-10 cursor-pointer items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100"
             >
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
+              <Bell />
+            </Button>
 
-            <button
+            <Button
               type="button"
               className="flex size-10 cursor-pointer items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100"
             >
-              <span className="material-symbols-outlined">settings</span>
-            </button>
+              <Settings />
+            </Button>
 
             <div
               aria-label="User profile picture"
@@ -167,7 +212,7 @@ export default function MultiMetricComparisonChart({ locale }: MultiMetricCompar
             <div className="flex flex-col gap-2">
               <div className="mb-1 flex items-center gap-2 text-sm font-medium text-slate-500">
                 <span>{locale === 'zh' ? '基础设施' : 'Infrastructure'}</span>
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                <ChevronRight className="text-[16px]" />
                 <span>{locale === 'zh' ? '监控' : 'Monitoring'}</span>
               </div>
 
@@ -185,7 +230,7 @@ export default function MultiMetricComparisonChart({ locale }: MultiMetricCompar
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
                 {TIME_RANGE_OPTIONS.map((range, index) => (
-                  <button
+                  <Button
                     key={range}
                     type="button"
                     className={
@@ -195,54 +240,67 @@ export default function MultiMetricComparisonChart({ locale }: MultiMetricCompar
                     }
                   >
                     {range}
-                  </button>
+                  </Button>
                 ))}
 
                 <div className="mx-1 h-4 w-px bg-slate-200" />
 
-                <button type="button" className="px-2 py-1.5 text-slate-500 transition-colors hover:text-slate-900">
-                  <span className="material-symbols-outlined text-[20px]">calendar_today</span>
-                </button>
+                <Button
+                  type="button"
+                  className="px-2 py-1.5 text-slate-500 transition-colors hover:text-slate-900"
+                >
+                  <Calendar className="text-[20px]" />
+                </Button>
               </div>
 
-              <button
+              <Button
                 type="button"
                 className="flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50"
               >
-                <span className="material-symbols-outlined text-[20px]">refresh</span>
+                <RefreshCw className="text-[20px]" />
                 <span>{locale === 'zh' ? '刷新' : 'Refresh'}</span>
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
                 className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0673e0] px-4 text-sm font-medium text-white shadow-sm shadow-blue-500/20 transition-all hover:bg-blue-600"
               >
-                <span className="material-symbols-outlined text-[20px]">add</span>
+                <Plus className="text-[20px]" />
                 <span>{locale === 'zh' ? '添加指标' : 'Add Metric'}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
           <article className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]">
             <div className="mb-8 flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">CPU Usage &amp; Load Average</h3>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  CPU Usage &amp; Load Average
+                </h3>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Live</span>
-                  <span className="text-sm text-slate-500">Oct 24, 2023 • 10:00 AM - 10:30 AM</span>
+                  <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                    Live
+                  </span>
+                  <span className="text-sm text-slate-500">
+                    Oct 24, 2023 • 10:00 AM - 10:30 AM
+                  </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <div className="text-2xl font-bold tracking-tight text-slate-900">82.4%</div>
+                  <div className="text-2xl font-bold tracking-tight text-slate-900">
+                    82.4%
+                  </div>
                   <div className="text-xs text-slate-500">Peak Usage</div>
                 </div>
 
                 <div className="h-8 w-px bg-slate-200" />
 
                 <div className="text-right">
-                  <div className="text-2xl font-bold tracking-tight text-slate-900">45.2%</div>
+                  <div className="text-2xl font-bold tracking-tight text-slate-900">
+                    45.2%
+                  </div>
                   <div className="text-xs text-slate-500">Avg Load</div>
                 </div>
               </div>
@@ -276,7 +334,13 @@ export default function MultiMetricComparisonChart({ locale }: MultiMetricCompar
                     <stop offset="100%" stopColor="#0071E3" stopOpacity="0" />
                   </linearGradient>
 
-                  <linearGradient id="gradientGreen" x1="0" x2="0" y1="0" y2="1">
+                  <linearGradient
+                    id="gradientGreen"
+                    x1="0"
+                    x2="0"
+                    y1="0"
+                    y2="1"
+                  >
                     <stop offset="0%" stopColor="#34C759" stopOpacity="0.1" />
                     <stop offset="100%" stopColor="#34C759" stopOpacity="0" />
                   </linearGradient>
@@ -317,40 +381,83 @@ export default function MultiMetricComparisonChart({ locale }: MultiMetricCompar
                 />
 
                 <g className="opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                  <line stroke="#94a3b8" strokeDasharray="4,4" strokeWidth="1" x1="600" x2="600" y1="0" y2="300" />
+                  <line
+                    stroke="#94a3b8"
+                    strokeDasharray="4,4"
+                    strokeWidth="1"
+                    x1="600"
+                    x2="600"
+                    y1="0"
+                    y2="300"
+                  />
 
-                  <circle cx="600" cy="190" fill="white" r="5" stroke="#0071E3" strokeWidth="3" />
-                  <circle cx="600" cy="213" fill="white" r="5" stroke="#34C759" strokeWidth="3" />
-                  <circle cx="600" cy="265" fill="white" r="5" stroke="#FF9500" strokeWidth="3" />
+                  <circle
+                    cx="600"
+                    cy="190"
+                    fill="white"
+                    r="5"
+                    stroke="#0071E3"
+                    strokeWidth="3"
+                  />
+                  <circle
+                    cx="600"
+                    cy="213"
+                    fill="white"
+                    r="5"
+                    stroke="#34C759"
+                    strokeWidth="3"
+                  />
+                  <circle
+                    cx="600"
+                    cy="265"
+                    fill="white"
+                    r="5"
+                    stroke="#FF9500"
+                    strokeWidth="3"
+                  />
                 </g>
               </svg>
 
               <div className="pointer-events-none absolute top-[80px] left-[620px] z-20 min-w-[220px] translate-y-2 rounded-xl border border-slate-100 bg-white p-4 opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_4px_8px_rgba(0,0,0,0.04)] transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
-                <div className="mb-3 text-xs font-semibold tracking-wider text-slate-400 uppercase">Oct 24, 10:18 AM</div>
+                <div className="mb-3 text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                  Oct 24, 10:18 AM
+                </div>
 
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="size-2.5 rounded-full bg-[#0071E3] shadow-[0_0_6px_rgba(0,113,227,0.6)]" />
-                      <span className="text-sm font-medium text-slate-700">Server Alpha</span>
+                      <span className="text-sm font-medium text-slate-700">
+                        Server Alpha
+                      </span>
                     </div>
-                    <span className="text-sm font-bold text-slate-900">62%</span>
+                    <span className="text-sm font-bold text-slate-900">
+                      62%
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="size-2.5 rounded-full bg-[#34C759] shadow-[0_0_6px_rgba(52,199,89,0.6)]" />
-                      <span className="text-sm font-medium text-slate-700">Server Beta</span>
+                      <span className="text-sm font-medium text-slate-700">
+                        Server Beta
+                      </span>
                     </div>
-                    <span className="text-sm font-bold text-slate-900">48%</span>
+                    <span className="text-sm font-bold text-slate-900">
+                      48%
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between opacity-60">
                     <div className="flex items-center gap-2">
                       <div className="size-2.5 rounded-full bg-[#FF9500]" />
-                      <span className="text-sm font-medium text-slate-700">DB Primary</span>
+                      <span className="text-sm font-medium text-slate-700">
+                        DB Primary
+                      </span>
                     </div>
-                    <span className="text-sm font-bold text-slate-900">15%</span>
+                    <span className="text-sm font-bold text-slate-900">
+                      15%
+                    </span>
                   </div>
                 </div>
               </div>
@@ -365,55 +472,69 @@ export default function MultiMetricComparisonChart({ locale }: MultiMetricCompar
             <div className="mt-2 border-t border-slate-100 pt-6">
               <div className="flex flex-wrap gap-4">
                 {LEGEND_ITEMS.map((item) => (
-                  <label
+                  <Label
                     key={item.name}
                     className={`flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2 transition-colors hover:border-slate-200 hover:bg-slate-50 ${item.muted ? 'opacity-60' : ''}`}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       defaultChecked={item.checked}
-                      className={`size-4 rounded border-slate-300 ${item.accentClass}`}
+                      className={`size-4 border-slate-300 ${item.accentClass}`}
                       aria-label={`${item.name} visibility`}
                     />
                     <div className={`size-2 rounded-full ${item.colorClass}`} />
                     <div className="flex flex-col">
-                      <span className="text-sm font-semibold text-slate-900">{item.name}</span>
-                      <span className="text-xs text-slate-500">{item.detail}</span>
+                      <span className="text-sm font-semibold text-slate-900">
+                        {item.name}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {item.detail}
+                      </span>
                     </div>
-                  </label>
+                  </Label>
                 ))}
 
-                <button
+                <Button
                   type="button"
                   className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:border-[#0673e0] hover:text-[#0673e0]"
                 >
-                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  <Plus className="text-[18px]" />
                   <span>{locale === 'zh' ? '对比' : 'Compare'}</span>
-                </button>
+                </Button>
               </div>
             </div>
           </article>
 
           <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {STAT_CARDS.map((card) => (
-              <article
-                key={card.title}
-                className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-slate-500">{card.title}</h4>
-                  <span className="material-symbols-outlined text-[20px] text-slate-400">{card.icon}</span>
-                </div>
+            {STAT_CARDS.map((card) => {
+              const CardIcon = card.icon
+              const TrendIcon = card.trendIcon
 
-                <div className="flex items-baseline gap-2">
-                  <span className="leading-none text-2xl font-bold text-slate-900">{card.value}</span>
-                  <span className={`flex items-center text-xs font-medium ${card.trendClass}`}>
-                    <span className="material-symbols-outlined text-[14px]">{card.trendIcon}</span>
-                    {card.trend}
-                  </span>
-                </div>
-              </article>
-            ))}
+              return (
+                <article
+                  key={card.title}
+                  className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-slate-500">
+                      {card.title}
+                    </h4>
+                    <CardIcon className="text-[20px] text-slate-400" />
+                  </div>
+
+                  <div className="flex items-baseline gap-2">
+                    <span className="leading-none text-2xl font-bold text-slate-900">
+                      {card.value}
+                    </span>
+                    <span
+                      className={`flex items-center text-xs font-medium ${card.trendClass}`}
+                    >
+                      <TrendIcon className="text-[14px]" />
+                      {card.trend}
+                    </span>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         </section>
       </main>

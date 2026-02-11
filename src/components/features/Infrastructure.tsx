@@ -4,6 +4,10 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Agent } from '@/lib/types';
 import { simulateNodeFailure, analyzeHardwareImage } from '@/actions/ai';
 import { useI18n } from '@/contexts/I18nContext';
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { BadgeCheck, Brain, Cctv, CloudUpload, HousePlus, MousePointerClick, Network, Server } from 'lucide-react'
 
 interface InfrastructureProps {
     agents: Agent[];
@@ -180,9 +184,9 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                     <p className="text-secondary text-base font-medium">{tr('Interactive neural topology explorer for distributed infrastructure visualization.')}</p>
                 </div>
                 <div className="bg-[#F5F5F7] p-2 rounded-[1.75rem] flex gap-2 shadow-inner border border-[#E5E5EA]">
-                    <button onClick={() => setViewMode('topology')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'topology' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('Mesh Grid')}</button>
-                    <button onClick={() => setViewMode('map')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'map' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('Global Map')}</button>
-                    <button onClick={() => setViewMode('inspector')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'inspector' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('HW Vision')}</button>
+                    <Button onClick={() => setViewMode('topology')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'topology' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('Mesh Grid')}</Button>
+                    <Button onClick={() => setViewMode('map')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'map' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('Global Map')}</Button>
+                    <Button onClick={() => setViewMode('inspector')} className={`px-10 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'inspector' ? 'bg-white shadow-soft text-primary' : 'text-secondary hover:text-text-main'}`}>{tr('HW Vision')}</Button>
                 </div>
             </div>
 
@@ -191,10 +195,10 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                     {viewMode === 'topology' && (
                         <>
                             <div className="absolute top-12 left-12 z-30">
-                                <button onClick={() => setIsTelemetryFlowOn(!isTelemetryFlowOn)} className={`px-8 py-4 rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.3em] transition-all flex items-center gap-4 border shadow-soft ${isTelemetryFlowOn ? 'bg-primary border-primary text-white shadow-primary/30' : 'bg-white border-[#E5E5EA] text-[#86868B] hover:border-primary/40'}`}>
-                                    <span className={`material-symbols-outlined text-[22px] ${isTelemetryFlowOn ? 'animate-pulse' : ''}`}>online_prediction</span>
+                                <Button onClick={() => setIsTelemetryFlowOn(!isTelemetryFlowOn)} className={`px-8 py-4 rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.3em] transition-all flex items-center gap-4 border shadow-soft ${isTelemetryFlowOn ? 'bg-primary border-primary text-white shadow-primary/30' : 'bg-white border-[#E5E5EA] text-[#86868B] hover:border-primary/40'}`}>
+                                    <Brain className={`text-[22px] ${isTelemetryFlowOn ? 'animate-pulse' : ''}`} />
                                     {isTelemetryFlowOn ? tr('Live Telemetry Active') : tr('Enable Neural Flow')}
-                                </button>
+                                </Button>
                             </div>
                             <svg className="w-full h-full absolute inset-0">
                                 {topologyNodes.map(({ agent, tx, ty }, index) => {
@@ -213,19 +217,27 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                             </svg>
                             <div className="absolute z-10" style={{ left: centerX, top: centerY, transform: 'translate(-50%, -50%)' }}>
                                 <div className="w-32 h-32 bg-primary rounded-[3.5rem] flex items-center justify-center text-white shadow-2xl ring-[18px] ring-primary/5 group cursor-pointer hover:scale-105 transition-transform">
-                                    <span className="material-symbols-outlined text-6xl filled group-hover:scale-110 transition-transform">hub</span>
+                                    <Network className="text-6xl group-hover:scale-110 transition-transform" />
                                 </div>
                             </div>
-                            {topologyNodes.map(({ agent, tx, ty }) => {
-                                return (
-                                    <button key={agent.id} onClick={() => setSelectedNode(agent)} className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ${selectedNode?.id === agent.id ? 'scale-125' : 'hover:scale-110'}`} style={{ left: tx, top: ty }}>
-                                        <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-2xl border-2 transition-all ${selectedNode?.id === agent.id ? 'bg-primary border-primary text-white' : 'bg-white text-secondary border-[#E5E5EA]'}`}>
-                                            <span className="material-symbols-outlined text-[32px]">dns</span>
-                                        </div>
-                                        <span className="absolute top-full left-1/2 -translate-x-1/2 mt-5 whitespace-nowrap text-[11px] font-black text-secondary uppercase tracking-[0.25em] bg-white/90 backdrop-blur-2xl px-5 py-2.5 rounded-2xl border border-[#E5E5EA] shadow-soft opacity-0 group-hover:opacity-100 transition-all pointer-events-none">{agent.name}</span>
-                                    </button>
-                                );
-                            })}
+                            <TooltipProvider delayDuration={120}>
+                                {topologyNodes.map(({ agent, tx, ty }) => {
+                                    return (
+                                        <Tooltip key={agent.id}>
+                                            <TooltipTrigger asChild>
+                                                <Button onClick={() => setSelectedNode(agent)} className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ${selectedNode?.id === agent.id ? 'scale-125' : 'hover:scale-110'}`} style={{ left: tx, top: ty }}>
+                                                    <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-2xl border-2 transition-all ${selectedNode?.id === agent.id ? 'bg-primary border-primary text-white' : 'bg-white text-secondary border-[#E5E5EA]'}`}>
+                                                        <Server className="text-[32px]" />
+                                                    </div>
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom" sideOffset={12} className="rounded-2xl border border-[#E5E5EA] bg-white px-5 py-2.5 text-[11px] font-black uppercase tracking-[0.25em] text-secondary shadow-soft">
+                                                {agent.name}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    );
+                                })}
+                            </TooltipProvider>
                         </>
                     )}
 
@@ -246,14 +258,14 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                         <div className="absolute inset-0 border-[40px] border-white/5 pointer-events-none"></div>
                                         <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-red-500/50 animate-pulse shadow-2xl shadow-red-500/60"></div>
                                         <div className="absolute bottom-16 left-0 right-0 flex justify-center gap-10">
-                                            <button onClick={captureAndAnalyze} className="px-14 py-6 bg-primary text-white rounded-[1.75rem] font-black text-[12px] uppercase tracking-[0.4em] shadow-3xl shadow-primary/40 hover:bg-primary-hover active:scale-95 transition-all">{tr('Capture Logic Frame')}</button>
-                                            <button onClick={stopCamera} className="px-14 py-6 bg-white/10 text-white rounded-[1.75rem] font-black text-[12px] uppercase tracking-[0.4em] border border-white/20 backdrop-blur-3xl hover:bg-white/20 transition-all">{tr('Terminate Stream')}</button>
+                                            <Button onClick={captureAndAnalyze} className="px-14 py-6 bg-primary text-white rounded-[1.75rem] font-black text-[12px] uppercase tracking-[0.4em] shadow-3xl shadow-primary/40 hover:bg-primary-hover active:scale-95 transition-all">{tr('Capture Logic Frame')}</Button>
+                                            <Button onClick={stopCamera} className="px-14 py-6 bg-white/10 text-white rounded-[1.75rem] font-black text-[12px] uppercase tracking-[0.4em] border border-white/20 backdrop-blur-3xl hover:bg-white/20 transition-all">{tr('Terminate Stream')}</Button>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                         <div className="relative group cursor-pointer">
-                                            <input type="file" accept="image/*" onChange={(e) => {
+                                            <Input type="file" accept="image/*" onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if(file) {
                                                     const reader = new FileReader();
@@ -263,17 +275,17 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                             }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                                             <div className="p-28 border-4 border-dashed border-[#E5E5EA] rounded-[4.5rem] bg-white flex flex-col items-center justify-center transition-all group-hover:border-primary group-hover:bg-primary/5 shadow-inner">
                                                 <div className="w-32 h-32 bg-[#F5F5F7] rounded-[3rem] flex items-center justify-center text-[#C1C1C1] group-hover:text-primary transition-all">
-                                                    <span className="material-symbols-outlined text-8xl">cloud_upload</span>
+                                                    <CloudUpload className="text-8xl" />
                                                 </div>
                                                 <p className="mt-12 text-sm font-black text-text-main uppercase tracking-[0.5em] text-center">{tr('Sync Static Payload')}</p>
                                             </div>
                                         </div>
-                                        <button onClick={startCamera} className="p-28 border-4 border-dashed border-[#E5E5EA] rounded-[4.5rem] bg-white flex flex-col items-center justify-center transition-all hover:border-indigo-500 hover:bg-indigo-50 shadow-inner group">
+                                        <Button onClick={startCamera} className="p-28 border-4 border-dashed border-[#E5E5EA] rounded-[4.5rem] bg-white flex flex-col items-center justify-center transition-all hover:border-indigo-500 hover:bg-indigo-50 shadow-inner group">
                                             <div className="w-32 h-32 bg-[#F5F5F7] rounded-[3rem] flex items-center justify-center text-[#C1C1C1] group-hover:text-indigo-500 transition-all">
-                                                <span className="material-symbols-outlined text-8xl">linked_camera</span>
+                                                <Cctv className="text-8xl" />
                                             </div>
                                             <p className="mt-12 text-sm font-black text-text-main uppercase tracking-[0.5em] text-center">{tr('Neural Live-Stream')}</p>
-                                        </button>
+                                        </Button>
                                     </div>
                                 )}
 
@@ -291,7 +303,7 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                         </div>
                                         <div className="bg-[#0F172A] text-white p-20 rounded-[3.5rem] shadow-2xl border border-white/10 overflow-y-auto max-h-[600px] custom-scrollbar flex flex-col">
                                             <div className="flex items-center gap-6 mb-16 border-b border-white/10 pb-12 shrink-0">
-                                                <div className="w-20 h-20 bg-success text-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-success/40 ring-1 ring-white/10"><span className="material-symbols-outlined text-5xl filled">verified</span></div>
+                                                <div className="w-20 h-20 bg-success text-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-success/40 ring-1 ring-white/10"><BadgeCheck className="text-5xl" /></div>
                                                 <div>
                                                     <h4 className="text-[14px] font-black uppercase tracking-[0.4em] text-indigo-300">{tr('Vision Diagnostic Audit')}</h4>
                                                     <p className="text-white/40 text-[11px] font-black uppercase mt-3">{tr('SRE Grade: Optimized Physical Layer')}</p>
@@ -311,7 +323,7 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                     {selectedNode ? (
                         <div className="space-y-16 animate-fade-in">
                             <div className="p-12 bg-white rounded-[3.5rem] border border-[#E5E5EA] shadow-soft group relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-[120px] text-primary">dns</span></div>
+                                <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:scale-110 transition-transform"><Server className="text-[120px] text-primary" /></div>
                                 <p className="text-[11px] uppercase font-black text-secondary mb-5 tracking-[0.5em]">{tr('Entity Identifier')}</p>
                                 <p className="text-4xl font-black text-primary tracking-tighter truncate">{selectedNode.name}</p>
                                 <div className="mt-14 space-y-10">
@@ -321,12 +333,12 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                                 </div>
                             </div>
                             <div className="space-y-6">
-                                <button onClick={handleSimulateFailure} disabled={isSimulatingFailure} className="w-full py-7 bg-danger text-white rounded-[2rem] font-black text-[12px] uppercase tracking-[0.5em] hover:bg-danger/90 transition-all shadow-2xl shadow-danger/40 active:scale-95 disabled:opacity-50">
+                                <Button onClick={handleSimulateFailure} disabled={isSimulatingFailure} className="w-full py-7 bg-danger text-white rounded-[2rem] font-black text-[12px] uppercase tracking-[0.5em] hover:bg-danger/90 transition-all shadow-2xl shadow-danger/40 active:scale-95 disabled:opacity-50">
                                     {isSimulatingFailure ? tr('Initializing Sim-X...') : tr('Execute Failure Sim-X')}
-                                </button>
+                                </Button>
                                 {failureAnalysis && (
                                     <div className="p-12 bg-red-50/90 border border-red-200 rounded-[3.5rem] text-[14px] text-red-950 leading-relaxed font-bold animate-fade-in-up shadow-inner backdrop-blur-3xl">
-                                        <div className="flex items-center gap-5 mb-8 text-danger"><span className="material-symbols-outlined text-[28px] filled">emergency_home</span><span className="text-[12px] uppercase tracking-[0.4em] font-black">{tr('Risk Projection Audit')}</span></div>
+                                        <div className="flex items-center gap-5 mb-8 text-danger"><HousePlus className="text-[28px]" /><span className="text-[12px] uppercase tracking-[0.4em] font-black">{tr('Risk Projection Audit')}</span></div>
                                         <div className="prose prose-sm text-red-900 font-medium">
                                             {failureAnalysis}
                                         </div>
@@ -336,7 +348,7 @@ const Infrastructure: React.FC<InfrastructureProps> = ({ agents, onShowToast }) 
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center text-center p-20 space-y-12 opacity-20 grayscale">
-                            <div className="w-32 h-32 bg-[#E5E5EA] rounded-full flex items-center justify-center text-secondary"><span className="material-symbols-outlined text-8xl">ads_click</span></div>
+                            <div className="w-32 h-32 bg-[#E5E5EA] rounded-full flex items-center justify-center text-secondary"><MousePointerClick className="text-8xl" /></div>
                             <p className="text-[13px] font-black text-secondary uppercase tracking-[0.6em] leading-[3.2]">{tr('Await Target Selection for')}<br/>{tr('High-Fidelity Neural Profile')}</p>
                         </div>
                     )}

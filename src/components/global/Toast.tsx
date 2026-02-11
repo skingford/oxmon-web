@@ -1,6 +1,9 @@
 'use client'
 
 import React, { useEffect } from 'react'
+import { CheckCircle2, CircleAlert, Info, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export interface ToastMessage {
   id: string
@@ -15,36 +18,59 @@ interface ToastProps {
 
 const Toast: React.FC<ToastProps> = ({ toasts, onRemove }) => {
   useEffect(() => {
-    const timers = toasts.map(toast =>
-      setTimeout(() => onRemove(toast.id), 3000)
+    const timers = toasts.map((toast) =>
+      setTimeout(() => onRemove(toast.id), 3000),
     )
-    return () => timers.forEach(timer => clearTimeout(timer))
+
+    return () => timers.forEach((timer) => clearTimeout(timer))
   }, [toasts, onRemove])
 
+  const renderToastIcon = (type: ToastMessage['type']) => {
+    if (type === 'success') {
+      return <CheckCircle2 className="size-[18px]" />
+    }
+
+    if (type === 'error') {
+      return <CircleAlert className="size-[18px]" />
+    }
+
+    return <Info className="size-[18px]" />
+  }
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+    <div className="pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col gap-3">
       {toasts.map((toast) => (
-        <div
+        <Alert
           key={toast.id}
-          className="pointer-events-auto flex items-center gap-3 px-4 py-3 bg-white border border-border rounded-xl shadow-lg animate-fade-in-up min-w-[300px]"
+          variant={toast.type === 'error' ? 'destructive' : 'default'}
+          className="pointer-events-auto flex min-w-[300px] items-center gap-3 border border-border bg-white px-4 py-3 shadow-lg"
         >
-          <div className={`p-1 rounded-full ${
-            toast.type === 'success' ? 'bg-green-100 text-success' :
-            toast.type === 'error' ? 'bg-red-100 text-danger' :
-            'bg-blue-100 text-primary'
-          }`}>
-             <span className="material-symbols-outlined text-[18px] filled">
-                {toast.type === 'success' ? 'check' : toast.type === 'error' ? 'error' : 'info'}
-             </span>
-          </div>
-          <p className="text-sm font-medium text-text-main flex-1">{toast.message}</p>
-          <button
-            onClick={() => onRemove(toast.id)}
-            className="text-secondary hover:text-text-main transition-colors"
+          <div
+            className={`rounded-full p-1 ${
+              toast.type === 'success'
+                ? 'bg-green-100 text-success'
+                : toast.type === 'error'
+                  ? 'bg-red-100 text-danger'
+                  : 'bg-blue-100 text-primary'
+            }`}
           >
-            <span className="material-symbols-outlined text-[18px]">close</span>
-          </button>
-        </div>
+            {renderToastIcon(toast.type)}
+          </div>
+
+          <AlertDescription className="flex-1 text-sm font-medium text-text-main">
+            {toast.message}
+          </AlertDescription>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onRemove(toast.id)}
+            className="text-secondary transition-colors hover:text-text-main"
+          >
+            <X className="size-[18px]" />
+          </Button>
+        </Alert>
       ))}
     </div>
   )

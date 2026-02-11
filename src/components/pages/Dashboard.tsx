@@ -1,25 +1,75 @@
 'use client'
 
+import {
+  ArrowRight,
+  CheckCircle2,
+  CircleAlert,
+  CloudCheck,
+  Info,
+  Rocket,
+  Timer,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react'
 import { useI18n } from '@/contexts/I18nContext'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface DashboardStatCard {
   id: string
   title: string
   value: string
-  icon: string
+  icon: LucideIcon
   iconWrapClass: string
   valueSuffix?: string
   detail?: string
-  footerType: 'progress' | 'badge' | 'text'
-  footerLabel?: string
-  footerValue?: string
-  progressWidth?: string
-  footerIcon?: string
-  footerText?: string
-  footerClassName?: string
+  footer:
+    | {
+      type: 'progress'
+      label: string
+      value: string
+      progress: number
+    }
+    | {
+      type: 'badge'
+      icon: LucideIcon
+      text: string
+      className: string
+    }
+    | {
+      type: 'text'
+      text: string
+    }
 }
 
-const STATIC_ALERTS = [
+type AlertSeverity = 'Critical' | 'Warning' | 'Info'
+
+interface AlertItem {
+  id: string
+  severity: AlertSeverity
+  source: string
+  message: string
+  time: string
+}
+
+const STATIC_ALERTS: AlertItem[] = [
   {
     id: 'critical-web-01',
     severity: 'Critical',
@@ -41,7 +91,7 @@ const STATIC_ALERTS = [
     message: 'Scheduled disk cleanup completed successfully',
     time: '1 hr ago',
   },
-] as const
+]
 
 const DASHBOARD_STATS: DashboardStatCard[] = [
   {
@@ -49,46 +99,64 @@ const DASHBOARD_STATS: DashboardStatCard[] = [
     title: 'Agent Online Rate',
     value: '3/5',
     detail: '(60%)',
-    icon: 'cloud_done',
+    icon: CloudCheck,
     iconWrapClass: 'bg-blue-50 text-[#0073e6]',
-    footerType: 'progress' as const,
-    footerLabel: 'Progress',
-    footerValue: '60%',
-    progressWidth: '60%',
+    footer: {
+      type: 'progress',
+      label: 'Progress',
+      value: '60%',
+      progress: 60,
+    },
   },
   {
     id: 'service-version',
     title: 'Service Version',
     value: 'v0.1.0',
-    icon: 'deployed_code',
+    icon: Rocket,
     iconWrapClass: 'bg-purple-50 text-purple-600',
-    footerType: 'badge' as const,
-    footerIcon: 'check_circle',
-    footerText: 'Up to date',
-    footerClassName: 'text-green-600',
+    footer: {
+      type: 'badge',
+      icon: CheckCircle2,
+      text: 'Up to date',
+      className: 'text-green-700 bg-green-50 border-green-100',
+    },
   },
   {
     id: 'system-uptime',
     title: 'System Uptime',
     value: '3',
     valueSuffix: 'Days',
-    icon: 'timer',
+    icon: Timer,
     iconWrapClass: 'bg-green-50 text-green-600',
-    footerType: 'text' as const,
-    footerText: 'Since last maintenance',
+    footer: {
+      type: 'text',
+      text: 'Since last maintenance',
+    },
   },
-] as const
+]
 
-function getSeverityClass(severity: string) {
+function getSeverityClass(severity: AlertSeverity) {
   if (severity === 'Critical') {
-    return 'bg-red-50 text-red-700 border border-red-100'
+    return 'bg-red-50 text-red-700 border-red-100'
   }
 
   if (severity === 'Warning') {
-    return 'bg-orange-50 text-orange-700 border border-orange-100'
+    return 'bg-orange-50 text-orange-700 border-orange-100'
   }
 
-  return 'bg-blue-50 text-blue-700 border border-blue-100'
+  return 'bg-blue-50 text-blue-700 border-blue-100'
+}
+
+function getSeverityIcon(severity: AlertSeverity) {
+  if (severity === 'Critical') {
+    return CircleAlert
+  }
+
+  if (severity === 'Warning') {
+    return TriangleAlert
+  }
+
+  return Info
 }
 
 export default function Dashboard() {
@@ -100,81 +168,94 @@ export default function Dashboard() {
         <h3 className="text-2xl font-bold text-slate-900 mb-1">{tr('Welcome back, Administrator')}</h3>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {DASHBOARD_STATS.map((stat) => (
-          <article key={stat.id} className="h-40 bg-white rounded-xl p-6 border border-[#E5E5EA] shadow-card flex flex-col justify-between">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-slate-500">{tr(stat.title)}</p>
-                <h4 className="mt-2 text-3xl font-bold text-slate-900">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {DASHBOARD_STATS.map((stat) => {
+          const StatIcon = stat.icon
+          const FooterIcon = stat.footer.type === 'badge' ? stat.footer.icon : null
+
+          return (
+            <Card key={stat.id} className="h-40 justify-between gap-0 border-[#E5E5EA] shadow-card">
+              <CardHeader className="pt-6">
+                <CardTitle className="text-sm font-medium text-slate-500">{tr(stat.title)}</CardTitle>
+                <CardDescription className="mt-2 text-3xl font-bold text-slate-900">
                   {stat.value}
                   {stat.valueSuffix ? ` ${tr(stat.valueSuffix)}` : null}
                   {stat.detail ? <span className="text-lg font-medium text-slate-400"> {stat.detail}</span> : null}
-                </h4>
-              </div>
-              <div className={`p-2 rounded-lg ${stat.iconWrapClass}`}>
-                <span className="material-symbols-outlined">{stat.icon}</span>
-              </div>
-            </div>
+                </CardDescription>
+                <CardAction>
+                  <div className={`rounded-lg p-2 ${stat.iconWrapClass}`}>
+                    <StatIcon className="size-5" />
+                  </div>
+                </CardAction>
+              </CardHeader>
 
-            {stat.footerType === 'progress' ? (
-              <div className="w-full">
-                <div className="flex items-center justify-between mb-1.5 text-xs font-medium text-slate-500">
-                  <span>{tr(stat.footerLabel)}</span>
-                  <span>{stat.footerValue}</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-2 rounded-full bg-[#0073e6]" style={{ width: stat.progressWidth }} />
-                </div>
-              </div>
-            ) : null}
+              <CardContent>
+                {stat.footer.type === 'progress' ? (
+                  <div className="w-full space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                      <span>{tr(stat.footer.label)}</span>
+                      <span>{stat.footer.value}</span>
+                    </div>
+                    <Progress value={stat.footer.progress} />
+                  </div>
+                ) : null}
 
-            {stat.footerType === 'badge' ? (
-              <div className={`mt-4 flex items-center gap-2 text-sm ${stat.footerClassName}`}>
-                <span className="material-symbols-outlined text-[16px]">{stat.footerIcon}</span>
-                <span>{tr(stat.footerText)}</span>
-              </div>
-            ) : null}
+                {stat.footer.type === 'badge' ? (
+                  <Badge variant="outline" className={`gap-1.5 ${stat.footer.className}`}>
+                    {FooterIcon ? <FooterIcon className="size-3.5" /> : null}
+                    <span>{tr(stat.footer.text)}</span>
+                  </Badge>
+                ) : null}
 
-            {stat.footerType === 'text' ? (
-              <div className="mt-4 text-sm text-slate-500">{tr(stat.footerText)}</div>
-            ) : null}
-          </article>
-        ))}
+                {stat.footer.type === 'text' ? (
+                  <p className="text-sm text-slate-500">{tr(stat.footer.text)}</p>
+                ) : null}
+              </CardContent>
+            </Card>
+          )
+        })}
       </section>
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-900">{tr('Recent Alerts')}</h3>
-          <span className="text-sm font-medium text-[#0073e6]">{tr('View all alerts')}</span>
+          <Button variant="link" size="sm" className="h-auto px-0 py-0 text-sm font-medium text-[#0073e6]">
+            <span>{tr('View all alerts')}</span>
+            <ArrowRight className="size-4" />
+          </Button>
         </div>
 
-        <div className="bg-white rounded-xl border border-[#E5E5EA] shadow-card overflow-hidden">
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 border-b border-[#E5E5EA] text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <div className="col-span-2 md:col-span-1">{tr('Severity')}</div>
-            <div className="col-span-4 md:col-span-2">{tr('Source')}</div>
-            <div className="col-span-6 md:col-span-7">{tr('Message')}</div>
-            <div className="hidden md:block col-span-2 text-right">{tr('Time')}</div>
-          </div>
+        <Card className="overflow-hidden border-[#E5E5EA] shadow-card">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow className="hover:bg-slate-50">
+                <TableHead className="w-[140px]">{tr('Severity')}</TableHead>
+                <TableHead className="w-[140px]">{tr('Source')}</TableHead>
+                <TableHead>{tr('Message')}</TableHead>
+                <TableHead className="text-right">{tr('Time')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {STATIC_ALERTS.map((alert) => {
+                const SeverityIcon = getSeverityIcon(alert.severity)
 
-          <div className="divide-y divide-[#E5E5EA]">
-            {STATIC_ALERTS.map((alert) => (
-              <div
-                key={alert.id}
-                className="w-full grid grid-cols-12 gap-4 px-6 py-4 items-center text-left"
-              >
-                <div className="col-span-2 md:col-span-1">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${getSeverityClass(alert.severity)}`}>
-                    {tr(alert.severity)}
-                  </span>
-                </div>
-                <div className="col-span-4 md:col-span-2 font-medium text-slate-900 truncate">{alert.source}</div>
-                <div className="col-span-6 md:col-span-7 text-sm text-slate-600 truncate">{tr(alert.message)}</div>
-                <div className="hidden md:block col-span-2 text-right text-xs text-slate-400 font-medium">{tr(alert.time)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+                return (
+                  <TableRow key={alert.id}>
+                    <TableCell>
+                      <Badge variant="outline" className={`gap-1.5 ${getSeverityClass(alert.severity)}`}>
+                        <SeverityIcon className="size-3.5" />
+                        {tr(alert.severity)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium text-slate-900">{alert.source}</TableCell>
+                    <TableCell className="text-slate-600">{tr(alert.message)}</TableCell>
+                    <TableCell className="text-right text-xs font-medium text-slate-400">{tr(alert.time)}</TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </Card>
       </section>
 
       <footer className="pt-6 mt-8 border-t border-[#E5E5EA] text-center text-xs text-slate-400">

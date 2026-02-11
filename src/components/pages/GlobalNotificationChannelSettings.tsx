@@ -1,3 +1,9 @@
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { BellRing, ChevronRight, EyeOff, Link, Mail, Send, Server, User, Zap } from 'lucide-react'
+
 type GlobalNotificationChannelSettingsProps = {
   locale: 'en' | 'zh'
 }
@@ -38,7 +44,7 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                     }`}
                   >
                     <span>{item.label}</span>
-                    {item.active ? <span className="material-symbols-outlined text-[16px]">chevron_right</span> : null}
+                    {item.active ? <ChevronRight className="text-[16px]" /> : null}
                   </a>
                 ))}
               </div>
@@ -61,7 +67,7 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                   <div className="flex items-center justify-between gap-4 p-6">
                     <div className="flex items-center gap-4">
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0071E3]/10 text-[#0071E3]">
-                        <span className="material-symbols-outlined">notifications_active</span>
+                        <BellRing />
                       </div>
                       <div className="flex flex-col">
                         <span className="text-base font-medium text-[#1D1D1F]">{isZh ? '启用全局通知' : 'Enable Global Notifications'}</span>
@@ -73,10 +79,11 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                       </div>
                     </div>
 
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input type="checkbox" defaultChecked className="peer sr-only" />
-                      <div className="h-6 w-11 rounded-full bg-gray-200 transition-all after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[#0071E3] peer-checked:after:translate-x-full" />
-                    </label>
+                    <Switch
+                      defaultChecked
+                      aria-label={isZh ? '启用全局通知' : 'Enable global notifications'}
+                      className="h-6 w-11 bg-gray-200 data-[state=checked]:bg-[#0071E3]"
+                    />
                   </div>
                 </div>
               </section>
@@ -100,9 +107,9 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                   <form className="space-y-6">
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                       <div className="space-y-2">
-                        <label htmlFor="smtp-server" className="block text-sm font-medium text-[#86868B]">SMTP Server</label>
+                        <Label htmlFor="smtp-server" className="block text-sm font-medium text-[#86868B]">SMTP Server</Label>
                         <div className="relative">
-                          <input
+                          <Input
                             id="smtp-server"
                             type="text"
                             value="smtp.mailgun.org"
@@ -110,14 +117,14 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                             className="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-[#0071E3] focus:ring-[#0071E3]"
                           />
                           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
-                            <span className="material-symbols-outlined text-[20px]">dns</span>
+                            <Server className="text-[20px]" />
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="smtp-port" className="block text-sm font-medium text-[#86868B]">Port</label>
-                        <input
+                        <Label htmlFor="smtp-port" className="block text-sm font-medium text-[#86868B]">Port</Label>
+                        <Input
                           id="smtp-port"
                           type="number"
                           value="587"
@@ -127,9 +134,9 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="smtp-username" className="block text-sm font-medium text-[#86868B]">Username</label>
+                        <Label htmlFor="smtp-username" className="block text-sm font-medium text-[#86868B]">Username</Label>
                         <div className="relative">
-                          <input
+                          <Input
                             id="smtp-username"
                             type="text"
                             value="postmaster@oxmon.io"
@@ -137,15 +144,15 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                             className="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-[#0071E3] focus:ring-[#0071E3]"
                           />
                           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
-                            <span className="material-symbols-outlined text-[20px]">person</span>
+                            <User className="text-[20px]" />
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="smtp-password" className="block text-sm font-medium text-[#86868B]">Password</label>
+                        <Label htmlFor="smtp-password" className="block text-sm font-medium text-[#86868B]">Password</Label>
                         <div className="relative">
-                          <input
+                          <Input
                             id="smtp-password"
                             type="password"
                             value="supersecretpassword"
@@ -153,15 +160,15 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                             className="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-[#0071E3] focus:ring-[#0071E3]"
                           />
                           <div className="absolute inset-y-0 right-0 flex cursor-pointer items-center pr-3 text-gray-400 transition-colors hover:text-gray-600">
-                            <span className="material-symbols-outlined text-[20px]">visibility_off</span>
+                            <EyeOff className="text-[20px]" />
                           </div>
                         </div>
                       </div>
 
                       <div className="col-span-1 space-y-2 md:col-span-2">
-                        <label htmlFor="sender-address" className="block text-sm font-medium text-[#86868B]">Sender Address (From)</label>
+                        <Label htmlFor="sender-address" className="block text-sm font-medium text-[#86868B]">Sender Address (From)</Label>
                         <div className="relative">
-                          <input
+                          <Input
                             id="sender-address"
                             type="email"
                             value="alerts@oxmon.io"
@@ -169,7 +176,7 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                             className="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-[#0071E3] focus:ring-[#0071E3]"
                           />
                           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
-                            <span className="material-symbols-outlined text-[20px]">mail</span>
+                            <Mail className="text-[20px]" />
                           </div>
                         </div>
                         <p className="text-xs text-[#86868B]">
@@ -181,24 +188,24 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                     </div>
 
                     <div className="flex items-center justify-between border-t border-[#D2D2D7]/40 pt-4">
-                      <button
+                      <Button
                         type="button"
                         className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-[#1D1D1F] shadow-sm transition-all hover:bg-gray-50 focus:ring-2 focus:ring-[#0071E3] focus:ring-offset-2 focus:outline-none"
                       >
-                        <span className="material-symbols-outlined text-[18px]">send</span>
+                        <Send className="text-[18px]" />
                         {isZh ? '测试连接' : 'Test Connection'}
-                      </button>
+                      </Button>
 
                       <div className="flex gap-3">
-                        <button type="button" className="px-3 py-2 text-sm font-medium text-[#86868B] transition-colors hover:text-[#1D1D1F]">
+                        <Button type="button" className="px-3 py-2 text-sm font-medium text-[#86868B] transition-colors hover:text-[#1D1D1F]">
                           {isZh ? '取消' : 'Cancel'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="submit"
                           className="inline-flex justify-center rounded-lg border border-transparent bg-[#0071E3] px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#0077ED] focus:ring-2 focus:ring-[#0071E3] focus:ring-offset-2 focus:outline-none"
                         >
                           {isZh ? '保存更改' : 'Save Changes'}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </form>
@@ -224,12 +231,12 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                   <form className="space-y-6">
                     <div className="grid grid-cols-1 gap-6">
                       <div className="space-y-2">
-                        <label htmlFor="webhook-url" className="block text-sm font-medium text-[#86868B]">Webhook URL</label>
+                        <Label htmlFor="webhook-url" className="block text-sm font-medium text-[#86868B]">Webhook URL</Label>
                         <div className="relative">
                           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                            <span className="material-symbols-outlined text-[20px]">link</span>
+                            <Link className="text-[20px]" />
                           </div>
-                          <input
+                          <Input
                             id="webhook-url"
                             type="url"
                             placeholder="https://example.com/slack-webhook"
@@ -244,12 +251,12 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="channel-name" className="block text-sm font-medium text-[#86868B]">Default Channel</label>
+                        <Label htmlFor="channel-name" className="block text-sm font-medium text-[#86868B]">Default Channel</Label>
                         <div className="relative">
                           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                             <span className="text-sm font-bold">#</span>
                           </div>
-                          <input
+                          <Input
                             id="channel-name"
                             type="text"
                             placeholder="alerts-infrastructure"
@@ -260,25 +267,25 @@ export default function GlobalNotificationChannelSettings({ locale }: GlobalNoti
                     </div>
 
                     <div className="flex items-center justify-between border-t border-[#D2D2D7]/40 pt-4">
-                      <button
+                      <Button
                         type="button"
                         disabled
                         className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-[#1D1D1F] opacity-50 shadow-sm"
                       >
-                        <span className="material-symbols-outlined text-[18px]">bolt</span>
+                        <Zap className="text-[18px]" />
                         {isZh ? '发送测试消息' : 'Send Test Message'}
-                      </button>
+                      </Button>
 
                       <div className="flex gap-3">
-                        <button type="button" className="px-3 py-2 text-sm font-medium text-[#86868B] transition-colors hover:text-[#1D1D1F]">
+                        <Button type="button" className="px-3 py-2 text-sm font-medium text-[#86868B] transition-colors hover:text-[#1D1D1F]">
                           {isZh ? '取消' : 'Cancel'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="submit"
                           className="inline-flex justify-center rounded-lg border border-transparent bg-[#0071E3] px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#0077ED] focus:ring-2 focus:ring-[#0071E3] focus:ring-offset-2 focus:outline-none"
                         >
                           {isZh ? '保存更改' : 'Save Changes'}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </form>

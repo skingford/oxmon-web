@@ -1,5 +1,7 @@
 // client-localstorage-schema pattern: Version and minimize localStorage data
 
+import { safeJsonParse } from './json'
+
 const STORAGE_VERSION = 'v1'
 
 export interface StorageSchema {
@@ -14,7 +16,8 @@ export function getFromLocalStorage<T>(key: string, defaultValue: T): T {
     const item = localStorage.getItem(key)
     if (!item) return defaultValue
 
-    const parsed: StorageSchema = JSON.parse(item)
+    const parsed = safeJsonParse<StorageSchema | null>(item, null)
+    if (!parsed) return defaultValue
 
     // Version check
     if (parsed.version !== STORAGE_VERSION) {

@@ -1,3 +1,9 @@
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Activity, Bell, Info, Minimize, Plus, Share } from 'lucide-react'
+
 type FullScreenMetricsChartViewProps = {
   locale: 'en' | 'zh'
 }
@@ -65,14 +71,14 @@ export default function FullScreenMetricsChartView({ locale }: FullScreenMetrics
       <header className="z-10 flex items-center justify-between border-b border-gray-200 bg-white/80 px-6 py-3 backdrop-blur-md">
         <div className="flex items-center gap-3 text-slate-900">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0673e0] text-white">
-            <span className="material-symbols-outlined text-[20px]">monitor_heart</span>
+            <Activity className="text-[20px]" />
           </div>
           <h1 className="text-lg font-semibold tracking-tight">{isZh ? 'Oxmon 仪表盘' : 'Oxmon Dashboard'}</h1>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500">
-            <span className="material-symbols-outlined text-[18px]">notifications</span>
+            <Bell className="text-[18px]" />
           </div>
           <div className="h-8 w-8 overflow-hidden rounded-full bg-gray-200">
             <img alt="User Avatar" className="h-full w-full object-cover" src={USER_AVATAR_URL} />
@@ -101,7 +107,7 @@ export default function FullScreenMetricsChartView({ locale }: FullScreenMetrics
 
               <div className="hidden rounded-lg bg-gray-100/80 p-1 md:flex">
                 {RANGE_OPTIONS.map((option, index) => (
-                  <button
+                  <Button
                     key={option}
                     type="button"
                     className={
@@ -111,27 +117,27 @@ export default function FullScreenMetricsChartView({ locale }: FullScreenMetrics
                     }
                   >
                     {option}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 type="button"
                 className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:bg-gray-50"
               >
-                <span className="material-symbols-outlined text-[18px]">ios_share</span>
+                <Share className="text-[18px]" />
                 <span>{isZh ? '导出' : 'Export'}</span>
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
                 className="group flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-md transition-colors hover:bg-slate-800"
               >
-                <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-90">close_fullscreen</span>
+                <Minimize className="text-[18px] transition-transform group-hover:scale-90" />
                 <span>{isZh ? '退出全屏' : 'Exit Full Screen'}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -255,22 +261,21 @@ export default function FullScreenMetricsChartView({ locale }: FullScreenMetrics
               <div className="border-b border-gray-100 p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-xs font-bold tracking-widest text-slate-900 uppercase">Metrics</h3>
-                  <button type="button" className="text-xs font-medium text-[#0673e0] hover:underline">
+                  <Button type="button" className="text-xs font-medium text-[#0673e0] hover:underline">
                     {isZh ? '全选' : 'Select All'}
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="space-y-3">
                   {METRIC_LEGEND_ITEMS.map((item) => (
-                    <label
+                    <Label
                       key={item.name}
                       className={`group -mx-2 flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-all hover:bg-white hover:shadow-sm ${item.muted ? 'opacity-60 hover:opacity-100' : ''}`}
                     >
                       <div className="relative flex items-center justify-center">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           defaultChecked={item.checked}
-                          className={`peer h-4 w-4 cursor-pointer rounded border-gray-300 focus:ring-0 focus:ring-offset-0 ${item.accentClass}`}
+                          className={`h-4 w-4 border-gray-300 focus-visible:ring-0 focus-visible:ring-offset-0 ${item.accentClass}`}
                           aria-label={`${item.name} toggle`}
                         />
                       </div>
@@ -290,18 +295,18 @@ export default function FullScreenMetricsChartView({ locale }: FullScreenMetrics
                           </div>
                         )}
                       </div>
-                    </label>
+                    </Label>
                   ))}
                 </div>
 
                 <div className="mt-4 border-t border-dashed border-gray-200 pt-4">
-                  <button
+                  <Button
                     type="button"
                     className="flex w-full items-center justify-center gap-2 rounded border border-transparent py-2 text-xs font-medium text-slate-500 transition-colors hover:border-gray-200 hover:bg-white hover:text-[#0673e0] hover:shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[16px]">add</span>
+                    <Plus className="text-[16px]" />
                     <span>{isZh ? '添加指标' : 'Add Metric'}</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -319,12 +324,12 @@ export default function FullScreenMetricsChartView({ locale }: FullScreenMetrics
                       </span>
                     </div>
 
-                    <button
+                    <Button
                       type="button"
                       className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 transition-colors focus:ring-2 focus:ring-[#0673e0] focus:ring-offset-2 focus:outline-none"
                     >
                       <span className="inline-block h-4 w-4 translate-x-1 transform rounded-full bg-white shadow-sm transition-transform" />
-                    </button>
+                    </Button>
                   </div>
 
                   <div className="space-y-3">
@@ -350,19 +355,19 @@ export default function FullScreenMetricsChartView({ locale }: FullScreenMetrics
                       <span className="text-[10px] text-slate-400">Alerts &amp; Deployments</span>
                     </div>
 
-                    <button
+                    <Button
                       type="button"
                       className="relative inline-flex h-6 w-11 items-center rounded-full bg-[#0673e0] transition-colors focus:ring-2 focus:ring-[#0673e0] focus:ring-offset-2 focus:outline-none"
                     >
                       <span className="inline-block h-4 w-4 translate-x-6 transform rounded-full bg-white shadow-sm transition-transform" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
 
               <div className="mt-auto border-t border-gray-100 bg-gray-50 p-6">
                 <div className="flex items-center gap-3 text-slate-500">
-                  <span className="material-symbols-outlined text-[18px]">info</span>
+                  <Info className="text-[18px]" />
                   <p className="text-[10px] leading-tight">
                     {isZh
                       ? '数据每 15 分钟聚合一次。最后更新于 2 分钟前。'

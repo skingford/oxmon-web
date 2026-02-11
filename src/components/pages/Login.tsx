@@ -3,6 +3,10 @@
 import React, { useState } from 'react'
 import { I18nProvider, useI18n } from '@/contexts/I18nContext'
 import LanguageSwitcher from '@/components/global/LanguageSwitcher'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Activity, ArrowRight, Lock, User } from 'lucide-react'
 
 interface LoginProps {
   onLogin: () => void
@@ -33,7 +37,7 @@ const LoginInner: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="w-full max-w-[400px] bg-white rounded-2xl shadow-xl p-10 flex flex-col gap-8 border border-white/50 backdrop-blur-sm animate-fade-in-up">
         <div className="flex flex-col items-center gap-4">
           <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-primary to-blue-400 flex items-center justify-center shadow-lg shadow-primary/20 text-white mb-2">
-            <span className="material-symbols-outlined text-4xl filled">monitoring</span>
+            <Activity className="text-4xl" />
           </div>
           <div className="text-center space-y-1">
             <h1 className="text-text-main text-2xl font-bold tracking-tight">Oxmon Admin</h1>
@@ -43,9 +47,9 @@ const LoginInner: React.FC<LoginProps> = ({ onLogin }) => {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="space-y-2">
-            <label className="text-text-main text-sm font-medium ml-1" htmlFor="username">{t('login.username')}</label>
+            <Label className="text-text-main text-sm font-medium ml-1" htmlFor="username">{t('login.username')}</Label>
             <div className="relative group">
-              <input
+              <Input
                 id="username"
                 type="text"
                 value={email}
@@ -54,18 +58,18 @@ const LoginInner: React.FC<LoginProps> = ({ onLogin }) => {
                 placeholder="admin@oxmon.com"
               />
               <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-primary transition-colors">
-                <span className="material-symbols-outlined text-[20px]">person</span>
+                <User className="text-[20px]" />
               </div>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
-              <label className="text-text-main text-sm font-medium" htmlFor="password">{t('login.password')}</label>
+              <Label className="text-text-main text-sm font-medium" htmlFor="password">{t('login.password')}</Label>
               <a href="#" className="text-primary hover:text-blue-600 text-xs font-medium transition-colors">{t('login.forgotPassword')}</a>
             </div>
             <div className="relative group">
-              <input
+              <Input
                 id="password"
                 type="password"
                 value={password}
@@ -74,12 +78,12 @@ const LoginInner: React.FC<LoginProps> = ({ onLogin }) => {
                 placeholder="••••••••"
               />
               <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-primary transition-colors">
-                <span className="material-symbols-outlined text-[20px]">lock</span>
+                <Lock className="text-[20px]" />
               </div>
             </div>
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={isLoading}
             className={`mt-2 w-full h-12 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg text-[15px] tracking-wide transition-all duration-200 shadow-md shadow-primary/20 flex items-center justify-center gap-2 group active:scale-[0.98] ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
@@ -89,10 +93,10 @@ const LoginInner: React.FC<LoginProps> = ({ onLogin }) => {
             ) : (
                 <>
                 <span>{t('login.signIn')}</span>
-                <span className="material-symbols-outlined text-[18px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+                <ArrowRight className="text-[18px] group-hover:translate-x-0.5 transition-transform" />
                 </>
             )}
-          </button>
+          </Button>
         </form>
 
         <div className="pt-4 border-t border-gray-100 flex flex-col items-center gap-2">

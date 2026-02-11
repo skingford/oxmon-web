@@ -1,3 +1,9 @@
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Activity, Bell, ChartColumn, Download, RefreshCw, Search, Server, Settings, Share, TrendingDown, TriangleAlert } from 'lucide-react'
+
 const TIME_RANGE_OPTIONS = ['1h', '6h', '24h', '7d', 'Custom'] as const
 const X_AXIS_LABELS = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '00:00'] as const
 
@@ -9,36 +15,36 @@ export default function MetricsTimeSeriesQuery() {
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex size-8 items-center justify-center text-[#0073e6]">
-                <span className="material-symbols-outlined text-[32px]">monitoring</span>
+                <Activity className="text-[32px]" />
               </div>
               <span className="text-lg font-bold tracking-tight text-[#1d1d1f]">Oxmon Admin</span>
             </div>
 
             <div className="flex items-center gap-4">
-              <button
+              <Button
                 type="button"
                 aria-label="Search"
                 className="rounded-full p-2 text-[#86868b] transition-colors hover:bg-gray-100 hover:text-[#1d1d1f]"
               >
-                <span className="material-symbols-outlined">search</span>
-              </button>
+                <Search />
+              </Button>
 
-              <button
+              <Button
                 type="button"
                 aria-label="Notifications"
                 className="relative rounded-full p-2 text-[#86868b] transition-colors hover:bg-gray-100 hover:text-[#1d1d1f]"
               >
-                <span className="material-symbols-outlined">notifications</span>
+                <Bell />
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
                 aria-label="Settings"
                 className="rounded-full p-2 text-[#86868b] transition-colors hover:bg-gray-100 hover:text-[#1d1d1f]"
               >
-                <span className="material-symbols-outlined">settings</span>
-              </button>
+                <Settings />
+              </Button>
 
               <div className="ml-2 h-8 w-8 overflow-hidden rounded-full border border-gray-200 bg-gray-100">
                 <img
@@ -60,33 +66,31 @@ export default function MetricsTimeSeriesQuery() {
           </div>
 
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-[#1d1d1f] shadow-sm transition-colors hover:bg-gray-50"
             >
-              <span className="material-symbols-outlined text-[20px]">download</span>
+              <Download className="text-[20px]" />
               Export
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-[#1d1d1f] shadow-sm transition-colors hover:bg-gray-50"
             >
-              <span className="material-symbols-outlined text-[20px]">share</span>
+              <Share className="text-[20px]" />
               Share
-            </button>
+            </Button>
           </div>
         </div>
 
         <section className="rounded-xl border border-gray-100 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]">
           <div className="flex flex-col items-end gap-6 lg:flex-row">
             <div className="w-full flex-1 space-y-2">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#86868b]">Agent</label>
+              <Label className="block text-xs font-semibold uppercase tracking-wider text-[#86868b]">Agent</Label>
               <div className="group relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#0073e6]">
-                  dns
-                </span>
-                <input
+                <Server className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#0073e6]" />
+                <Input
                   type="text"
                   defaultValue="production-server-01"
                   placeholder="Search agent (e.g. prod-server-01)"
@@ -96,33 +100,30 @@ export default function MetricsTimeSeriesQuery() {
             </div>
 
             <div className="w-full flex-1 space-y-2">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#86868b]">Metric Name</label>
+              <Label className="block text-xs font-semibold uppercase tracking-wider text-[#86868b]">Metric Name</Label>
               <div className="group relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#0073e6]">
-                  bar_chart
-                </span>
-                <select
-                  defaultValue="cpu"
-                  className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-10 text-sm text-[#1d1d1f] transition-all focus:border-[#0073e6] focus:outline-none focus:ring-2 focus:ring-[#0073e6]/50"
-                >
-                  <option value="cpu">system.cpu.usage</option>
-                  <option value="memory">system.memory.usage</option>
-                  <option value="disk">system.disk.io</option>
-                  <option value="network">system.network.bytes</option>
-                </select>
-                <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                  expand_more
-                </span>
+                <ChartColumn className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#0073e6]" />
+                <Select defaultValue="cpu">
+                  <SelectTrigger className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-10 text-sm text-[#1d1d1f] transition-all focus:border-[#0073e6] focus:outline-none focus:ring-2 focus:ring-[#0073e6]/50">
+                    <SelectValue placeholder="system.cpu.usage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cpu">system.cpu.usage</SelectItem>
+                    <SelectItem value="memory">system.memory.usage</SelectItem>
+                    <SelectItem value="disk">system.disk.io</SelectItem>
+                    <SelectItem value="network">system.network.bytes</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <button
+            <Button
               type="button"
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0073e6] px-6 py-2.5 font-medium text-white shadow-md shadow-blue-500/20 transition-all hover:bg-blue-600 active:scale-95 lg:w-auto"
             >
-              <span className="material-symbols-outlined text-[20px]">search</span>
+              <Search className="text-[20px]" />
               Query
-            </button>
+            </Button>
           </div>
 
           <div className="my-5 h-px bg-gray-100" />
@@ -130,7 +131,7 @@ export default function MetricsTimeSeriesQuery() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2 rounded-lg bg-gray-100 p-1">
               {TIME_RANGE_OPTIONS.map((option) => (
-                <button
+                <Button
                   type="button"
                   key={option}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -140,7 +141,7 @@ export default function MetricsTimeSeriesQuery() {
                   }`}
                 >
                   {option}
-                </button>
+                </Button>
               ))}
             </div>
 
@@ -151,9 +152,9 @@ export default function MetricsTimeSeriesQuery() {
               </span>
               <span className="text-gray-300">|</span>
               <span>Updated 1m ago</span>
-              <button type="button" title="Refresh" className="rounded p-1 transition-colors hover:bg-gray-100">
-                <span className="material-symbols-outlined text-[18px]">refresh</span>
-              </button>
+              <Button type="button" title="Refresh" className="rounded p-1 transition-colors hover:bg-gray-100">
+                <RefreshCw className="text-[18px]" />
+              </Button>
             </div>
           </div>
         </section>
@@ -245,7 +246,7 @@ export default function MetricsTimeSeriesQuery() {
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-[#1d1d1f]">42.8%</span>
               <span className="flex items-center text-xs font-medium text-green-500">
-                <span className="material-symbols-outlined text-[14px]">trending_down</span>
+                <TrendingDown className="text-[14px]" />
                 2.1%
               </span>
             </div>
@@ -256,7 +257,7 @@ export default function MetricsTimeSeriesQuery() {
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-[#1d1d1f]">89.2%</span>
               <span className="flex items-center text-xs font-medium text-red-500">
-                <span className="material-symbols-outlined text-[14px]">warning</span>
+                <TriangleAlert className="text-[14px]" />
                 Spike detected
               </span>
             </div>

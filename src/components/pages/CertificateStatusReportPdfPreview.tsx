@@ -1,4 +1,17 @@
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ChartColumn, ChartPie, Download, FileText, Minus, Plus, RectangleHorizontal, RectangleVertical, ShieldCheck, X } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 type domainstatusReportPdfPreviewProps = {
   locale: 'en' | 'zh'
@@ -105,22 +118,31 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
         </div>
       </div>
 
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[20px] transition-all duration-300 sm:p-6 lg:p-8">
-        <div className="flex h-[90vh] w-full max-w-[1200px] overflow-hidden rounded-2xl bg-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] ring-1 ring-black/5">
+      <Dialog open onOpenChange={() => {}}>
+        <DialogContent
+          showCloseButton={false}
+          className="h-[90vh] w-full max-w-[1200px] overflow-hidden rounded-2xl border-0 bg-white p-0 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] ring-1 ring-black/5 sm:max-w-[1200px]"
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{isZh ? '证书状态报告预览' : 'Certificate status report preview'}</DialogTitle>
+            <DialogDescription>{isZh ? '预览并导出 PDF 报告' : 'Preview and export the PDF report'}</DialogDescription>
+          </DialogHeader>
+
+          <div className="flex h-full w-full">
           <div className="relative flex min-w-0 flex-1 flex-col bg-slate-100/50">
             <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white/80 px-6 backdrop-blur-md">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                <span className="material-symbols-outlined text-lg">description</span>
+                <FileText className="text-lg" />
                 <span>{isZh ? '正在预览第 1 / 4 页' : 'Previewing 1 of 4 pages'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100">
-                  <span className="material-symbols-outlined text-xl">remove</span>
-                </button>
+                <Button type="button" className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100">
+                  <Minus className="text-xl" />
+                </Button>
                 <span className="w-12 text-center text-sm font-semibold text-slate-700">100%</span>
-                <button type="button" className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100">
-                  <span className="material-symbols-outlined text-xl">add</span>
-                </button>
+                <Button type="button" className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100">
+                  <Plus className="text-xl" />
+                </Button>
               </div>
             </div>
 
@@ -129,7 +151,7 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
                 <div className="mb-8 flex items-start justify-between border-b-2 border-slate-100 pb-6">
                   <div className="flex flex-col gap-1">
                     <div className="mb-1 flex items-center gap-2 text-[#0b73da]">
-                      <span className="material-symbols-outlined text-3xl">verified_user</span>
+                      <ShieldCheck className="text-3xl" />
                       <span className="text-xl font-bold tracking-tight text-slate-900">Oxmon</span>
                     </div>
                     <div className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Infrastructure Security</div>
@@ -144,7 +166,7 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
                 <div className="mb-10 grid grid-cols-2 gap-8">
                   <div className="rounded-lg border border-slate-100 bg-slate-50 p-5">
                     <h3 className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-2 text-sm font-semibold text-slate-700">
-                      <span className="material-symbols-outlined text-sm">pie_chart</span>
+                      <ChartPie className="text-sm" />
                       Validity Distribution
                     </h3>
                     <div className="flex items-center gap-4">
@@ -170,7 +192,7 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
 
                   <div className="rounded-lg border border-slate-100 bg-slate-50 p-5">
                     <h3 className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-2 text-sm font-semibold text-slate-700">
-                      <span className="material-symbols-outlined text-sm">bar_chart</span>
+                      <ChartColumn className="text-sm" />
                       Top Issuers
                     </h3>
                     <div className="space-y-3">
@@ -211,30 +233,30 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
                     <span className="text-xs font-normal text-slate-500">Showing top 5 priority items</span>
                   </h3>
 
-                  <table className="w-full border-collapse text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-xs tracking-wide text-slate-500 uppercase">
-                        <th className="py-2 pl-2 font-medium">Domain</th>
-                        <th className="py-2 font-medium">Issuer</th>
-                        <th className="py-2 font-medium">Expiry Date</th>
-                        <th className="py-2 pr-2 text-right font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-slate-700">
+                  <Table className="w-full border-collapse text-left text-sm">
+                    <TableHeader>
+                      <TableRow className="border-b border-slate-200 text-xs tracking-wide text-slate-500 uppercase">
+                        <TableHead className="py-2 pl-2 font-medium">Domain</TableHead>
+                        <TableHead className="py-2 font-medium">Issuer</TableHead>
+                        <TableHead className="py-2 font-medium">Expiry Date</TableHead>
+                        <TableHead className="py-2 pr-2 text-right font-medium">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="text-slate-700">
                       {CERTIFICATE_ROWS.map((row) => (
-                        <tr key={row.domain} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="py-3 pl-2 font-medium text-slate-900">{row.domain}</td>
-                          <td className="py-3 text-slate-500">{row.issuer}</td>
-                          <td className="py-3 font-tabular text-slate-500">{row.expiryDate}</td>
-                          <td className="py-3 pr-2 text-right">
+                        <TableRow key={row.domain} className="border-b border-slate-100 hover:bg-slate-50">
+                          <TableCell className="py-3 pl-2 font-medium text-slate-900">{row.domain}</TableCell>
+                          <TableCell className="py-3 text-slate-500">{row.issuer}</TableCell>
+                          <TableCell className="py-3 font-tabular text-slate-500">{row.expiryDate}</TableCell>
+                          <TableCell className="py-3 pr-2 text-right">
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${getStatusClass(row.status)}`}>
                               {row.status}
                             </span>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
 
                 <div className="mt-auto border-t border-slate-100 pt-6 text-center">
@@ -251,7 +273,7 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
                 href={`/${locale}/domains/settings`}
                 className="text-slate-400 transition-colors hover:text-slate-600"
               >
-                <span className="material-symbols-outlined">close</span>
+                <X />
               </Link>
             </div>
 
@@ -259,23 +281,19 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
               <div className="space-y-4">
                 <h3 className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Report Content</h3>
                 {REPORT_OPTIONS.map((option) => (
-                  <label key={option.title} className="group flex cursor-pointer items-start gap-3">
+                  <Label key={option.title} className="group flex cursor-pointer items-start gap-3">
                     <div className="relative flex items-center">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         defaultChecked={option.checked}
-                        className="peer h-5 w-5 cursor-pointer appearance-none rounded border border-slate-300 bg-white transition-all checked:border-[#0b73da] checked:bg-[#0b73da] focus:ring-2 focus:ring-[#0b73da]/20"
+                        className="peer h-5 w-5 border-slate-300 data-[state=checked]:border-[#0b73da] data-[state=checked]:bg-[#0b73da]"
                         aria-label={option.title}
                       />
-                      <span className="material-symbols-outlined pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[14px] text-white opacity-0 peer-checked:opacity-100">
-                        check
-                      </span>
                     </div>
                     <div className="flex-1">
                       <span className="block text-sm font-medium text-slate-900 transition-colors group-hover:text-[#0b73da]">{option.title}</span>
                       <span className="mt-0.5 block text-xs text-slate-500">{option.description}</span>
                     </div>
-                  </label>
+                  </Label>
                 ))}
               </div>
 
@@ -283,38 +301,39 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
                 <h3 className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Format</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Paper Size</label>
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-700">Paper Size</Label>
                     <div className="relative">
-                      <select
-                        defaultValue="a4"
-                        className="h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 text-slate-900 shadow-sm focus:border-[#0b73da] focus:ring-[#0b73da] sm:text-sm"
-                      >
-                        <option value="a4">A4 (210 x 297 mm)</option>
-                        <option value="letter">Letter (8.5 x 11 in)</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                        <span className="material-symbols-outlined">expand_more</span>
-                      </div>
+                      <Select defaultValue="a4">
+                        <SelectTrigger className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900 shadow-sm focus:border-[#0b73da] focus:ring-[#0b73da] sm:text-sm">
+                          <SelectValue placeholder="A4 (210 x 297 mm)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="a4">A4 (210 x 297 mm)</SelectItem>
+                          <SelectItem value="letter">Letter (8.5 x 11 in)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Orientation</label>
+                    <Label className="mb-1.5 block text-sm font-medium text-slate-700">Orientation</Label>
                     <div className="flex gap-2">
-                      <label className="flex-1 cursor-pointer">
-                        <input type="radio" name="orientation" defaultChecked className="peer sr-only" />
-                        <div className="rounded-lg border border-slate-200 p-3 text-center transition-all hover:border-[#0b73da]/50 peer-checked:border-[#0b73da] peer-checked:bg-[#0b73da]/5 peer-checked:text-[#0b73da]">
-                          <span className="material-symbols-outlined mx-auto mb-1 block">crop_portrait</span>
-                          <span className="text-xs font-medium">{isZh ? '纵向' : 'Portrait'}</span>
-                        </div>
-                      </label>
-                      <label className="flex-1 cursor-pointer">
-                        <input type="radio" name="orientation" className="peer sr-only" />
-                        <div className="rounded-lg border border-slate-200 p-3 text-center transition-all hover:border-[#0b73da]/50 peer-checked:border-[#0b73da] peer-checked:bg-[#0b73da]/5 peer-checked:text-[#0b73da]">
-                          <span className="material-symbols-outlined mx-auto mb-1 block">crop_landscape</span>
-                          <span className="text-xs font-medium">{isZh ? '横向' : 'Landscape'}</span>
-                        </div>
-                      </label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-auto flex-1 flex-col rounded-lg border-[#0b73da] bg-[#0b73da]/5 px-3 py-3 text-[#0b73da]"
+                      >
+                        <RectangleVertical className="mb-1" />
+                        <span className="text-xs font-medium">{isZh ? '纵向' : 'Portrait'}</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-auto flex-1 flex-col rounded-lg border-slate-200 px-3 py-3 text-slate-700 hover:border-[#0b73da]/50"
+                      >
+                        <RectangleHorizontal className="mb-1" />
+                        <span className="text-xs font-medium">{isZh ? '横向' : 'Landscape'}</span>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -322,13 +341,13 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
             </div>
 
             <div className="border-t border-slate-100 bg-slate-50 p-6">
-              <button
+              <Button
                 type="button"
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0b73da] px-4 py-3 font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-600 active:scale-[0.98]"
               >
-                <span className="material-symbols-outlined">download</span>
+                <Download />
                 <span>{isZh ? '下载 PDF' : 'Download PDF'}</span>
-              </button>
+              </Button>
               <Link
                 href={`/${locale}/domains/settings`}
                 className="mt-3 block w-full text-center text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
@@ -337,8 +356,9 @@ export default function domainstatusReportPdfPreview({ locale }: domainstatusRep
               </Link>
             </div>
           </aside>
-        </div>
-      </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

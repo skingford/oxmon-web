@@ -1,8 +1,11 @@
 'use client'
 
 import React, { useMemo } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/contexts/I18nContext'
+import { Button } from '@/components/ui/button'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 
 const ROUTE_TITLE_MAP: Record<string, { title: string; subtitle: string }> = {
   dashboard: {
@@ -76,19 +79,25 @@ const Header: React.FC = () => {
   return (
     <header className="flex-none bg-[#f5f7f8] px-8 py-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[#1D1D1F]">{tr(routeMeta.title)}</h2>
-          <p className="mt-1 text-sm text-[#86868b]">{tr(routeMeta.subtitle)}</p>
+        <div className="flex items-start gap-3">
+          <SidebarTrigger
+            className="mt-0.5 text-[#86868b] hover:bg-white hover:text-[#1D1D1F]"
+            aria-label={tr('Toggle navigation')}
+          />
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-[#1D1D1F]">{tr(routeMeta.title)}</h2>
+            <p className="mt-1 text-sm text-[#86868b]">{tr(routeMeta.subtitle)}</p>
+          </div>
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <button
+          <Button
             type="button"
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-[#86868b] transition-all hover:border-gray-200 hover:bg-white hover:text-[#1D1D1F] hover:shadow-sm"
             aria-label={tr('Refresh')}
           >
-            <span className="material-symbols-outlined">refresh</span>
-          </button>
+            <RefreshCw className="size-5" />
+          </Button>
         </div>
       </div>
     </header>

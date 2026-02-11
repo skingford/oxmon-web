@@ -1,11 +1,46 @@
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import {
+  Activity,
+  CheckCircle2,
+  ChevronLeft,
+  Database,
+  Ellipsis,
+  Gauge,
+  HardDrive,
+  MemoryStick,
+  RefreshCw,
+  Settings,
+  TriangleAlert,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 type AgentDetailedMetricsWeb01Props = {
   locale: 'en' | 'zh'
   agentId: string
 }
 
-const CPU_BARS = ['40%', '35%', '50%', '60%', '55%', '45%', '48%', '52%', '65%', '58%', '50%', '45%'] as const
+const CPU_BARS = [
+  '40%',
+  '35%',
+  '50%',
+  '60%',
+  '55%',
+  '45%',
+  '48%',
+  '52%',
+  '65%',
+  '58%',
+  '50%',
+  '45%',
+] as const
 
 const RECENT_ACTIVITY = [
   {
@@ -34,7 +69,45 @@ const RECENT_ACTIVITY = [
   },
 ] as const
 
-export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDetailedMetricsWeb01Props) {
+function renderActivityIcon(icon: (typeof RECENT_ACTIVITY)[number]['icon']) {
+  if (icon === 'system_update') {
+    return <RefreshCw className="text-sm" />
+  }
+
+  if (icon === 'warning') {
+    return <TriangleAlert className="text-sm" />
+  }
+
+  return <CheckCircle2 className="text-sm" />
+}
+
+function MetricActionMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-slate-400 hover:text-slate-600"
+          aria-label="Metric actions"
+        >
+          <Ellipsis className="text-xl" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-40">
+        <DropdownMenuItem>View details</DropdownMenuItem>
+        <DropdownMenuItem>Set threshold</DropdownMenuItem>
+        <DropdownMenuItem>Export data</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+export default function AgentDetailedMetricsWeb01({
+  locale,
+  agentId,
+}: AgentDetailedMetricsWeb01Props) {
   const displayAgentId = decodeURIComponent(agentId)
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f7f8] font-sans text-slate-900 antialiased">
@@ -42,13 +115,15 @@ export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDeta
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
             <div className="rounded-lg bg-[#0073e6]/10 p-1.5">
-              <span className="material-symbols-outlined text-2xl text-[#0073e6]">monitoring</span>
+              <Activity className="text-2xl text-[#0073e6]" />
             </div>
             <span className="text-lg font-semibold tracking-tight">Oxmon</span>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-sm font-medium text-slate-600">JD</div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-sm font-medium text-slate-600">
+              JD
+            </div>
           </div>
         </div>
       </header>
@@ -59,7 +134,7 @@ export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDeta
             href={`/${locale}/agents`}
             className="group inline-flex items-center text-sm font-medium text-slate-500 transition-colors hover:text-[#0073e6]"
           >
-            <span className="material-symbols-outlined mr-1 text-[20px] transition-transform group-hover:-translate-x-0.5">chevron_left</span>
+            <ChevronLeft className="mr-1 text-[20px] transition-transform group-hover:-translate-x-0.5" />
             Back to Agent List
           </Link>
         </div>
@@ -67,32 +142,35 @@ export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDeta
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <div className="mb-1 flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Agent: {displayAgentId}</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                Agent: {displayAgentId}
+              </h1>
               <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
                 <span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                 Active
               </span>
             </div>
             <p className="max-w-2xl text-sm text-slate-500">
-              Detailed infrastructure metrics and health status for {displayAgentId}.
+              Detailed infrastructure metrics and health status for{' '}
+              {displayAgentId}.
             </p>
           </div>
 
           <div className="flex gap-3">
-            <button
+            <Button
               type="button"
               className="inline-flex items-center justify-center rounded-lg border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0073e6] focus:ring-offset-2"
             >
-              <span className="material-symbols-outlined mr-2 text-[18px]">refresh</span>
+              <RefreshCw className="mr-2 text-[18px]" />
               Refresh
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="inline-flex items-center justify-center rounded-lg border border-transparent bg-[#0073e6] px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-[#0073e6] focus:ring-offset-2"
             >
-              <span className="material-symbols-outlined mr-2 text-[18px]">settings</span>
+              <Settings className="mr-2 text-[18px]" />
               Configure
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -101,17 +179,21 @@ export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDeta
             <div className="mb-4 flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <div className="rounded-lg bg-blue-50 p-2">
-                  <span className="material-symbols-outlined text-blue-600">memory</span>
+                  <MemoryStick className="text-blue-600" />
                 </div>
-                <h3 className="text-sm font-medium text-slate-500">CPU Usage</h3>
+                <h3 className="text-sm font-medium text-slate-500">
+                  CPU Usage
+                </h3>
               </div>
-              <span className="material-symbols-outlined text-xl text-slate-400">more_horiz</span>
+              <MetricActionMenu />
             </div>
 
             <div className="mb-4 flex items-baseline gap-2">
-              <span className="text-[32px] font-bold leading-none text-slate-900">45.2%</span>
+              <span className="text-[32px] font-bold leading-none text-slate-900">
+                45.2%
+              </span>
               <span className="inline-flex items-center rounded bg-emerald-50 px-1.5 py-0.5 text-sm font-medium text-emerald-600">
-                <span className="material-symbols-outlined mr-0.5 text-[14px]">trending_down</span>
+                <TrendingDown className="mr-0.5 text-[14px]" />
                 2.1%
               </span>
             </div>
@@ -131,23 +213,30 @@ export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDeta
             <div className="mb-4 flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <div className="rounded-lg bg-purple-50 p-2">
-                  <span className="material-symbols-outlined text-purple-600">sd_card</span>
+                  <HardDrive className="text-purple-600" />
                 </div>
-                <h3 className="text-sm font-medium text-slate-500">Memory Usage</h3>
+                <h3 className="text-sm font-medium text-slate-500">
+                  Memory Usage
+                </h3>
               </div>
-              <span className="material-symbols-outlined text-xl text-slate-400">more_horiz</span>
+              <MetricActionMenu />
             </div>
 
             <div className="mb-4 flex items-baseline gap-2">
-              <span className="text-[32px] font-bold leading-none text-slate-900">72.8%</span>
+              <span className="text-[32px] font-bold leading-none text-slate-900">
+                72.8%
+              </span>
               <span className="inline-flex items-center rounded bg-amber-50 px-1.5 py-0.5 text-sm font-medium text-amber-600">
-                <span className="material-symbols-outlined mr-0.5 text-[14px]">trending_up</span>
+                <TrendingUp className="mr-0.5 text-[14px]" />
                 5.4%
               </span>
             </div>
 
             <div className="mb-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div className="h-2.5 rounded-full bg-purple-500" style={{ width: '72.8%' }} />
+              <div
+                className="h-2.5 rounded-full bg-purple-500"
+                style={{ width: '72.8%' }}
+              />
             </div>
             <div className="flex justify-between text-xs text-slate-400">
               <span>Used: 11.6 GB</span>
@@ -159,29 +248,41 @@ export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDeta
             <div className="mb-4 flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <div className="rounded-lg bg-indigo-50 p-2">
-                  <span className="material-symbols-outlined text-indigo-600">database</span>
+                  <Database className="text-indigo-600" />
                 </div>
-                <h3 className="text-sm font-medium text-slate-500">Disk Usage</h3>
+                <h3 className="text-sm font-medium text-slate-500">
+                  Disk Usage
+                </h3>
               </div>
-              <span className="material-symbols-outlined text-xl text-slate-400">more_horiz</span>
+              <MetricActionMenu />
             </div>
 
             <div className="mb-4 flex items-baseline gap-2">
-              <span className="text-[32px] font-bold leading-none text-slate-900">58.3%</span>
-              <span className="text-sm font-medium text-slate-500">/ 500GB</span>
+              <span className="text-[32px] font-bold leading-none text-slate-900">
+                58.3%
+              </span>
+              <span className="text-sm font-medium text-slate-500">
+                / 500GB
+              </span>
             </div>
 
             <div className="mt-2 grid grid-cols-2 gap-4">
               <div>
                 <p className="mb-1 text-xs text-slate-500">Root (/)</p>
                 <div className="h-1.5 w-full rounded-full bg-slate-100">
-                  <div className="h-1.5 rounded-full bg-indigo-500" style={{ width: '58.3%' }} />
+                  <div
+                    className="h-1.5 rounded-full bg-indigo-500"
+                    style={{ width: '58.3%' }}
+                  />
                 </div>
               </div>
               <div>
                 <p className="mb-1 text-xs text-slate-500">Data (/mnt/data)</p>
                 <div className="h-1.5 w-full rounded-full bg-slate-100">
-                  <div className="h-1.5 rounded-full bg-indigo-400" style={{ width: '32%' }} />
+                  <div
+                    className="h-1.5 rounded-full bg-indigo-400"
+                    style={{ width: '32%' }}
+                  />
                 </div>
               </div>
             </div>
@@ -191,30 +292,48 @@ export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDeta
             <div className="mb-4 flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <div className="rounded-lg bg-orange-50 p-2">
-                  <span className="material-symbols-outlined text-orange-600">speed</span>
+                  <Gauge className="text-orange-600" />
                 </div>
-                <h3 className="text-sm font-medium text-slate-500">Load Average</h3>
+                <h3 className="text-sm font-medium text-slate-500">
+                  Load Average
+                </h3>
               </div>
-              <span className="material-symbols-outlined text-xl text-slate-400">more_horiz</span>
+              <MetricActionMenu />
             </div>
 
             <div className="mb-4 flex items-baseline gap-2">
-              <span className="text-[32px] font-bold leading-none text-slate-900">1.24</span>
-              <span className="inline-flex items-center rounded bg-emerald-50 px-1.5 py-0.5 text-sm font-medium text-emerald-600">Healthy</span>
+              <span className="text-[32px] font-bold leading-none text-slate-900">
+                1.24
+              </span>
+              <span className="inline-flex items-center rounded bg-emerald-50 px-1.5 py-0.5 text-sm font-medium text-emerald-600">
+                Healthy
+              </span>
             </div>
 
             <div className="mt-4 grid grid-cols-3 gap-2 divide-x divide-slate-100">
               <div className="flex flex-col pr-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">1 min</span>
-                <span className="text-lg font-semibold text-slate-700">1.24</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  1 min
+                </span>
+                <span className="text-lg font-semibold text-slate-700">
+                  1.24
+                </span>
               </div>
               <div className="flex flex-col px-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">5 min</span>
-                <span className="text-lg font-semibold text-slate-700">1.10</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  5 min
+                </span>
+                <span className="text-lg font-semibold text-slate-700">
+                  1.10
+                </span>
               </div>
               <div className="flex flex-col pl-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">15 min</span>
-                <span className="text-lg font-semibold text-slate-700">0.95</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  15 min
+                </span>
+                <span className="text-lg font-semibold text-slate-700">
+                  0.95
+                </span>
               </div>
             </div>
           </section>
@@ -222,23 +341,39 @@ export default function AgentDetailedMetricsWeb01({ locale, agentId }: AgentDeta
 
         <section className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between border-b border-[#e5e7eb] px-6 py-5">
-            <h2 className="text-lg font-semibold text-slate-900">Recent Activity</h2>
-            <button type="button" className="text-sm font-medium text-[#0073e6] transition-colors hover:text-blue-600">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Recent Activity
+            </h2>
+            <Button
+              type="button"
+              className="text-sm font-medium text-[#0073e6] transition-colors hover:text-blue-600"
+            >
               View All
-            </button>
+            </Button>
           </div>
 
           <div className="divide-y divide-[#e5e7eb]">
             {RECENT_ACTIVITY.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full ${activity.iconWrap}`}>
-                  <span className="material-symbols-outlined text-sm">{activity.icon}</span>
+              <div
+                key={activity.id}
+                className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50"
+              >
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full ${activity.iconWrap}`}
+                >
+                  {renderActivityIcon(activity.icon)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900">{activity.title}</p>
-                  <p className="text-xs text-slate-500">{activity.description}</p>
+                  <p className="truncate text-sm font-medium text-slate-900">
+                    {activity.title}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {activity.description}
+                  </p>
                 </div>
-                <div className="whitespace-nowrap text-xs text-slate-400">{activity.time}</div>
+                <div className="whitespace-nowrap text-xs text-slate-400">
+                  {activity.time}
+                </div>
               </div>
             ))}
           </div>

@@ -1,3 +1,7 @@
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Clock3, Search } from 'lucide-react'
+
 type MetricRecord = {
   id: string
   timestamp: string
@@ -206,7 +210,7 @@ export default function Metrics({ locale }: MetricsProps) {
       <div className="flex flex-col overflow-hidden rounded-xl border border-[#e5e5e5]/60 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_0_rgba(0,0,0,0.03)]">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#e5e5e5]/60 p-4">
           <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span className="material-symbols-outlined text-[18px] text-[#0073e6]">schedule</span>
+            <Clock3 className="text-[18px] text-[#0073e6]" />
             <span>
               {isZh ? '最近更新时间：' : 'Latest sample: '}
               <span className="font-medium text-slate-700">
@@ -216,8 +220,8 @@ export default function Metrics({ locale }: MetricsProps) {
           </div>
 
           <div className="relative w-full max-w-xs">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">search</span>
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400" />
+            <Input
               type="text"
               readOnly
               value={isZh ? '按 agent_id / metric_name 搜索（示例）' : 'Search by agent_id / metric_name (sample)'}
@@ -227,33 +231,33 @@ export default function Metrics({ locale }: MetricsProps) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-y border-[#e5e5e5]/60 bg-slate-50/50">
-                <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Timestamp</th>
-                <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Agent ID</th>
-                <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Metric</th>
-                <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Value</th>
-                <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Labels</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Created At</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#e5e5e5]/60">
+          <Table className="w-full border-collapse text-left">
+            <TableHeader>
+              <TableRow className="border-y border-[#e5e5e5]/60 bg-slate-50/50">
+                <TableHead className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Timestamp</TableHead>
+                <TableHead className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Agent ID</TableHead>
+                <TableHead className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Metric</TableHead>
+                <TableHead className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Value</TableHead>
+                <TableHead className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Labels</TableHead>
+                <TableHead className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Created At</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-[#e5e5e5]/60">
               {SORTED_METRIC_RECORDS.map((record) => (
-                <tr key={record.id} className="transition-colors hover:bg-slate-50">
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-600">
+                <TableRow key={record.id} className="transition-colors hover:bg-slate-50">
+                  <TableCell className="whitespace-nowrap px-6 py-4 text-sm text-slate-600">
                     {formatTimestamp(record.timestamp, locale)}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-6 py-4">
                     <code className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{record.agent_id}</code>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-800">{record.metric_name}</td>
-                  <td className="whitespace-nowrap px-6 py-4">
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-800">{record.metric_name}</TableCell>
+                  <TableCell className="whitespace-nowrap px-6 py-4">
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getValueClass(record.value)}`}>
                       {formatMetricValue(record.value)}
                     </span>
-                  </td>
-                  <td className="px-6 py-4">
+                  </TableCell>
+                  <TableCell className="px-6 py-4">
                     <div className="flex flex-wrap gap-1.5">
                       {Object.entries(record.labels).map(([key, labelValue]) => (
                         <span
@@ -264,14 +268,14 @@ export default function Metrics({ locale }: MetricsProps) {
                         </span>
                       ))}
                     </div>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-slate-500">
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-6 py-4 text-right text-sm text-slate-500">
                     {formatTimestamp(record.created_at, locale)}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     </div>

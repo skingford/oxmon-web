@@ -4,6 +4,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '@google/genai';
 import { Agent, Alert, Certificate } from '@/lib/types';
 import { useI18n } from '@/contexts/I18nContext';
+import { Button } from '@/components/ui/button'
+import { AudioLines, BrainCircuit, Mic, MicOff, X } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface LiveAssistantProps {
   isOpen: boolean;
@@ -222,32 +231,40 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
     setTranscriptions([]);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md animate-fade-in" onClick={onClose}></div>
-      <div className="relative bg-[#0F172A] w-full max-w-lg rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden flex flex-col h-[650px] animate-fade-in-up ring-1 ring-white/20">
-         <div className="p-10 bg-white/5 border-b border-white/10 flex items-center justify-between">
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <DialogContent className="overflow-hidden border border-white/10 bg-[#0F172A] p-0 text-white shadow-2xl ring-1 ring-white/20 sm:max-w-lg" showCloseButton={false}>
+         <DialogHeader className="sr-only">
+            <DialogTitle>{tr('Sentinel Assistant')}</DialogTitle>
+            <DialogDescription>{tr('Oxmon Native Audio Intelligence v3.1')}</DialogDescription>
+         </DialogHeader>
+
+         <div className="flex h-[650px] flex-col">
+           <div className="p-10 bg-white/5 border-b border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-5">
                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transition-all ${isActive ? 'bg-primary shadow-primary/30' : 'bg-white/10'}`}>
-                    <span className={`material-symbols-outlined text-[32px] filled ${isActive ? 'animate-pulse' : ''}`}>neurology</span>
+                    <BrainCircuit className={`text-[32px] ${isActive ? 'animate-pulse' : ''}`} />
                 </div>
                 <div>
                     <h3 className="text-white font-black text-xs uppercase tracking-[0.25em]">{tr('Sentinel Assistant')}</h3>
                     <p className={`text-[10px] font-black uppercase mt-1 ${isActive ? 'text-success' : isConnecting ? 'text-warning' : 'text-white/40'}`}>{isActive ? tr('Neural Link Active') : isConnecting ? tr('Handshaking...') : tr('Ready for Telemetry')}</p>
                 </div>
             </div>
-            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white transition-colors bg-white/5 rounded-xl">
-                <span className="material-symbols-outlined">close</span>
-            </button>
-         </div>
+            <Button type="button" onClick={onClose} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white transition-colors bg-white/5 rounded-xl">
+                <X />
+            </Button>
+           </div>
 
-         <div ref={scrollRef} className="flex-1 overflow-y-auto p-10 space-y-6 custom-scrollbar bg-gradient-to-b from-transparent to-black/20">
+           <div ref={scrollRef} className="flex-1 overflow-y-auto p-10 space-y-6 custom-scrollbar bg-gradient-to-b from-transparent to-black/20">
             {transcriptions.length === 0 && !isConnecting && (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-8 opacity-40">
                     <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
-                        <span className="material-symbols-outlined text-5xl text-white">settings_voice</span>
+                        <AudioLines className="text-5xl text-white" />
                     </div>
                     <p className="text-white text-xs leading-loose font-medium max-w-xs uppercase tracking-widest">{tr('Awaiting neural handshake for real-time infrastructure command & control.')}</p>
                 </div>
@@ -264,9 +281,9 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
                      <div className="bg-white/5 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-indigo-300 border border-white/5 italic">{tr('Initializing high-fidelity stream...')}</div>
                 </div>
             )}
-         </div>
+           </div>
 
-         <div className="p-10 bg-white/5 border-t border-white/10 flex flex-col items-center gap-8">
+           <div className="p-10 bg-white/5 border-t border-white/10 flex flex-col items-center gap-8">
             <div className="flex items-center gap-6">
                 {isActive && (
                     <div className="flex items-center gap-3">
@@ -280,21 +297,23 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
             </div>
 
             {!isActive && !isConnecting ? (
-                <button
+                <Button
+                  type="button"
                   onClick={startSession}
                   className="w-full py-5 bg-primary text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-4 shadow-2xl shadow-primary/30 hover:bg-primary-hover active:scale-95 transition-all"
                 >
-                    <span className="material-symbols-outlined">mic</span>
+                    <Mic />
                     {tr('Initiate Neural Session')}
-                </button>
+                </Button>
             ) : isActive ? (
-                <button
+                <Button
+                  type="button"
                   onClick={stopSession}
                   className="w-full py-5 bg-white/5 hover:bg-white/10 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-4 border border-white/10 transition-all active:scale-95"
                 >
-                    <span className="material-symbols-outlined">mic_off</span>
+                    <MicOff />
                     {tr('Terminate Link')}
-                </button>
+                </Button>
             ) : (
                 <div className="w-full py-5 bg-primary/20 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-4 animate-pulse">
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -302,9 +321,10 @@ const LiveAssistant: React.FC<LiveAssistantProps> = ({
                 </div>
             )}
             <p className="text-[9px] text-white/20 uppercase font-black tracking-[0.4em]">{tr('Oxmon Native Audio Intelligence v3.1')}</p>
+           </div>
          </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

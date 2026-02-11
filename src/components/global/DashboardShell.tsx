@@ -1,39 +1,28 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
 import { I18nProvider } from '@/contexts/I18nContext'
 import { AppProvider } from '@/contexts/AppContext'
 import Sidebar from '@/components/global/Sidebar'
 import Header from '@/components/global/Header'
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 
 function DashboardShellInner({ children }: { children: React.ReactNode }) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  const handleCloseSidebar = useCallback(() => {
-    setIsMobileMenuOpen(false)
-  }, [])
-
-  useEffect(() => {
-    const handleToggle = () => setIsMobileMenuOpen((prev) => !prev)
-    window.addEventListener('toggle-mobile-menu', handleToggle)
-    return () => window.removeEventListener('toggle-mobile-menu', handleToggle)
-  }, [])
-
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#f5f7f8] text-[#1D1D1F] font-sans selection:bg-[#0071E3]/10">
-      <Sidebar
-        isOpen={isMobileMenuOpen}
-        onClose={handleCloseSidebar}
-      />
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <Header />
-        <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
-          <div className="mx-auto h-full max-w-[1200px]">
-            {children}
+    <SidebarProvider>
+      <div className="flex h-screen w-full overflow-hidden bg-[#f5f7f8] text-[#1D1D1F] font-sans selection:bg-[#0071E3]/10">
+        <Sidebar />
+        <SidebarInset className="h-full overflow-hidden bg-[#f5f7f8]">
+          <div className="relative flex h-full flex-1 flex-col overflow-hidden">
+            <Header />
+            <div className="custom-scrollbar flex-1 overflow-y-auto px-8 pb-8">
+              <div className="mx-auto h-full max-w-[1200px]">
+                {children}
+              </div>
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   )
 }
 

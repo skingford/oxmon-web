@@ -1,4 +1,11 @@
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
+import { CalendarClock, Mail, Webhook, X } from 'lucide-react'
 
 type CertificateExpirationNotificationSettingsProps = {
   locale: 'en' | 'zh'
@@ -65,30 +72,22 @@ const CHANNEL_ITEMS: ChannelItem[] = [
 
 function Toggle({ enabled, id }: { enabled: boolean; id: string }) {
   return (
-    <button
+    <Switch
       id={id}
-      type="button"
-      aria-pressed={enabled}
-      className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${
-        enabled ? 'bg-[#0071E3]' : 'bg-gray-200'
-      }`}
-    >
-      <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-          enabled ? 'translate-x-6' : 'translate-x-1'
-        }`}
-      />
-    </button>
+      checked={enabled}
+      aria-label="Notification threshold toggle"
+      className="h-6 w-12 bg-gray-200 data-[state=checked]:bg-[#0071E3]"
+    />
   )
 }
 
 function ChannelIcon({ icon }: { icon: ChannelItem['icon'] }) {
   if (icon === 'mail') {
-    return <span className="material-symbols-outlined text-[20px] text-gray-500 transition-colors group-hover:text-[#0071E3]">mail</span>
+    return <Mail className="text-[20px] text-gray-500 transition-colors group-hover:text-[#0071E3]" />
   }
 
   if (icon === 'webhook') {
-    return <span className="material-symbols-outlined text-[20px] text-gray-500 transition-colors group-hover:text-[#0071E3]">webhook</span>
+    return <Webhook className="text-[20px] text-gray-500 transition-colors group-hover:text-[#0071E3]" />
   }
 
   return (
@@ -131,7 +130,7 @@ export default function CertificateExpirationNotificationSettings({ locale }: Ce
                   : 'Specify how many days before expiration you want to be notified.'}
               </p>
             </div>
-            <span className="material-symbols-outlined text-[#86868B] opacity-50">calendar_clock</span>
+            <CalendarClock className="text-[#86868B] opacity-50" />
           </div>
 
           <div className="divide-y divide-[#D2D2D7]/50">
@@ -159,15 +158,14 @@ export default function CertificateExpirationNotificationSettings({ locale }: Ce
 
           <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-3">
             {CHANNEL_ITEMS.map((channel) => (
-              <label
+              <Label
                 key={channel.name}
                 className="group flex cursor-pointer items-start gap-3 rounded-lg border border-[#D2D2D7] p-4 transition-all hover:border-[#0071E3]/50 hover:bg-blue-50/50"
               >
                 <div className="mt-1">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     defaultChecked={channel.checked}
-                    className="h-5 w-5 rounded border-gray-300 text-[#0071E3] transition duration-150 ease-in-out focus:ring-[#0071E3]/20"
+                    className="h-5 w-5 border-gray-300 data-[state=checked]:border-[#0071E3] data-[state=checked]:bg-[#0071E3]"
                     aria-label={`${channel.name} channel`}
                   />
                 </div>
@@ -179,7 +177,7 @@ export default function CertificateExpirationNotificationSettings({ locale }: Ce
                   </div>
                   <p className="text-xs text-[#86868B]">{channel.description}</p>
                 </div>
-              </label>
+              </Label>
             ))}
           </div>
         </section>
@@ -194,25 +192,25 @@ export default function CertificateExpirationNotificationSettings({ locale }: Ce
 
           <div className="space-y-6 p-6">
             <div>
-              <label htmlFor="recipients" className="mb-2 block text-sm font-semibold text-[#1D1D1F]">
+              <Label htmlFor="recipients" className="mb-2 block text-sm font-semibold text-[#1D1D1F]">
                 {isZh ? '收件人列表' : 'Recipient List'}
-              </label>
+              </Label>
               <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-[#D2D2D7] bg-white p-2 transition-shadow focus-within:border-[#0071E3] focus-within:ring-2 focus-within:ring-[#0071E3]">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-[#0071E3]/20 bg-[#0071E3]/10 px-2.5 py-1 text-xs font-medium text-[#0071E3]">
                   admin@oxmon.com
-                  <button type="button" className="hover:text-[#0077ED] focus:outline-none">
-                    <span className="material-symbols-outlined align-middle text-[14px]">close</span>
-                  </button>
+                  <Button type="button" className="hover:text-[#0077ED] focus:outline-none">
+                    <X className="align-middle text-[14px]" />
+                  </Button>
                 </span>
 
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-[#0071E3]/20 bg-[#0071E3]/10 px-2.5 py-1 text-xs font-medium text-[#0071E3]">
                   security-team@oxmon.com
-                  <button type="button" className="hover:text-[#0077ED] focus:outline-none">
-                    <span className="material-symbols-outlined align-middle text-[14px]">close</span>
-                  </button>
+                  <Button type="button" className="hover:text-[#0077ED] focus:outline-none">
+                    <X className="align-middle text-[14px]" />
+                  </Button>
                 </span>
 
-                <input
+                <Input
                   id="recipients"
                   type="text"
                   placeholder={isZh ? '添加邮箱地址...' : 'Add email address...'}
@@ -223,22 +221,22 @@ export default function CertificateExpirationNotificationSettings({ locale }: Ce
             </div>
 
             <div className="max-w-md">
-              <label htmlFor="frequency" className="mb-2 block text-sm font-semibold text-[#1D1D1F]">
+              <Label htmlFor="frequency" className="mb-2 block text-sm font-semibold text-[#1D1D1F]">
                 {isZh ? '通知频率' : 'Notification Frequency'}
-              </label>
+              </Label>
               <div className="relative">
-                <select
-                  id="frequency"
-                  className="block w-full cursor-pointer rounded-lg border border-[#D2D2D7] bg-white py-2.5 pr-10 pl-3 text-sm text-[#1D1D1F] shadow-sm transition-colors hover:border-gray-400 focus:border-[#0071E3] focus:ring-[#0071E3]"
-                  defaultValue="once"
-                >
-                  <option value="once">{isZh ? '每个阈值仅通知一次' : 'Notify Once per threshold'}</option>
-                  <option value="daily">{isZh ? '每日提醒直到解决' : 'Daily Reminders until resolved'}</option>
-                </select>
-
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                  <span className="material-symbols-outlined text-[20px] text-[#86868B]">expand_more</span>
-                </div>
+                <Select defaultValue="once">
+                  <SelectTrigger
+                    id="frequency"
+                    className="block w-full cursor-pointer rounded-lg border border-[#D2D2D7] bg-white py-2.5 pr-10 pl-3 text-sm text-[#1D1D1F] shadow-sm transition-colors hover:border-gray-400 focus:border-[#0071E3] focus:ring-[#0071E3]"
+                  >
+                    <SelectValue placeholder={isZh ? '每个阈值仅通知一次' : 'Notify Once per threshold'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="once">{isZh ? '每个阈值仅通知一次' : 'Notify Once per threshold'}</SelectItem>
+                    <SelectItem value="daily">{isZh ? '每日提醒直到解决' : 'Daily Reminders until resolved'}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <p className="mt-2 text-xs text-[#86868B]">
                 {isZh

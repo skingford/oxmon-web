@@ -2,6 +2,7 @@
 
 import { cache } from 'react'
 import { GoogleGenAI, Type } from "@google/genai"
+import { parseLooseJson } from '@/lib/json'
 
 // Apply server-cache-react pattern: Cache AI client instance per request
 const getAI = cache(() => {
@@ -60,7 +61,11 @@ export async function interpretCommand(input: string): Promise<{ action: string;
         }
       }
     })
-    return JSON.parse(response.text || '{}')
+    return parseLooseJson(response.text, {
+      action: 'navigate',
+      target: 'dashboard',
+      message: 'Command understood.',
+    })
   } catch {
     throw new Error('Neural translation failed.')
   }
@@ -212,7 +217,16 @@ export async function generateLiveLog(): Promise<{ level: string; category: stri
       contents: 'Act as an SRE observability engine. Output a single technical monitoring log entry in JSON format for a multi-region cloud cluster. Format: { "level": "info"|"warn"|"error", "category": "auth"|"system"|"network"|"db", "message": "highly specific technical string with hex IDs" }',
       config: { responseMimeType: "application/json" }
     })
-    return JSON.parse(response.text || '{}')
+    const parsed = parseLooseJson<{ level: string; category: string; message: string } | null>(response.text, null)
+    if (!parsed || typeof parsed !== 'object') {
+      return null
+    }
+
+    if (typeof parsed.level !== 'string' || typeof parsed.category !== 'string' || typeof parsed.message !== 'string') {
+      return null
+    }
+
+    return parsed
   } catch {
     return null
   }

@@ -6,6 +6,14 @@ import { useAppUiContext } from '@/contexts/AppContext'
 import { useI18n } from '@/contexts/I18nContext'
 import { interpretCommand } from '@/actions/ai'
 import { buildLocalePath } from '@/lib/locale'
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 
 interface CommandPaletteProps {
   onClose: () => void
@@ -27,16 +35,17 @@ const viewToRoute: Record<string, string> = {
 const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose }) => {
   const router = useRouter()
   const { showToast } = useAppUiContext()
-  const { locale, t } = useI18n()
+  const { locale, t, tr } = useI18n()
   const [commandInput, setCommandInput] = useState('')
   const [isCommandExecuting, setIsCommandExecuting] = useState(false)
 
-  const handleCommandSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!commandInput.trim()) return
+  const executeCommand = async (rawCommand: string) => {
+    const normalizedCommand = rawCommand.trim()
+    if (!normalizedCommand || isCommandExecuting) return
+
     setIsCommandExecuting(true)
     try {
-      const result = await interpretCommand(commandInput)
+      const result = await interpretCommand(normalizedCommand)
       if (result.action === 'navigate') {
         const route = viewToRoute[result.target] || '/dashboard'
         router.push(buildLocalePath(locale, route))
@@ -59,27 +68,71 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ onClose }) => {
     t('commandPalette.suggestion.settings'),
   ]
 
+  const canExecute = commandInput.trim().length > 0 && !isCommandExecuting
+
   return (
-    <div className="fixed inset-0 z-[110] flex items-start justify-center pt-[15vh] px-4">
-      <div className="absolute inset-0 bg-[#020617]/80 backdrop-blur-md animate-fade-in" onClick={onClose}></div>
-      <div className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl border border-[#E5E5EA] overflow-hidden animate-fade-in-up ring-1 ring-black/5">
-        <form onSubmit={handleCommandSubmit} className="flex items-center p-12 border-b border-[#E5E5EA]">
-          <span className="material-symbols-outlined text-[#0071E3] text-4xl mr-8 filled">psychology</span>
-          <input autoFocus type="text" value={commandInput} onChange={(e) => setCommandInput(e.target.value)} placeholder={t('commandPalette.inputPlaceholder')} className="flex-1 text-2xl font-black text-[#1D1D1F] outline-none bg-transparent placeholder:text-[#C1C1C1]" disabled={isCommandExecuting} />
-          {isCommandExecuting && <div className="w-8 h-8 border-4 border-[#0071E3] border-t-transparent rounded-full animate-spin"></div>}
-        </form>
-        <div className="p-10 bg-[#F5F5F7]/50">
-          <h4 className="text-[10px] font-black text-[#86868B] uppercase tracking-[0.4em] mb-8">{t('commandPalette.intentSuggestions')}</h4>
-          <div className="grid grid-cols-2 gap-4">
-            {suggestions.map((cmd) => (
-              <button key={cmd} onClick={() => setCommandInput(cmd)} className="text-left px-8 py-5 bg-white border border-[#E5E5EA] rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] text-[#86868B] hover:text-[#0071E3] hover:border-[#0071E3]/30 hover:shadow-soft transition-all shadow-sm group">
-                <span className="group-hover:translate-x-1 transition-transform inline-block">{cmd}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+    <CommandDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+      title={t('commandPalette.inputPlaceholder')}
+      description={t('commandPalette.intentSuggestions')}
+      className="max-w-2xl overflow-hidden rounded-[2.5rem] border border-[#E5E5EA] p-0 shadow-2xl ring-1 ring-black/5"
+      showCloseButton={false}
+    >
+      <div className="relative border-b border-[#E5E5EA] p-10">
+        <CommandInput
+          autoFocus
+          value={commandInput}
+          onValueChange={setCommandInput}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              void executeCommand(commandInput)
+            }
+          }}
+          placeholder={t('commandPalette.inputPlaceholder')}
+          className="h-14 text-lg font-black text-[#1D1D1F] placeholder:text-[#C1C1C1]"
+          disabled={isCommandExecuting}
+        />
+        {isCommandExecuting && <div className="absolute right-10 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full border-2 border-[#0071E3] border-t-transparent animate-spin" />}
       </div>
-    </div>
+
+      <CommandList className="max-h-[360px] bg-[#F5F5F7]/50 p-6">
+        <CommandEmpty className="px-4 py-6 text-left text-xs font-semibold text-[#86868B]">
+          {t('commandPalette.intentSuggestions')}
+        </CommandEmpty>
+
+        <CommandGroup heading={t('commandPalette.intentSuggestions')}>
+          {suggestions.map((suggestion) => (
+            <CommandItem
+              key={suggestion}
+              value={suggestion}
+              onSelect={() => setCommandInput(suggestion)}
+              className="rounded-2xl border border-[#E5E5EA] bg-white px-4 py-3 text-[11px] font-black uppercase tracking-[0.15em] text-[#86868B] shadow-sm data-[selected=true]:border-[#0071E3]/30 data-[selected=true]:bg-white data-[selected=true]:text-[#0071E3]"
+            >
+              {suggestion}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+
+        <CommandGroup>
+          <CommandItem
+            value={t('commandPalette.inputPlaceholder')}
+            onSelect={() => {
+              if (canExecute) {
+                void executeCommand(commandInput)
+              }
+            }}
+            disabled={!canExecute}
+            className="mt-4 rounded-2xl bg-[#0071E3] px-4 py-3 text-[11px] font-black uppercase tracking-[0.15em] text-white data-[selected=true]:bg-[#0063cb] data-[disabled=true]:opacity-40"
+          >
+            {isCommandExecuting ? tr('Synthesizing Link...') : tr('Initiate Handshake')}
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
   )
 }
 
