@@ -274,8 +274,15 @@ export default function CertificateDetailViewExampleComPage({ locale }: Certific
         </section>
 
         <section className="mb-12 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">
-          <div className="border-b border-gray-100 px-6 py-5">
+          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
             <h3 className="text-base font-semibold text-[#111827]">Certificate Chain Verification</h3>
+            <Link
+              href={`/${locale}/certificate-chain-visual-path`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-[#0073e6] transition-colors hover:text-[#005dc1]"
+            >
+              {locale === 'zh' ? '查看链路路径' : 'View chain path'}
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </Link>
           </div>
 
           <div className="flex flex-col items-start gap-6 p-6 md:flex-row md:items-center md:p-8">

@@ -112,23 +112,27 @@ export default function DomainManagementTabPage() {
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col bg-[#f5f7f8]">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col p-4 md:p-8">
+        <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col px-4 pb-6 pt-5 sm:p-6 md:p-8">
           <div className="flex flex-col gap-1 pb-6">
             <h2 className="text-2xl font-bold leading-tight tracking-tight text-[#12161b] md:text-3xl">SSL Certificates</h2>
             <p className="text-sm font-normal leading-normal text-[#60758a] md:text-base">Manage and monitor your SSL domains</p>
           </div>
 
           <div className="mb-5 border-b border-[#d8dee5]">
-            <div className="flex gap-6 md:gap-8">
-              <a href="#" className="relative flex items-center border-b-2 border-[#2587e8] px-1 pb-3 text-sm font-semibold leading-normal text-[#2587e8]">
-                Domain Management
-              </a>
-              <a href="#" className="relative flex items-center border-b-2 border-transparent px-1 pb-3 text-sm font-medium leading-normal text-[#60758a] transition-colors duration-150 ease-out hover:text-[#111418] active:text-[#3f4c5a]">
-                Alert Rules
-              </a>
-              <a href="#" className="relative flex items-center border-b-2 border-transparent px-1 pb-3 text-sm font-medium leading-normal text-[#60758a] transition-colors duration-150 ease-out hover:text-[#111418] active:text-[#3f4c5a]">
-                Logs
-              </a>
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-[14px] bg-gradient-to-r from-[#f5f7f8] to-transparent sm:hidden" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-[14px] bg-gradient-to-l from-[#f5f7f8] to-transparent sm:hidden" />
+              <div className="flex gap-6 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:gap-8">
+                <a href="#" className="relative flex items-center border-b-2 border-[#2587e8] px-1 pb-3 text-sm font-semibold leading-normal text-[#2587e8]">
+                  Domain Management
+                </a>
+                <a href="#" className="relative flex items-center border-b-2 border-transparent px-1 pb-3 text-sm font-medium leading-normal text-[#60758a] transition-colors duration-150 ease-out hover:text-[#111418] active:text-[#3f4c5a]">
+                  Alert Rules
+                </a>
+                <a href="#" className="relative flex items-center border-b-2 border-transparent px-1 pb-3 text-sm font-medium leading-normal text-[#60758a] transition-colors duration-150 ease-out hover:text-[#111418] active:text-[#3f4c5a]">
+                  Logs
+                </a>
+              </div>
             </div>
           </div>
 
@@ -161,24 +165,27 @@ export default function DomainManagementTabPage() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[22px] border border-[#d2d9e1] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.045),0_1px_1px_rgba(16,24,40,0.018)]">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[930px] border-collapse text-left">
+          <div className="overflow-hidden rounded-[18px] border border-[#d2d9e1] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.045),0_1px_1px_rgba(16,24,40,0.018)] sm:rounded-[22px]">
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 z-[2] w-[6px] bg-gradient-to-r from-white to-transparent sm:hidden" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-[5] w-[18px] bg-gradient-to-l from-white to-transparent sm:hidden" />
+              <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <table className="w-full min-w-[860px] border-collapse text-left sm:min-w-[930px]">
                 <thead>
                   <tr className="border-b border-[#d7dee6] bg-[#f7f8fa]">
-                    <th className="px-[22px] py-[15px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397]">Domain</th>
-                    <th className="px-[22px] py-[15px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397]">Port</th>
-                    <th className="px-[22px] py-[15px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397]">Enabled</th>
-                    <th className="px-[22px] py-[15px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397]">Interval</th>
-                    <th className="px-[22px] py-[15px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397]">Last Checked</th>
-                    <th className="px-[22px] py-[15px] text-right text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397]">Actions</th>
+                    <th className="sticky left-0 z-[4] bg-[#f7f8fa] px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] shadow-[1px_0_0_#d7dee6] sm:static sm:bg-transparent sm:px-[22px] sm:py-[15px] sm:shadow-none">Domain</th>
+                    <th className="px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] sm:px-[22px] sm:py-[15px]">Port</th>
+                    <th className="px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] sm:px-[22px] sm:py-[15px]">Enabled</th>
+                    <th className="px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] sm:px-[22px] sm:py-[15px]">Interval</th>
+                    <th className="px-4 py-[13px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] sm:px-[22px] sm:py-[15px]">Last Checked</th>
+                    <th className="px-4 py-[13px] text-right text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6f8397] sm:px-[22px] sm:py-[15px]">Actions</th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-[#d9e0e7]">
                   {DOMAIN_ROWS.map((row) => (
                     <tr key={row.domain} className="group transition-colors duration-150 ease-out hover:bg-[#f9fbfd]">
-                      <td className="px-[22px] py-[15px]">
+                      <td className="sticky left-0 z-[3] bg-white px-4 py-[13px] shadow-[1px_0_0_#d9e0e7] group-hover:bg-[#f9fbfd] sm:static sm:bg-transparent sm:px-[22px] sm:py-[15px] sm:shadow-none">
                         <div className="flex items-center gap-3">
                           <div className={`flex h-10 w-10 items-center justify-center rounded-full ${row.paused ? 'bg-[#edf1f4]' : 'bg-[#e9f2ff]'}`}>
                             <span className={`material-symbols-outlined relative -top-px text-[18px] leading-none ${row.paused ? 'text-[#7e8896]' : 'text-[#2587e8]'}`}>
@@ -191,21 +198,21 @@ export default function DomainManagementTabPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-[22px] py-[15px] align-middle"><span className="relative -top-px block text-sm font-medium leading-normal text-[#6f8397]">{row.port}</span></td>
-                      <td className="px-[22px] py-[15px] align-middle">
+                      <td className="px-4 py-[13px] align-middle sm:px-[22px] sm:py-[15px]"><span className="relative -top-px block text-sm font-medium leading-normal text-[#6f8397]">{row.port}</span></td>
+                      <td className="px-4 py-[13px] align-middle sm:px-[22px] sm:py-[15px]">
                         <div className="relative -top-px">
                           <ToggleSwitch checked={row.enabled} />
                         </div>
                       </td>
-                      <td className="w-[124px] rounded-[10px] bg-[#f3f4f6] px-[22px] py-[15px] align-middle"><span className="relative -top-px block text-sm font-medium leading-normal text-[#2e343b]">{row.interval}</span></td>
-                      <td className="px-[22px] py-[15px] align-middle">
+                      <td className="w-[124px] rounded-[10px] bg-[#f3f4f6] px-4 py-[13px] align-middle sm:px-[22px] sm:py-[15px]"><span className="relative -top-px block text-sm font-medium leading-normal text-[#2e343b]">{row.interval}</span></td>
+                      <td className="px-4 py-[13px] align-middle sm:px-[22px] sm:py-[15px]">
                         <div className="relative -top-px flex items-center gap-2 text-sm font-normal leading-normal text-[#6f8397]">
                           <span className={`h-2.5 w-2.5 rounded-full ${row.paused ? 'bg-[#cfd5dc]' : 'bg-[#27c184]'}`} />
                           {row.lastChecked}
                         </div>
                       </td>
-                      <td className="px-[22px] py-[15px] text-right">
-                        <div className="relative -right-px flex items-center justify-end gap-[7px] opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100">
+                      <td className="px-4 py-[13px] text-right sm:px-[22px] sm:py-[15px]">
+                        <div className="relative -right-px flex items-center justify-end gap-1.5 opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100 sm:gap-[7px]">
                           <button
                             type="button"
                             className="rounded-lg p-2 text-[#60758a] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] hover:text-[#2587e8] active:bg-[#e8edf3]"
@@ -233,43 +240,44 @@ export default function DomainManagementTabPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between border-t border-[#d9e0e7] bg-white px-[22px] py-[15px]">
-              <p className="text-sm font-normal leading-normal text-[#6f8397]">
+            <div className="flex flex-col items-start gap-2.5 border-t border-[#d9e0e7] bg-white px-4 py-[13px] sm:flex-row sm:items-center sm:justify-between sm:gap-0 sm:px-[22px] sm:py-[15px]">
+              <p className="text-[11px] font-normal leading-normal text-[#6f8397] sm:text-sm">
                 Showing <span className="font-medium text-[#2e343b]">1</span> to <span className="font-medium text-[#2e343b]">4</span> of{' '}
                 <span className="font-medium text-[#2e343b]">12</span> results
               </p>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
-                  className="rounded-lg p-2 text-[#6f8397] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] active:bg-[#e8edf3]"
+                  className="flex h-[34px] w-[34px] items-center justify-center rounded-lg text-[#6f8397] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] active:bg-[#e8edf3] sm:h-auto sm:w-auto sm:p-2"
                   aria-label="Previous page"
                 >
                   <span className="material-symbols-outlined relative -top-px text-[20px] leading-none">chevron_left</span>
                 </button>
                 <button
                   type="button"
-                  className="flex h-[35px] w-[35px] items-center justify-center rounded-full bg-[#eef1f4] text-sm font-medium leading-normal text-[#2e343b]"
+                  className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#eef1f4] text-sm font-medium leading-normal text-[#2e343b] sm:h-[35px] sm:w-[35px]"
                 >
                   1
                 </button>
                 <button
                   type="button"
-                  className="flex h-[35px] w-[35px] items-center justify-center rounded-full text-sm font-medium leading-normal text-[#6f8397] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] active:bg-[#e8edf3]"
+                  className="flex h-[34px] w-[34px] items-center justify-center rounded-full text-sm font-medium leading-normal text-[#6f8397] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] active:bg-[#e8edf3] sm:h-[35px] sm:w-[35px]"
                 >
                   2
                 </button>
                 <button
                   type="button"
-                  className="flex h-[35px] w-[35px] items-center justify-center rounded-full text-sm font-medium leading-normal text-[#6f8397] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] active:bg-[#e8edf3]"
+                  className="flex h-[34px] w-[34px] items-center justify-center rounded-full text-sm font-medium leading-normal text-[#6f8397] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] active:bg-[#e8edf3] sm:h-[35px] sm:w-[35px]"
                 >
                   3
                 </button>
                 <button
                   type="button"
-                  className="rounded-lg p-2 text-[#6f8397] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] active:bg-[#e8edf3]"
+                  className="flex h-[34px] w-[34px] items-center justify-center rounded-lg text-[#6f8397] transition-colors duration-150 ease-out hover:bg-[#f2f5f8] active:bg-[#e8edf3] sm:h-auto sm:w-auto sm:p-2"
                   aria-label="Next page"
                 >
                   <span className="material-symbols-outlined relative -top-px text-[20px] leading-none">chevron_right</span>

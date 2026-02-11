@@ -176,6 +176,36 @@ export const PAGE_METADATA = {
       description: '在专用全屏图表工作区中分析系统资源指标，并配合侧栏控制项。',
     },
   },
+  'certificate-chain-visual-path': {
+    en: {
+      title: 'Certificate Chain Path | Oxmon Admin',
+      description: 'Visualize the certificate trust chain from root to leaf with validation summary and export actions.',
+    },
+    zh: {
+      title: '证书链路径 | Oxmon Admin',
+      description: '可视化从根到叶子证书的信任链，并查看验证摘要与导出操作。',
+    },
+  },
+  'certificate-expiration-notification-settings': {
+    en: {
+      title: 'Certificate Expiration Settings | Oxmon Admin',
+      description: 'Configure expiration alert thresholds, delivery channels, recipients, and reminder frequency for certificates.',
+    },
+    zh: {
+      title: '证书过期通知设置 | Oxmon Admin',
+      description: '配置证书过期告警阈值、通知渠道、收件人和提醒频率。',
+    },
+  },
+  'certificate-status-report-pdf-preview': {
+    en: {
+      title: 'Certificate Report PDF Preview | Oxmon Admin',
+      description: 'Preview certificate status reports before export and configure PDF content and format options.',
+    },
+    zh: {
+      title: '证书报告 PDF 预览 | Oxmon Admin',
+      description: '导出前预览证书状态报告，并配置 PDF 内容与格式选项。',
+    },
+  },
   help: {
     en: {
       title: 'Help Center | Oxmon Admin',
