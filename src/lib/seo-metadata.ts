@@ -36,6 +36,16 @@ export const PAGE_METADATA = {
       description: '管理节点生命周期，监控连接状态并执行定向运维操作。',
     },
   },
+  metrics: {
+    en: {
+      title: 'Metrics | Oxmon Admin',
+      description: 'Monitor time-series telemetry across agents with labels, thresholds, and recent sample health.',
+    },
+    zh: {
+      title: '指标中心 | Oxmon Admin',
+      description: '查看各节点时序指标、标签上下文与最近样本健康状态。',
+    },
+  },
   certificates: {
     en: {
       title: 'SSL Certificates | Oxmon Admin',

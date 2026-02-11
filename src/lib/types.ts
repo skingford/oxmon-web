@@ -64,4 +64,4 @@ export interface LogEntry {
   message: string;
 }
 
-export type ViewState = 'dashboard' | 'agents' | 'certificates' | 'settings' | 'alerts' | 'logs' | 'infrastructure' | 'tools' | 'help';
+export type ViewState = 'dashboard' | 'agents' | 'metrics' | 'certificates' | 'settings' | 'alerts' | 'logs' | 'infrastructure' | 'tools' | 'help';

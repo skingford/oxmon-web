@@ -46,7 +46,7 @@ export async function interpretCommand(input: string): Promise<{ action: string;
     const ai = getAI()
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Interpret intent: "${input}". Options: dashboard, agents, infrastructure, certificates, alerts, logs, tools, settings. Return JSON: { "action": "navigate", "target": "view_name", "message": "feedback" }`,
+      contents: `Interpret intent: "${input}". Options: dashboard, agents, metrics, infrastructure, certificates, alerts, logs, tools, settings. Return JSON: { "action": "navigate", "target": "view_name", "message": "feedback" }`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {

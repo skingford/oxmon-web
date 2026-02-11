@@ -13,6 +13,10 @@ const ROUTE_TITLE_MAP: Record<string, { title: string; subtitle: string }> = {
     title: 'Agent Management',
     subtitle: 'Manage and monitor your infrastructure agents.',
   },
+  metrics: {
+    title: 'Metrics Center',
+    subtitle: 'Track time-series metrics, trends, and agent telemetry health.',
+  },
   certificates: {
     title: 'Certificate Management',
     subtitle: 'Track trust posture and credential lifecycle.',

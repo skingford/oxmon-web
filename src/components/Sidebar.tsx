@@ -35,6 +35,7 @@ const Sidebar = memo<SidebarProps>(({ isOpen, onClose }) => {
   const navItems: NavItem[] = [
     { key: 'dashboard', icon: 'dashboard', label: tr('Dashboard'), href: `/${locale}/dashboard` },
     { key: 'agents', icon: 'dns', label: tr('Agents'), href: `/${locale}/agents` },
+    { key: 'metrics', icon: 'query_stats', label: tr('Metrics'), href: `/${locale}/metrics` },
     {
       key: 'certificates',
       icon: 'verified_user',

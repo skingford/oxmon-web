@@ -15,6 +15,7 @@ interface CommandPaletteProps {
 const viewToRoute: Record<string, string> = {
   dashboard: '/dashboard',
   agents: '/agents',
+  metrics: '/metrics',
   infrastructure: '/infrastructure',
   certificates: '/certificates',
   alerts: '/alerts',

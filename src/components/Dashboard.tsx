@@ -45,7 +45,6 @@ export default function Dashboard() {
     <div className="space-y-8 pb-8 animate-fade-in">
       <section>
         <h3 className="text-2xl font-bold text-slate-900 mb-1">{tr('Welcome back, Administrator')}</h3>
-        <p className="text-slate-500">{tr("Here's what's happening with your infrastructure today.")}</p>
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
