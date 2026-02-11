@@ -1,40 +1,36 @@
-import type { Metadata } from 'next'
-import { headers } from 'next/headers'
-import localFont from 'next/font/local'
-import './globals.css'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 
-const inter = localFont({
-  src: [
-    {
-      path: './fonts/Inter-Latin.woff2',
-      weight: '300 700',
-      style: 'normal',
-    },
-  ],
-  display: 'swap',
-})
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
-  title: 'Oxmon Admin',
-  description: 'Infrastructure Monitoring & domains',
-}
+  title: "Oxmon Web",
+  description: "Web interface for Oxmon server monitoring",
+};
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const requestHeaders = await headers()
-  const locale = requestHeaders.get('x-current-locale') ?? 'en'
-
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className={inter.className} suppressHydrationWarning>
-        <TooltipProvider>{children}</TooltipProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {children}
+        <Toaster />
       </body>
     </html>
-  )
+  );
 }
