@@ -1,4 +1,4 @@
-import { Calendar, Home, Inbox, Search, Settings, Shield, Bell, Users, Server, List, Activity } from "lucide-react"
+import { Calendar, Home, Inbox, Search, Settings, Shield, Bell, Users, User, Server, List, Activity } from "lucide-react"
 
 import {
   Sidebar,
@@ -42,6 +42,11 @@ const items = [
     title: "Metrics",
     url: "/metrics",
     icon: Activity,
+  },
+  {
+    title: "Profile",
+    url: "/profile",
+    icon: User,
   },
   {
     title: "System",

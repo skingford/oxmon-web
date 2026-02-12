@@ -248,20 +248,22 @@ export interface BatchCreateDomainsRequest {
 }
 
 export interface MetricDataPointResponse {
+  id: string;
   agent_id: string;
   metric_name: string;
   value: number;
   labels: Record<string, string>;
+  timestamp: string;
   created_at: string;
 }
 
 export interface MetricSummaryResponse {
-  agent_id: string;
-  metric_name: string;
   min: number;
   max: number;
   avg: number;
   count: number;
+  agent_id?: string;
+  metric_name?: string;
 }
 
 export interface CreateChannelRequest {
@@ -294,6 +296,12 @@ export interface CreateSilenceWindowRequest {
   metric_pattern: string;
   start_time: string;
   end_time: string;
+}
+
+export interface AlertSummary {
+  total: number;
+  active: number;
+  by_severity: Record<string, number>;
 }
 
 export interface EnableRequest {

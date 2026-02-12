@@ -6,6 +6,7 @@ import {
   AlertEventResponse,
   AlertRuleDetailResponse,
   AlertRuleResponse,
+  AlertSummary,
   ApiResponseEnvelope,
   CertificateDetails,
   ChannelOverview,
@@ -227,17 +228,14 @@ export const api = {
     }),
 
   getAlertRules: (params: PaginationParams) =>
-    request<AlertRuleResponse[]>(`/v1/alerts/rules${buildQueryString(params)}`),
+    request<AlertRuleDetailResponse[]>(`/v1/alerts/rules${buildQueryString(params)}`),
 
-  createAlertRule: (data: CreateAlertRuleRequest, token: string) =>
+  createAlertRule: (data: CreateAlertRuleRequest) =>
     request<AlertRuleDetailResponse>("/v1/alerts/rules", {
       method: "POST",
       body: data,
-      token,
     }),
 
-  getAlertRulesConfig: (params: PaginationParams) =>
-    request<AlertRuleDetailResponse[]>(`/v1/alerts/rules/config${buildQueryString(params)}`),
 
   // Dashboard
   getDashboardOverview: () =>
@@ -365,7 +363,7 @@ export const api = {
     request(`/v1/alerts/rules/${id}`, { method: "DELETE" }),
 
   getAlertSummary: () =>
-    request<any>("/v1/alerts/summary"),
+    request<AlertSummary>("/v1/alerts/summary"),
 
   updateAgent: (id: string, data: { description: string | null }, token?: string) =>
     request<AgentWhitelistDetail>(`/v1/agents/whitelist/${id}`, {

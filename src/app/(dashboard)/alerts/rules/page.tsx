@@ -67,7 +67,7 @@ export default function AlertRulesPage() {
   const fetchRules = async () => {
     setLoading(true);
     try {
-      const data = await api.getAlertRulesConfig({ limit, offset });
+      const data = await api.getAlertRules({ limit, offset });
       setRules(data);
     } catch (error) {
       console.error(error);
@@ -113,14 +113,11 @@ export default function AlertRulesPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token");
-      
       if (editingRuleId) {
         await api.updateAlertRule(editingRuleId, ruleForm);
         toast.success("Rule updated successfully");
       } else {
-        await api.createAlertRule(ruleForm, token);
+        await api.createAlertRule(ruleForm);
         toast.success("Rule created successfully");
       }
       setIsSheetOpen(false);
