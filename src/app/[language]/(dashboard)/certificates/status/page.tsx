@@ -1,8 +1,11 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { api, getApiErrorMessage } from "@/lib/api";
-import { CertCheckResult } from "@/types/api";
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { api, getApiErrorMessage } from "@/lib/api"
+import { CertCheckResult } from "@/types/api"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useRequestState } from "@/hooks/use-request-state"
 import {
   Table,
   TableBody,
@@ -10,165 +13,397 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { Loader2, RefreshCw, Activity, CheckCircle2, XCircle, Clock, ShieldCheck, Search } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  ShieldX,
+} from "lucide-react"
+import { toast } from "sonner"
+
+const PAGE_LIMIT = 20
+
+function formatDateTime(value: string | null, locale: "zh" | "en") {
+  if (!value) {
+    return "-"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "-"
+  }
+
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
+function getStatusMeta(
+  status: CertCheckResult,
+  t: (path: any, values?: Record<string, string | number>) => string
+) {
+  if (status.is_valid && status.chain_valid) {
+    return {
+      className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+      label: t("certificates.status.statusHealthy"),
+      icon: ShieldCheck,
+    }
+  }
+
+  return {
+    className: "border-red-500/30 bg-red-500/10 text-red-600",
+    label: t("certificates.status.statusFailed"),
+    icon: ShieldX,
+  }
+}
 
 export default function CertificateStatusPage() {
-  const [statuses, setStatuses] = useState<CertCheckResult[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const { t, locale } = useAppTranslations("pages")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  const fetchStatus = async () => {
-    setLoading(true);
-    try {
-      const data = await api.getCertStatusAll({ limit: 100 });
-      setStatuses(data);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load check results"));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const searchParamValue = searchParams.get("search") || ""
+  const rawOffset = Number(searchParams.get("offset") || "0")
+  const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
+
+  const [search, setSearch] = useState(searchParamValue)
+  const [offset, setOffset] = useState(initialOffset)
+  const [currentPageCount, setCurrentPageCount] = useState(0)
+  const [checkingAll, setCheckingAll] = useState(false)
+
+  const {
+    data: statuses,
+    loading,
+    refreshing,
+    execute,
+  } = useRequestState<CertCheckResult[]>([])
+
+  const fetchStatus = useCallback(
+    async (silent = false) => {
+      await execute(
+        () => api.getCertStatusAll({ limit: PAGE_LIMIT, offset }),
+        {
+          silent,
+          onSuccess: (data) => {
+            setCurrentPageCount(data.length)
+          },
+          onError: (error) => {
+            toast.error(getApiErrorMessage(error, t("certificates.status.toastFetchError")))
+          },
+        }
+      )
+    },
+    [execute, offset, t]
+  )
 
   useEffect(() => {
-    fetchStatus();
-  }, []);
+    fetchStatus()
+  }, [fetchStatus])
 
-  const filtered = statuses.filter(s => 
-    s.domain.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    const nextSearch = searchParams.get("search") || ""
+    const nextRawOffset = Number(searchParams.get("offset") || "0")
+    const nextOffset = Number.isFinite(nextRawOffset) && nextRawOffset > 0
+      ? Math.floor(nextRawOffset)
+      : 0
+
+    setSearch((previous) => (previous === nextSearch ? previous : nextSearch))
+    setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (search.trim()) {
+      nextParams.set("search", search)
+    } else {
+      nextParams.delete("search")
+    }
+
+    if (offset > 0) {
+      nextParams.set("offset", String(offset))
+    } else {
+      nextParams.delete("offset")
+    }
+
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery === currentQuery) {
+      return
+    }
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    })
+  }, [offset, pathname, router, search, searchParams])
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setOffset((previous) => (previous === 0 ? previous : 0))
+  }
+
+  const handleClearSearch = () => {
+    setSearch("")
+    setOffset(0)
+  }
+
+  const filteredStatuses = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+
+    if (!keyword) {
+      return statuses
+    }
+
+    return statuses.filter((item) => item.domain.toLowerCase().includes(keyword))
+  }, [search, statuses])
+
+  const stats = useMemo(() => {
+    return statuses.reduce(
+      (result, status) => {
+        const healthy = status.is_valid && status.chain_valid
+
+        if (healthy) {
+          result.healthy += 1
+        } else {
+          result.failed += 1
+        }
+
+        if (typeof status.days_until_expiry === "number" && status.days_until_expiry >= 0 && status.days_until_expiry <= 30) {
+          result.expiringSoon += 1
+        }
+
+        return result
+      },
+      {
+        total: statuses.length,
+        healthy: 0,
+        failed: 0,
+        expiringSoon: 0,
+      }
+    )
+  }, [statuses])
+
+  const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
+  const canGoPrev = offset > 0
+  const canGoNext = currentPageCount >= PAGE_LIMIT
+
+  const handleCheckAllDomains = async () => {
+    setCheckingAll(true)
+
+    try {
+      await api.checkAllDomains()
+      toast.success(t("certificates.status.toastCheckAllSuccess"))
+      await fetchStatus(true)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("certificates.status.toastCheckAllError")))
+    } finally {
+      setCheckingAll(false)
+    }
+  }
 
   return (
-    <Card className="glass-card border-none shadow-xl overflow-hidden">
-      <CardHeader className="pb-4 bg-muted/20">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-             <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                <Activity className="h-5 w-5" />
-             </div>
-             <div>
-                <CardTitle>Global Status</CardTitle>
-                <CardDescription>Latest verification results across all monitored endpoints.</CardDescription>
-             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-              <Input
-                placeholder="Filter domains..."
-                className="pl-10 glass w-64 h-10 transition-all focus:w-80"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={async () => {
-                  try {
-                    await api.checkAllDomains();
-                    toast.success("Global check sequence initiated");
-                    fetchStatus();
-                  } catch (e) {
-                    toast.error("Global audit failed to start");
-                  }
-                }}
-                className="glass h-10 gap-2 px-4 hover:bg-primary/10 hover:text-primary transition-all border-white/5 shadow-lg shadow-primary/5"
-            >
-                <ShieldCheck className="h-4 w-4" />
-                Audit All
-            </Button>
-            <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={fetchStatus}
-                className="glass transition-transform active:scale-95"
-            >
-                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("certificates.status.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("certificates.status.description")}</p>
         </div>
-      </CardHeader>
-      <CardContent className="pt-6">
-        <div className="rounded-xl border border-white/5 overflow-hidden">
-          <Table>
-            <TableHeader className="bg-white/5">
-              <TableRow className="border-white/5 hover:bg-transparent">
-                <TableHead>Domain Address</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead>Chain</TableHead>
-                <TableHead>Checked At</TableHead>
-                <TableHead className="text-right px-6">Error Detail</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <AnimatePresence mode="popLayout">
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleCheckAllDomains}
+            disabled={checkingAll}
+          >
+            {checkingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+            {t("certificates.status.checkAllButton")}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => fetchStatus(true)}
+            disabled={loading || refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {t("certificates.status.refreshButton")}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("certificates.status.statTotal")}</CardDescription>
+            <CardTitle className="text-3xl">{stats.total}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("certificates.status.statHealthy")}</CardDescription>
+            <CardTitle className="text-3xl text-emerald-600">{stats.healthy}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("certificates.status.statFailed")}</CardDescription>
+            <CardTitle className="text-3xl text-red-600">{stats.failed}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("certificates.status.statExpiringSoon")}</CardDescription>
+            <CardTitle className="text-3xl text-amber-600">{stats.expiringSoon}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>{t("certificates.status.tableTitle")}</CardTitle>
+              <CardDescription>{t("certificates.status.tableDescription", { limit: PAGE_LIMIT })}</CardDescription>
+            </div>
+            <div className="flex w-full items-center gap-2 md:w-auto">
+              <div className="relative w-full md:w-80">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => handleSearchChange(event.target.value)}
+                  placeholder={t("certificates.status.searchPlaceholder")}
+                  className="pl-9"
+                />
+              </div>
+              <Button type="button" variant="outline" onClick={handleClearSearch}>
+                {t("certificates.status.clearSearch")}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("certificates.status.tableColDomain")}</TableHead>
+                  <TableHead>{t("certificates.status.tableColStatus")}</TableHead>
+                  <TableHead>{t("certificates.status.tableColChain")}</TableHead>
+                  <TableHead>{t("certificates.status.tableColExpiry")}</TableHead>
+                  <TableHead>{t("certificates.status.tableColCheckedAt")}</TableHead>
+                  <TableHead>{t("certificates.status.tableColError")}</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-48 text-center text-primary">
-                      <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                    <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
+                      <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                      {t("certificates.status.tableLoading")}
                     </TableCell>
                   </TableRow>
-                ) : filtered.length === 0 ? (
+                ) : filteredStatuses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic">
-                      No status reports available.
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                      <div className="space-y-1">
+                        <p>
+                          {statuses.length === 0
+                            ? t("certificates.status.tableEmpty")
+                            : t("certificates.status.tableEmptyFiltered")}
+                        </p>
+                        <p className="text-xs text-muted-foreground/80">
+                          {statuses.length === 0
+                            ? t("certificates.status.tableEmptyHint")
+                            : t("certificates.status.tableEmptyFilteredHint")}
+                        </p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((status, i) => (
-                    <motion.tr 
-                      key={status.domain}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.02 }}
-                      className="group border-white/5 hover:bg-white/5"
-                    >
-                      <TableCell className="py-4 font-bold text-sm">
-                        {status.domain}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={(status.is_valid && status.chain_valid) ? "success" : "destructive"} className="gap-1.5 h-6 px-2">
-                           {(status.is_valid && status.chain_valid) ? (
-                             <CheckCircle2 className="h-3 w-3" />
-                           ) : (
-                             <XCircle className="h-3 w-3" />
-                           )}
-                           {(status.is_valid && status.chain_valid) ? "Healthy" : "Failed"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                         {status.chain_valid ? (
-                            <Badge variant="outline" className="text-[10px] glass border-emerald-500/20 text-emerald-500 gap-1 h-5">
-                               <ShieldCheck className="h-2.5 w-2.5" /> Valid
-                            </Badge>
-                         ) : (
-                            <Badge variant="outline" className="text-[10px] glass border-red-500/20 text-red-500 gap-1 h-5">
-                               <XCircle className="h-2.5 w-2.5" /> Broken
-                            </Badge>
-                         )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 group-hover:text-foreground transition-colors pt-5">
-                         <Clock className="h-3 w-3" />
-                         {new Date(status.checked_at).toLocaleTimeString()}
-                      </TableCell>
-                      <TableCell className="text-right px-6 text-xs text-muted-foreground max-w-[200px] truncate italic" title={status.error || ""}>
-                         {status.error || "Handshake successful."}
-                      </TableCell>
-                    </motion.tr>
-                  ))
+                  filteredStatuses.map((status) => {
+                    const statusMeta = getStatusMeta(status, t)
+                    const StatusIcon = statusMeta.icon
+
+                    return (
+                      <TableRow key={status.id} className="hover:bg-muted/40">
+                        <TableCell className="font-medium">{status.domain}</TableCell>
+                        <TableCell>
+                          <Badge className={`gap-1 ${statusMeta.className}`}>
+                            <StatusIcon className="h-3 w-3" />
+                            {statusMeta.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={status.chain_valid
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                              : "border-red-500/30 bg-red-500/10 text-red-600"}
+                          >
+                            {status.chain_valid
+                              ? t("certificates.status.chainValid")
+                              : t("certificates.status.chainInvalid")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {typeof status.days_until_expiry === "number"
+                            ? t("certificates.status.expiryDays", { days: status.days_until_expiry })
+                            : t("certificates.status.expiryUnknown")}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDateTime(status.checked_at, locale)}
+                        </TableCell>
+                        <TableCell className="max-w-[240px] truncate text-muted-foreground" title={status.error || ""}>
+                          {status.error || t("certificates.status.errorNone")}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
-              </AnimatePresence>
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <span className="mr-2 text-xs text-muted-foreground">
+              {t("certificates.status.paginationPage", { page: pageNumber })}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canGoPrev || loading}
+              onClick={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              {t("certificates.status.paginationPrev")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canGoNext || loading}
+              onClick={() => setOffset((previous) => previous + PAGE_LIMIT)}
+            >
+              {t("certificates.status.paginationNext")}
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }

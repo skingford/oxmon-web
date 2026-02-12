@@ -1,25 +1,14 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api";
-import { AgentWhitelistDetail } from "@/types/api";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { AgentWhitelistDetail } from "@/types/api"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useRequestState } from "@/hooks/use-request-state"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -28,23 +17,139 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, Plus, RefreshCw, Trash2, Key } from "lucide-react";
-import { toast } from "sonner";
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  KeyRound,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  WifiOff,
+  HelpCircle,
+} from "lucide-react"
+import { toast } from "sonner"
+
+const PAGE_LIMIT = 20
+
+type TokenDialogState = {
+  open: boolean
+  token: string
+  agentId: string
+  title: string
+  description: string
+}
+
+function formatTimestamp(timestamp: string | null, locale: "zh" | "en") {
+  if (!timestamp) {
+    return "-"
+  }
+
+  const date = new Date(timestamp)
+
+  if (Number.isNaN(date.getTime())) {
+    return "-"
+  }
+
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
+function getStatusMeta(
+  status: string,
+  t: (path: any, values?: Record<string, string | number>) => string
+) {
+  const normalized = status.toLowerCase()
+
+  if (normalized === "active") {
+    return {
+      icon: CheckCircle2,
+      label: t("whitelist.statusActive"),
+      className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+    }
+  }
+
+  if (normalized === "inactive") {
+    return {
+      icon: WifiOff,
+      label: t("whitelist.statusInactive"),
+      className: "border-muted bg-muted text-muted-foreground",
+    }
+  }
+
+  return {
+    icon: HelpCircle,
+    label: t("whitelist.statusUnknown"),
+    className: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+  }
+}
 
 export default function WhitelistPage() {
-  const [agents, setAgents] = useState<AgentWhitelistDetail[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [limit] = useState(20);
-  const [offset, setOffset] = useState(0);
+  const { t, locale } = useAppTranslations("pages")
+  const {
+    data: agents,
+    loading,
+    refreshing,
+    execute,
+  } = useRequestState<AgentWhitelistDetail[]>([])
 
-  // Dialog states
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [newAgentId, setNewAgentId] = useState("");
-  const [newAgentDesc, setNewAgentDesc] = useState("");
-  const [adding, setAdding] = useState(false);
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const searchParamValue = searchParams.get("search") || ""
+  const rawOffset = Number(searchParams.get("offset") || "0")
+
+  const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0
+    ? Math.floor(rawOffset)
+    : 0
+
+  const [offset, setOffset] = useState(initialOffset)
+  const [currentPageCount, setCurrentPageCount] = useState(0)
+  const [search, setSearch] = useState(searchParamValue)
+
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [newAgentId, setNewAgentId] = useState("")
+  const [newAgentDesc, setNewAgentDesc] = useState("")
+  const [adding, setAdding] = useState(false)
+
+  const [editingAgent, setEditingAgent] = useState<AgentWhitelistDetail | null>(null)
+  const [editDescription, setEditDescription] = useState("")
+  const [updating, setUpdating] = useState(false)
+
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
+  const [deleteDialogAgent, setDeleteDialogAgent] = useState<AgentWhitelistDetail | null>(null)
+  const [regenerateDialogAgent, setRegenerateDialogAgent] = useState<AgentWhitelistDetail | null>(null)
+
+  const [tokenDialog, setTokenDialog] = useState<TokenDialogState>({
+    open: false,
+    token: "",
+    agentId: "",
+    title: "",
+    description: "",
+  })
 
   const getStatusAwareMessage = (
     error: unknown,
@@ -52,218 +157,667 @@ export default function WhitelistPage() {
     statusMessages?: Partial<Record<number, string>>
   ) => {
     if (error instanceof ApiRequestError && statusMessages?.[error.status]) {
-      return statusMessages[error.status] as string;
+      return statusMessages[error.status] as string
     }
 
-    return getApiErrorMessage(error, fallback);
-  };
+    return getApiErrorMessage(error, fallback)
+  }
 
-  const fetchAgents = async () => {
-    setLoading(true);
-    try {
-      const data = await api.getWhitelist({ limit, offset });
-      setAgents(data);
-    } catch (error) {
-      console.error(error);
-      toast.error(getApiErrorMessage(error, "Failed to fetch whitelist"));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchAgents = useCallback(
+    async (silent = false) => {
+      await execute(
+        () => api.getWhitelist({ limit: PAGE_LIMIT, offset }),
+        {
+          silent,
+          onSuccess: (data) => {
+            setCurrentPageCount(data.length)
+          },
+          onError: (error) => {
+            toast.error(getApiErrorMessage(error, t("whitelist.toastFetchError")))
+          },
+        }
+      )
+    },
+    [execute, offset, t]
+  )
 
   useEffect(() => {
-    fetchAgents();
-  }, [offset]);
+    fetchAgents()
+  }, [fetchAgents])
 
-  const handleAddAgent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAdding(true);
+  useEffect(() => {
+    const nextSearch = searchParams.get("search") || ""
+    const nextRawOffset = Number(searchParams.get("offset") || "0")
+    const nextOffset = Number.isFinite(nextRawOffset) && nextRawOffset > 0
+      ? Math.floor(nextRawOffset)
+      : 0
+
+    setSearch((previous) => (previous === nextSearch ? previous : nextSearch))
+    setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (search.trim()) {
+      nextParams.set("search", search)
+    } else {
+      nextParams.delete("search")
+    }
+
+    if (offset > 0) {
+      nextParams.set("offset", String(offset))
+    } else {
+      nextParams.delete("offset")
+    }
+
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery === currentQuery) {
+      return
+    }
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    })
+  }, [offset, pathname, router, search, searchParams])
+
+  const handleAddAgent = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const agentId = newAgentId.trim()
+
+    if (!agentId) {
+      toast.error(t("whitelist.toastAgentIdRequired"))
+      return
+    }
+
+    setAdding(true)
+
     try {
-      const res = await api.addWhitelistAgent({ 
-        agent_id: newAgentId, 
-        description: newAgentDesc || null,
-      });
-      
-      toast.success(`Agent added with token: ${res.token}`);
-      setIsAddOpen(false);
-      setNewAgentId("");
-      setNewAgentDesc("");
-      await fetchAgents();
+      const response = await api.addWhitelistAgent({
+        agent_id: agentId,
+        description: newAgentDesc.trim() ? newAgentDesc.trim() : null,
+      })
+
+      setTokenDialog({
+        open: true,
+        token: response.token,
+        agentId: response.agent_id,
+        title: t("whitelist.tokenDialogCreateTitle"),
+        description: t("whitelist.tokenDialogCreateDescription", {
+          agentId: response.agent_id,
+        }),
+      })
+
+      setIsAddOpen(false)
+      setNewAgentId("")
+      setNewAgentDesc("")
+      toast.success(t("whitelist.toastAddSuccess"))
+      await fetchAgents(true)
     } catch (error) {
       toast.error(
-        getStatusAwareMessage(error, "Failed to add agent", {
-          409: "Agent ID already exists",
+        getStatusAwareMessage(error, t("whitelist.toastAddError"), {
+          409: t("whitelist.toastAddConflict"),
         })
-      );
+      )
     } finally {
-      setAdding(false);
+      setAdding(false)
     }
-  };
+  }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this agent from whitelist?")) return;
+  const openEditDialog = (agent: AgentWhitelistDetail) => {
+    setEditingAgent(agent)
+    setEditDescription(agent.description ?? "")
+  }
+
+  const handleUpdateDescription = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!editingAgent) {
+      return
+    }
+
+    setUpdating(true)
+
     try {
-      await api.deleteWhitelistAgent(id);
-      toast.success("Agent removed");
-      await fetchAgents();
+      await api.updateWhitelistAgent(editingAgent.id, {
+        description: editDescription.trim() ? editDescription.trim() : null,
+      })
+
+      toast.success(t("whitelist.toastUpdateSuccess"))
+      setEditingAgent(null)
+      await fetchAgents(true)
     } catch (error) {
       toast.error(
-        getStatusAwareMessage(error, "Failed to remove agent", {
-          404: "Agent not found or already removed",
+        getStatusAwareMessage(error, t("whitelist.toastUpdateError"), {
+          404: t("whitelist.toastUpdateNotFound"),
         })
-      );
+      )
+    } finally {
+      setUpdating(false)
     }
-  };
+  }
 
-  const handleRegenerateToken = async (id: string) => {
-    if (!confirm("Regenerate token will invalidate the old one. Continue?")) return;
+  const openDeleteDialog = (agent: AgentWhitelistDetail) => {
+    setDeleteDialogAgent(agent)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteDialogAgent) {
+      return
+    }
+
+    const targetAgent = deleteDialogAgent
+
+    setDeletingId(targetAgent.id)
+
     try {
-      const res = await api.regenerateToken(id);
-      
-      // Show token in a dialog or toast
-      // For simplicity using alert or toast with duration
-      // Ideally should execute a copy to clipboard or show a modal
-      toast.message("New Token Generated", {
-        description: res.token,
-        duration: 10000,
-        action: {
-          label: "Copy",
-          onClick: () => navigator.clipboard.writeText(res.token),
-        },
-      });
+      await api.deleteWhitelistAgent(targetAgent.id)
+      toast.success(t("whitelist.toastRemoveSuccess"))
+      setDeleteDialogAgent(null)
+
+      if (currentPageCount === 1 && offset > 0) {
+        setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))
+      } else {
+        await fetchAgents(true)
+      }
     } catch (error) {
       toast.error(
-        getStatusAwareMessage(error, "Failed to regenerate token", {
-          404: "Agent not found",
+        getStatusAwareMessage(error, t("whitelist.toastRemoveError"), {
+          404: t("whitelist.toastRemoveNotFound"),
         })
-      );
+      )
+    } finally {
+      setDeletingId(null)
     }
-  };
+  }
+
+  const openRegenerateDialog = (agent: AgentWhitelistDetail) => {
+    setRegenerateDialogAgent(agent)
+  }
+
+  const handleRegenerateToken = async () => {
+    if (!regenerateDialogAgent) {
+      return
+    }
+
+    const targetAgent = regenerateDialogAgent
+
+    setRegeneratingId(targetAgent.id)
+
+    try {
+      const response = await api.regenerateToken(targetAgent.id)
+
+      setTokenDialog({
+        open: true,
+        token: response.token,
+        agentId: response.agent_id,
+        title: t("whitelist.tokenDialogRegenerateTitle"),
+        description: t("whitelist.tokenDialogRegenerateDescription", {
+          agentId: response.agent_id,
+        }),
+      })
+
+      toast.success(t("whitelist.toastRegenerateSuccess"))
+      setRegenerateDialogAgent(null)
+      await fetchAgents(true)
+    } catch (error) {
+      toast.error(
+        getStatusAwareMessage(error, t("whitelist.toastRegenerateError"), {
+          404: t("whitelist.toastRegenerateNotFound"),
+        })
+      )
+    } finally {
+      setRegeneratingId(null)
+    }
+  }
+
+  const copyToken = async () => {
+    if (!tokenDialog.token) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(tokenDialog.token)
+      toast.success(t("whitelist.toastTokenCopied"))
+    } catch {
+      toast.error(t("whitelist.toastTokenCopyFailed"))
+    }
+  }
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setOffset((previous) => (previous === 0 ? previous : 0))
+  }
+
+  const filteredAgents = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+
+    if (!keyword) {
+      return agents
+    }
+
+    return agents.filter((agent) => {
+      const agentId = agent.agent_id.toLowerCase()
+      const description = (agent.description ?? "").toLowerCase()
+      return agentId.includes(keyword) || description.includes(keyword)
+    })
+  }, [agents, search])
+
+  const stats = useMemo(() => {
+    return agents.reduce(
+      (result, agent) => {
+        const normalized = agent.status.toLowerCase()
+
+        if (normalized === "active") {
+          result.active += 1
+        } else if (normalized === "inactive") {
+          result.inactive += 1
+        } else {
+          result.unknown += 1
+        }
+
+        return result
+      },
+      {
+        total: agents.length,
+        active: 0,
+        inactive: 0,
+        unknown: 0,
+      }
+    )
+  }, [agents])
+
+  const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
+  const canGoPrev = offset > 0
+  const canGoNext = currentPageCount >= PAGE_LIMIT
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Whitelist</h2>
-          <p className="text-muted-foreground">
-            Manage allowed agents and their access tokens.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("whitelist.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("whitelist.description")}</p>
         </div>
-        <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" onClick={fetchAgents}>
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                <DialogTrigger asChild>
-                    <Button>
-                        <Plus className="mr-2 h-4 w-4" /> Add Agent
-                    </Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Add Agent to Whitelist</DialogTitle>
-                        <DialogDescription>
-                            Create a new whitelist entry. You will receive a token upon success.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleAddAgent}>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="agent-id" className="text-right">
-                                    Agent ID
-                                </Label>
-                                <Input
-                                    id="agent-id"
-                                    value={newAgentId}
-                                    onChange={(e) => setNewAgentId(e.target.value)}
-                                    className="col-span-3"
-                                    required
-                                />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="desc" className="text-right">
-                                    Description
-                                </Label>
-                                <Input
-                                    id="desc"
-                                    value={newAgentDesc}
-                                    onChange={(e) => setNewAgentDesc(e.target.value)}
-                                    className="col-span-3"
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="submit" disabled={adding}>
-                                {adding ? "Adding..." : "Add Agent"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => fetchAgents(true)}
+            disabled={loading || refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {t("whitelist.refreshButton")}
+          </Button>
+
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                {t("whitelist.addButton")}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t("whitelist.addDialogTitle")}</DialogTitle>
+                <DialogDescription>{t("whitelist.addDialogDescription")}</DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handleAddAgent} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="whitelist-agent-id">{t("whitelist.fieldAgentId")}</Label>
+                  <Input
+                    id="whitelist-agent-id"
+                    value={newAgentId}
+                    onChange={(event) => setNewAgentId(event.target.value)}
+                    placeholder={t("whitelist.fieldAgentIdPlaceholder")}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="whitelist-agent-description">{t("whitelist.fieldDescription")}</Label>
+                  <Input
+                    id="whitelist-agent-description"
+                    value={newAgentDesc}
+                    onChange={(event) => setNewAgentDesc(event.target.value)}
+                    placeholder={t("whitelist.fieldDescriptionPlaceholder")}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+                    {t("whitelist.cancelButton")}
+                  </Button>
+                  <Button type="submit" disabled={adding}>
+                    {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {adding ? t("whitelist.addSubmitting") : t("whitelist.addSubmit")}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("whitelist.statTotal")}</CardDescription>
+            <CardTitle className="text-3xl">{stats.total}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("whitelist.statActive")}</CardDescription>
+            <CardTitle className="text-3xl text-emerald-600">{stats.active}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("whitelist.statInactive")}</CardDescription>
+            <CardTitle className="text-3xl text-muted-foreground">{stats.inactive}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("whitelist.statUnknown")}</CardDescription>
+            <CardTitle className="text-3xl text-amber-600">{stats.unknown}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
       <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Agent ID</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Last Seen</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        <CardHeader>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>{t("whitelist.listTitle")}</CardTitle>
+              <CardDescription>{t("whitelist.listDescription", { limit: PAGE_LIMIT })}</CardDescription>
+            </div>
+            <div className="relative w-full md:w-80">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => handleSearchChange(event.target.value)}
+                placeholder={t("whitelist.searchPlaceholder")}
+                className="pl-9"
+              />
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                  </TableCell>
+                  <TableHead>{t("whitelist.tableColAgentId")}</TableHead>
+                  <TableHead>{t("whitelist.tableColDescription")}</TableHead>
+                  <TableHead>{t("whitelist.tableColStatus")}</TableHead>
+                  <TableHead>{t("whitelist.tableColLastSeen")}</TableHead>
+                  <TableHead>{t("whitelist.tableColUpdatedAt")}</TableHead>
+                  <TableHead className="text-right">{t("whitelist.tableColActions")}</TableHead>
                 </TableRow>
-              ) : agents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    No whitelisted agents.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                agents.map((agent) => (
-                  <TableRow key={agent.id}>
-                    <TableCell className="font-medium">
-                      {agent.agent_id}
-                    </TableCell>
-                    <TableCell>{agent.description || "-"}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          agent.status === "active" ? "default" : "secondary"
-                        }
-                      >
-                        {agent.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {agent.last_seen
-                        ? new Date(agent.last_seen).toLocaleString()
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => handleRegenerateToken(agent.id)} title="Regenerate Token">
-                            <Key className="h-4 w-4" />
-                        </Button>
-                        <Button variant="destructive" size="icon" onClick={() => handleDelete(agent.id)} title="Remove">
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+              </TableHeader>
+
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
+                      <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                      {t("whitelist.tableLoading")}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : filteredAgents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                      {agents.length === 0
+                        ? t("whitelist.tableEmpty")
+                        : t("whitelist.tableEmptyFiltered")}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAgents.map((agent) => {
+                    const status = getStatusMeta(agent.status, t)
+                    const StatusIcon = status.icon
+                    const isDeleting = deletingId === agent.id
+                    const isRegenerating = regeneratingId === agent.id
+
+                    return (
+                      <TableRow key={agent.id} className="hover:bg-muted/40">
+                        <TableCell className="font-mono text-sm">{agent.agent_id}</TableCell>
+                        <TableCell className="max-w-[280px] truncate text-muted-foreground">
+                          {agent.description || t("whitelist.fieldDescriptionEmpty")}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`gap-1 ${status.className}`}>
+                            <StatusIcon className="h-3 w-3" />
+                            {status.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {agent.last_seen
+                            ? formatTimestamp(agent.last_seen, locale)
+                            : t("whitelist.lastSeenNA")}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatTimestamp(agent.updated_at, locale)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              title={t("whitelist.actionEdit")}
+                              onClick={() => openEditDialog(agent)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              title={t("whitelist.actionRegenerate")}
+                              disabled={isRegenerating}
+                              onClick={() => openRegenerateDialog(agent)}
+                            >
+                              {isRegenerating ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <KeyRound className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              title={t("whitelist.actionRemove")}
+                              disabled={isDeleting}
+                              onClick={() => openDeleteDialog(agent)}
+                            >
+                              {isDeleting ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <span className="mr-2 text-xs text-muted-foreground">
+              {t("whitelist.paginationPage", { page: pageNumber })}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canGoPrev || loading}
+              onClick={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              {t("whitelist.paginationPrev")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canGoNext || loading}
+              onClick={() => setOffset((previous) => previous + PAGE_LIMIT)}
+            >
+              {t("whitelist.paginationNext")}
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={Boolean(regenerateDialogAgent)}
+        onOpenChange={(open) => !open && setRegenerateDialogAgent(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("whitelist.regenerateDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("whitelist.regenerateDialogDescription", {
+                agentId: regenerateDialogAgent?.agent_id || "",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRegenerateDialogAgent(null)}
+              disabled={Boolean(regeneratingId)}
+            >
+              {t("whitelist.cancelButton")}
+            </Button>
+            <Button type="button" onClick={handleRegenerateToken} disabled={Boolean(regeneratingId)}>
+              {Boolean(regeneratingId) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("whitelist.actionRegenerate")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(deleteDialogAgent)} onOpenChange={(open) => !open && setDeleteDialogAgent(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("whitelist.deleteDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("whitelist.deleteDialogDescription", {
+                agentId: deleteDialogAgent?.agent_id || "",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialogAgent(null)}
+              disabled={Boolean(deletingId)}
+            >
+              {t("whitelist.cancelButton")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={Boolean(deletingId)}
+            >
+              {Boolean(deletingId) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("whitelist.actionRemove")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(editingAgent)} onOpenChange={(open) => !open && setEditingAgent(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("whitelist.editDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("whitelist.editDialogDescription", {
+                agentId: editingAgent?.agent_id || "",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateDescription} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="whitelist-edit-description">{t("whitelist.fieldDescription")}</Label>
+              <Input
+                id="whitelist-edit-description"
+                value={editDescription}
+                onChange={(event) => setEditDescription(event.target.value)}
+                placeholder={t("whitelist.fieldDescriptionPlaceholder")}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingAgent(null)}>
+                {t("whitelist.cancelButton")}
+              </Button>
+              <Button type="submit" disabled={updating}>
+                {updating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {updating ? t("whitelist.updateSubmitting") : t("whitelist.updateSubmit")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={tokenDialog.open}
+        onOpenChange={(open) =>
+          setTokenDialog((previous) => ({
+            ...previous,
+            open,
+          }))
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tokenDialog.title}</DialogTitle>
+            <DialogDescription>{tokenDialog.description}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label>{t("whitelist.tokenDialogTokenLabel")}</Label>
+            <div className="rounded-md border bg-muted/40 p-3">
+              <code className="break-all text-xs text-foreground">{tokenDialog.token}</code>
+            </div>
+            <p className="text-xs text-muted-foreground">{t("whitelist.tokenDialogHint")}</p>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={copyToken}>
+              <Copy className="mr-2 h-4 w-4" />
+              {t("whitelist.copyTokenButton")}
+            </Button>
+            <Button
+              type="button"
+              onClick={() =>
+                setTokenDialog((previous) => ({
+                  ...previous,
+                  open: false,
+                }))
+              }
+            >
+              {t("whitelist.tokenDialogCloseButton")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  );
+  )
 }

@@ -6,6 +6,8 @@ import { useParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { LatestMetric } from "@/types/api"
 import { useAppLocale } from "@/hooks/use-app-locale"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useRequestState } from "@/hooks/use-request-state"
 import { withLocalePrefix } from "@/components/app-locale"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -80,6 +82,7 @@ function formatUpdatedAt(metrics: LatestMetric[]) {
 export default function AgentDetailPage() {
   const params = useParams()
   const locale = useAppLocale()
+  const { t } = useAppTranslations("pages")
 
   const agentId = useMemo(() => {
     const raw = params?.id
@@ -91,9 +94,13 @@ export default function AgentDetailPage() {
     return decodeURIComponent(Array.isArray(raw) ? raw[0] : raw)
   }, [params])
 
-  const [metrics, setMetrics] = useState<LatestMetric[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
+  const {
+    data: metrics,
+    setData: setMetrics,
+    loading,
+    refreshing,
+    execute,
+  } = useRequestState<LatestMetric[]>([])
   const [notFound, setNotFound] = useState(false)
 
   const agentsPath = useMemo(() => withLocalePrefix("/agents", locale), [locale])
@@ -104,29 +111,26 @@ export default function AgentDetailPage() {
         return
       }
 
-      if (silent) {
-        setRefreshing(true)
-      } else {
-        setLoading(true)
-      }
+      await execute(
+        () => api.getAgentLatestMetrics(agentId),
+        {
+          silent,
+          onSuccess: () => {
+            setNotFound(false)
+          },
+          onError: (error: any) => {
+            if (error?.status === 404) {
+              setNotFound(true)
+              setMetrics([])
+              return
+            }
 
-      try {
-        const data = await api.getAgentLatestMetrics(agentId)
-        setMetrics(data)
-        setNotFound(false)
-      } catch (error: any) {
-        if (error?.status === 404) {
-          setNotFound(true)
-          setMetrics([])
-        } else {
-          toast.error(getApiErrorMessage(error, "加载 Agent 指标失败"))
+            toast.error(getApiErrorMessage(error, t("agentDetail.toastFetchError")))
+          },
         }
-      } finally {
-        setLoading(false)
-        setRefreshing(false)
-      }
+      )
     },
-    [agentId]
+    [agentId, execute, setMetrics, t]
   )
 
   useEffect(() => {
@@ -141,25 +145,25 @@ export default function AgentDetailPage() {
   const cards = [
     {
       key: "cpu",
-      title: "CPU 使用率",
+      title: t("agentDetail.cardCpu"),
       value: formatPercent(cpu),
       valueClass: resolveValueColor(cpu, true),
     },
     {
       key: "memory",
-      title: "内存使用率",
+      title: t("agentDetail.cardMemory"),
       value: formatPercent(memory),
       valueClass: resolveValueColor(memory, true),
     },
     {
       key: "disk",
-      title: "磁盘使用率",
+      title: t("agentDetail.cardDisk"),
       value: formatPercent(disk),
       valueClass: resolveValueColor(disk, true),
     },
     {
       key: "load",
-      title: "负载均值",
+      title: t("agentDetail.cardLoad"),
       value: formatLoad(load),
       valueClass: resolveValueColor(load),
     },
@@ -172,11 +176,11 @@ export default function AgentDetailPage() {
           <Button variant="ghost" className="mb-2 -ml-3" asChild>
             <Link href={agentsPath}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              返回 Agent 列表
+              {t("agentDetail.backToList")}
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">Agent: {agentId || "-"}</h1>
-          <p className="text-sm text-muted-foreground">基于 /v1/agents/{"{id}"}/latest 的最新指标快照</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("agentDetail.title", { agentId: agentId || "-" })}</h1>
+          <p className="text-sm text-muted-foreground">{t("agentDetail.description")}</p>
         </div>
         <Button
           variant="outline"
@@ -184,7 +188,7 @@ export default function AgentDetailPage() {
           disabled={loading || refreshing || !agentId}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          刷新
+          {t("agentDetail.refreshButton")}
         </Button>
       </div>
 
@@ -192,7 +196,7 @@ export default function AgentDetailPage() {
         <Card>
           <CardContent className="flex h-56 flex-col items-center justify-center text-muted-foreground">
             <Loader2 className="mb-3 h-6 w-6 animate-spin" />
-            指标加载中...
+            {t("agentDetail.loading")}
           </CardContent>
         </Card>
       ) : notFound ? (
@@ -200,19 +204,19 @@ export default function AgentDetailPage() {
           <CardContent className="flex h-64 flex-col items-center justify-center gap-3 text-center">
             <AlertCircle className="h-10 w-10 text-destructive/70" />
             <div>
-              <p className="text-base font-medium">Agent 未找到</p>
-              <p className="text-sm text-muted-foreground">请确认 Agent ID 是否正确，或返回列表页重试</p>
+              <p className="text-base font-medium">{t("agentDetail.notFoundTitle")}</p>
+              <p className="text-sm text-muted-foreground">{t("agentDetail.notFoundDescription")}</p>
             </div>
             <Button variant="outline" asChild>
-              <Link href={agentsPath}>返回 Agent 列表</Link>
+              <Link href={agentsPath}>{t("agentDetail.backToList")}</Link>
             </Button>
           </CardContent>
         </Card>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-3">
-            <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600">指标已更新</Badge>
-            <span className="text-sm text-muted-foreground">最近采集时间：{formatUpdatedAt(metrics)}</span>
+            <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600">{t("agentDetail.updatedBadge")}</Badge>
+            <span className="text-sm text-muted-foreground">{t("agentDetail.updatedAt", { time: formatUpdatedAt(metrics) })}</span>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:gap-6">
@@ -233,12 +237,12 @@ export default function AgentDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>原始指标</CardTitle>
-              <CardDescription>用于排查指标名称映射与标签细节</CardDescription>
+              <CardTitle>{t("agentDetail.rawTitle")}</CardTitle>
+              <CardDescription>{t("agentDetail.rawDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               {metrics.length === 0 ? (
-                <p className="text-sm text-muted-foreground">暂无最新指标数据</p>
+                <p className="text-sm text-muted-foreground">{t("agentDetail.rawEmpty")}</p>
               ) : (
                 <div className="space-y-2">
                   {metrics.map((metric) => (
@@ -251,7 +255,7 @@ export default function AgentDetailPage() {
                         <span className="text-sm">{metric.value}</span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        时间：{new Date(metric.timestamp).toLocaleString()}
+                        {t("agentDetail.rawTime", { time: new Date(metric.timestamp).toLocaleString() })}
                       </p>
                     </div>
                   ))}

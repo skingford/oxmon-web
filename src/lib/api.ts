@@ -16,6 +16,7 @@ import {
   ChangePasswordRequest,
   CertificateChainInfo,
   CertCheckResult,
+  CertSummary,
   CertDomain,
   CreateDomainRequest,
   UpdateDomainRequest,
@@ -196,7 +197,7 @@ export const api = {
   getActiveAlerts: (params: PaginationParams) =>
     request<AlertEventResponse[]>(`/v1/alerts/active${buildQueryString(params)}`),
 
-  getAlertHistory: (params: PaginationParams & { agent_id__eq?: string; severity__eq?: string }) =>
+  getAlertHistory: (params: PaginationParams & { agent_id__eq?: string; severity__eq?: string; status__eq?: number }) =>
     request<AlertEventResponse[]>(`/v1/alerts/history${buildQueryString(params)}`),
 
   acknowledgeAlert: (id: string, token?: string) =>
@@ -279,7 +280,7 @@ export const api = {
     request<CertCheckResult>(`/v1/certs/domains/${id}/check`, { method: "POST" }),
 
   getCertCheckHistory: (id: string, params: PaginationParams) =>
-    request(`/v1/certs/domains/${id}/history${buildQueryString(params)}`),
+    request<CertCheckResult[]>(`/v1/certs/domains/${id}/history${buildQueryString(params)}`),
 
   getCertStatusAll: (params: PaginationParams) =>
     request<CertCheckResult[]>(`/v1/certs/status${buildQueryString(params)}`),
@@ -288,7 +289,7 @@ export const api = {
     request<CertCheckResult>(`/v1/certs/status/${domain}`),
 
   getCertSummary: () =>
-    request("/v1/certs/summary"),
+    request<CertSummary>("/v1/certs/summary"),
 
   // Metrics - Explorer
   queryAllMetrics: (params: PaginationParams & { agent_id__eq?: string; metric_name__eq?: string; timestamp__gte?: string; timestamp__lte?: string }) =>

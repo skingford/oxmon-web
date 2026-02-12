@@ -53,7 +53,7 @@ function normalizePathname(pathname: string) {
   const segments = pathname.split("/").filter(Boolean)
 
   if (segments.length === 0) {
-    return `/${DEFAULT_LOCALE}/login`
+    return `/${DEFAULT_LOCALE}/dashboard`
   }
 
   const [firstSegment, secondSegment] = segments
@@ -64,7 +64,7 @@ function normalizePathname(pathname: string) {
 
   if (isLocaleCandidate(firstSegment) && (!secondSegment || ROOT_ROUTE_SET.has(secondSegment))) {
     if (!secondSegment) {
-      return `/${DEFAULT_LOCALE}/login`
+      return `/${DEFAULT_LOCALE}/dashboard`
     }
 
     return `/${DEFAULT_LOCALE}/${segments.slice(1).join("/")}`
@@ -80,7 +80,7 @@ export function middleware(request: NextRequest) {
   if (locale) {
     if (pathname === `/${locale}` || pathname === `/${locale}/`) {
       const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = `/${locale}/login`
+      redirectUrl.pathname = `/${locale}/dashboard`
       return NextResponse.redirect(redirectUrl)
     }
 

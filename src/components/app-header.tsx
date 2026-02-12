@@ -9,6 +9,7 @@ import {
   getDefaultAppHeaderTitle,
 } from "@/components/app-header.config"
 import { AppHeaderLanguageSwitch } from "@/components/app-header-language-switch"
+import { AppHeaderUserMenu } from "@/components/app-header-user-menu"
 import { getMatchedSidebarRoute } from "@/components/app-navigation"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { Separator } from "@/components/ui/separator"
@@ -82,6 +83,7 @@ export function AppHeader({
             <AppHeaderLanguageSwitch />
           </Suspense>
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+          <AppHeaderUserMenu />
         </div>
       </div>
     </header>

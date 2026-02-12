@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { AgentResponse } from "@/types/api"
 import { useAppLocale } from "@/hooks/use-app-locale"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useRequestState } from "@/hooks/use-request-state"
 import { withLocalePrefix } from "@/components/app-locale"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,9 +34,9 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-function formatLastSeen(lastSeen: string | null) {
+function formatLastSeen(lastSeen: string | null, t: (path: any, values?: Record<string, string | number>) => string) {
   if (!lastSeen) {
-    return "从未上报"
+    return t("agents.lastSeenNever")
   }
 
   const seenAt = new Date(lastSeen)
@@ -48,26 +51,26 @@ function formatLastSeen(lastSeen: string | null) {
   const day = 24 * hour
 
   if (diff < minute) {
-    return "刚刚"
+    return t("agents.lastSeenJustNow")
   }
 
   if (diff < hour) {
-    return `${Math.floor(diff / minute)} 分钟前`
+    return t("agents.lastSeenMinutesAgo", { count: Math.floor(diff / minute) })
   }
 
   if (diff < day) {
-    return `${Math.floor(diff / hour)} 小时前`
+    return t("agents.lastSeenHoursAgo", { count: Math.floor(diff / hour) })
   }
 
-  return `${Math.floor(diff / day)} 天前`
+  return t("agents.lastSeenDaysAgo", { count: Math.floor(diff / day) })
 }
 
-function getStatusMeta(status: string) {
+function getStatusMeta(status: string, t: (path: any, values?: Record<string, string | number>) => string) {
   const normalized = status.toLowerCase()
 
   if (normalized === "active") {
     return {
-      label: "在线",
+      label: t("agents.statusActive"),
       icon: Wifi,
       className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
     }
@@ -75,14 +78,14 @@ function getStatusMeta(status: string) {
 
   if (normalized === "inactive") {
     return {
-      label: "离线",
+      label: t("agents.statusInactive"),
       icon: WifiOff,
       className: "border-muted bg-muted text-muted-foreground",
     }
   }
 
   return {
-    label: "未知",
+    label: t("agents.statusUnknown"),
     icon: Server,
     className: "border-amber-500/30 bg-amber-500/10 text-amber-600",
   }
@@ -90,42 +93,92 @@ function getStatusMeta(status: string) {
 
 export default function AgentsPage() {
   const locale = useAppLocale()
-  const [agents, setAgents] = useState<AgentResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [search, setSearch] = useState("")
-  const [offset, setOffset] = useState(0)
+  const { t } = useAppTranslations("pages")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const searchParamValue = searchParams.get("search") || ""
+  const rawOffset = Number(searchParams.get("offset") || "0")
+
+  const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0
+    ? Math.floor(rawOffset)
+    : 0
+
+  const [search, setSearch] = useState(searchParamValue)
+  const [offset, setOffset] = useState(initialOffset)
   const limit = 20
 
   const [currentPageCount, setCurrentPageCount] = useState(0)
+
+  const {
+    data: agents,
+    loading,
+    refreshing,
+    execute,
+  } = useRequestState<AgentResponse[]>([])
 
   const whitelistPath = useMemo(() => withLocalePrefix("/whitelist", locale), [locale])
 
   const fetchAgents = useCallback(
     async (silent = false) => {
-      if (silent) {
-        setRefreshing(true)
-      } else {
-        setLoading(true)
-      }
-
-      try {
-        const data = await api.getAgents({ limit, offset })
-        setAgents(data)
-        setCurrentPageCount(data.length)
-      } catch (error) {
-        toast.error(getApiErrorMessage(error, "加载 Agent 列表失败"))
-      } finally {
-        setLoading(false)
-        setRefreshing(false)
-      }
+      await execute(
+        () => api.getAgents({ limit, offset }),
+        {
+          silent,
+          onSuccess: (data) => {
+            setCurrentPageCount(data.length)
+          },
+          onError: (error) => {
+            toast.error(getApiErrorMessage(error, t("agents.toastFetchError")))
+          },
+        }
+      )
     },
-    [limit, offset]
+    [execute, limit, offset, t]
   )
 
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])
+
+  useEffect(() => {
+    const nextSearch = searchParams.get("search") || ""
+    const nextRawOffset = Number(searchParams.get("offset") || "0")
+    const nextOffset = Number.isFinite(nextRawOffset) && nextRawOffset > 0
+      ? Math.floor(nextRawOffset)
+      : 0
+
+    setSearch((prev) => (prev === nextSearch ? prev : nextSearch))
+    setOffset((prev) => (prev === nextOffset ? prev : nextOffset))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (search.trim()) {
+      nextParams.set("search", search)
+    } else {
+      nextParams.delete("search")
+    }
+
+    if (offset > 0) {
+      nextParams.set("offset", String(offset))
+    } else {
+      nextParams.delete("offset")
+    }
+
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery === currentQuery) {
+      return
+    }
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    })
+  }, [offset, pathname, router, search, searchParams])
 
   const filteredAgents = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -168,14 +221,14 @@ export default function AgentsPage() {
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Agent 列表</h1>
-          <p className="text-sm text-muted-foreground">展示在线状态与最后上报时间，支持跳转详情页</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("agents.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("agents.description")}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
             <Link href={whitelistPath}>
               <ListChecks className="mr-2 h-4 w-4" />
-              白名单
+              {t("agents.whitelistButton")}
             </Link>
           </Button>
           <Button
@@ -184,7 +237,7 @@ export default function AgentsPage() {
             disabled={loading || refreshing}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            刷新
+            {t("agents.refreshButton")}
           </Button>
         </div>
       </div>
@@ -192,19 +245,19 @@ export default function AgentsPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>在线 Agent</CardDescription>
+            <CardDescription>{t("agents.statActive")}</CardDescription>
             <CardTitle className="text-3xl text-emerald-600">{statusStats.active}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>离线 Agent</CardDescription>
+            <CardDescription>{t("agents.statInactive")}</CardDescription>
             <CardTitle className="text-3xl text-muted-foreground">{statusStats.inactive}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>状态未知</CardDescription>
+            <CardDescription>{t("agents.statUnknown")}</CardDescription>
             <CardTitle className="text-3xl text-amber-600">{statusStats.unknown}</CardTitle>
           </CardHeader>
         </Card>
@@ -214,13 +267,13 @@ export default function AgentsPage() {
         <CardHeader>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle>当前页 Agent</CardTitle>
-              <CardDescription>默认每页 {limit} 条，按最后上报时间排序</CardDescription>
+              <CardTitle>{t("agents.currentPageTitle")}</CardTitle>
+              <CardDescription>{t("agents.currentPageDescription", { limit })}</CardDescription>
             </div>
             <div className="relative w-full md:w-72">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="按 Agent ID 搜索"
+                placeholder={t("agents.searchPlaceholder")}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="pl-9"
@@ -233,10 +286,10 @@ export default function AgentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Agent ID</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>最后上报</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableHead>{t("agents.tableColAgentId")}</TableHead>
+                  <TableHead>{t("agents.tableColStatus")}</TableHead>
+                  <TableHead>{t("agents.tableColLastSeen")}</TableHead>
+                  <TableHead className="text-right">{t("agents.tableColActions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -244,18 +297,18 @@ export default function AgentsPage() {
                   <TableRow>
                     <TableCell colSpan={4} className="h-40 text-center text-muted-foreground">
                       <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                      加载 Agent 数据中...
+                      {t("agents.tableLoading")}
                     </TableCell>
                   </TableRow>
                 ) : filteredAgents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                      暂无 Agent 数据
+                      {t("agents.tableEmpty")}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredAgents.map((agent) => {
-                    const statusMeta = getStatusMeta(agent.status)
+                    const statusMeta = getStatusMeta(agent.status, t)
                     const AgentStatusIcon = statusMeta.icon
                     const detailPath = withLocalePrefix(
                       `/agents/${encodeURIComponent(agent.agent_id)}`,
@@ -276,11 +329,11 @@ export default function AgentsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {formatLastSeen(agent.last_seen)}
+                          {formatLastSeen(agent.last_seen, t)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={detailPath}>查看详情</Link>
+                            <Link href={detailPath}>{t("agents.detailAction")}</Link>
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -292,7 +345,7 @@ export default function AgentsPage() {
           </div>
 
           <div className="mt-4 flex items-center justify-end gap-2">
-            <span className="mr-2 text-xs text-muted-foreground">第 {pageNumber} 页</span>
+            <span className="mr-2 text-xs text-muted-foreground">{t("agents.paginationPage", { page: pageNumber })}</span>
             <Button
               variant="outline"
               size="sm"
@@ -300,7 +353,7 @@ export default function AgentsPage() {
               onClick={() => setOffset((prev) => Math.max(0, prev - limit))}
             >
               <ChevronLeft className="mr-1 h-4 w-4" />
-              上一页
+              {t("agents.paginationPrev")}
             </Button>
             <Button
               variant="outline"
@@ -308,7 +361,7 @@ export default function AgentsPage() {
               disabled={!canGoNext || loading}
               onClick={() => setOffset((prev) => prev + limit)}
             >
-              下一页
+              {t("agents.paginationNext")}
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>

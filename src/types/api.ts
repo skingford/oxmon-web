@@ -67,6 +67,7 @@ export interface AlertEventResponse {
   timestamp: string;
   acknowledged_at: string | null;
   resolved_at: string | null;
+  status: number; // 1=未处理, 2=已确认, 3=已处理
 }
 
 export interface AlertRuleResponse {
@@ -137,11 +138,13 @@ export interface CertificateDetails {
   not_before: string;
   not_after: string;
   ip_addresses: string[];
+  subject_alt_names: string[];
   issuer_cn: string | null;
   issuer_o: string | null;
   issuer_ou: string | null;
   issuer_c: string | null;
   chain_valid: boolean;
+  chain_error: string | null;
   last_checked: string;
   created_at: string;
   updated_at: string;
@@ -163,6 +166,8 @@ export interface ChannelOverview {
 export interface RuntimeConfig {
   grpc_port: number;
   http_port: number;
+  log_level?: string;
+  uptime_secs?: number;
   data_dir: string;
   retention_days: number;
   require_agent_auth: boolean;
@@ -189,6 +194,8 @@ export interface StorageInfo {
   partitions: PartitionDetail[];
   total_partitions: number;
   total_size_bytes: number;
+  alert_events_partition_count?: number;
+  metrics_partition_count?: number;
 }
 
 export interface ChangePasswordRequest {
@@ -196,20 +203,12 @@ export interface ChangePasswordRequest {
   new_password: string;
 }
 
-export interface ChainNode {
-  subject_cn: string | null;
-  issuer_cn: string | null;
-  not_after: string;
-  is_root: boolean;
-  is_trusted: boolean;
-}
-
 export interface CertificateChainInfo {
   id: string;
   domain: string;
-  is_valid: boolean;
-  validation_error: string | null;
-  chain: ChainNode[];
+  chain_valid: boolean;
+  chain_error: string | null;
+  last_checked: string;
 }
 
 export interface CertCheckResult {
@@ -235,21 +234,27 @@ export interface CertCheckResult {
 export interface CertDomain {
   id: string;
   domain: string;
+  port: number;
   enabled: boolean;
-  check_interval_secs: number;
+  check_interval_secs: number | null;
+  note: string | null;
+  last_checked_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateDomainRequest {
   domain: string;
-  enabled?: boolean;
-  check_interval_secs?: number;
+  port?: number | null;
+  check_interval_secs?: number | null;
+  note?: string | null;
 }
 
 export interface UpdateDomainRequest {
-  enabled?: boolean;
-  check_interval_secs?: number;
+  port?: number | null;
+  enabled?: boolean | null;
+  check_interval_secs?: number | null;
+  note?: string | null;
 }
 
 export interface BatchCreateDomainsRequest {

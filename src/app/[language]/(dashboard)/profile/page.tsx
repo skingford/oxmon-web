@@ -1,232 +1,207 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { getAuthToken } from "@/lib/auth-token";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { 
-  User, 
-  Copy, 
-  Check, 
-  Shield, 
-  Key, 
-  LogOut, 
-  Fingerprint,
-  ExternalLink,
-  Lock,
-  Edit3,
-  Eye,
-  EyeOff
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { clearAuthToken } from "@/lib/auth-token";
-import Link from "next/link";
-import { withLocalePrefix } from "@/components/app-locale";
-import { useAppLocale } from "@/hooks/use-app-locale";
+import { useState, useEffect } from "react"
+import { getAuthToken, clearAuthToken } from "@/lib/auth-token"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
+import { User, Copy, Shield, LogOut, Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react"
+import { motion } from "framer-motion"
+import { withLocalePrefix } from "@/components/app-locale"
+import { useAppLocale } from "@/hooks/use-app-locale"
+import { useAppTranslations } from "@/hooks/use-app-translations"
 
 export default function ProfilePage() {
-  const [token, setToken] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [showToken, setShowToken] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const locale = useAppLocale();
+  const { t } = useAppTranslations("profile")
+  const locale = useAppLocale()
+  const [token, setToken] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [showToken, setShowToken] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const t = getAuthToken();
-    setToken(t);
+    const t = getAuthToken()
+    setToken(t)
 
     if (t) {
       try {
-        const payloadPart = t.split(".")[1];
+        const payloadPart = t.split(".")[1]
         if (payloadPart) {
-          const base64 = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-          const decoded = JSON.parse(window.atob(base64));
-          setUser(decoded);
+          const base64 = payloadPart.replace(/-/g, "+").replace(/_/g, "/")
+          const decoded = JSON.parse(window.atob(base64))
+          setUser(decoded)
         }
       } catch (e) {
-        console.error("Failed to decode token", e);
+        console.error("Failed to decode token", e)
       }
     }
-  }, []);
+    setLoading(false)
+  }, [])
 
   const handleCopy = () => {
     if (token) {
-      navigator.clipboard.writeText(token);
-      setCopied(true);
-      toast.success("Token copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
+      navigator.clipboard.writeText(token)
+      setCopied(true)
+      toast.success(t("toastTokenCopied"))
+      setTimeout(() => setCopied(false), 2000)
     }
-  };
+  }
 
   const handleLogout = () => {
-    clearAuthToken();
-    window.location.replace(withLocalePrefix("/login", locale));
-  };
+    clearAuthToken()
+    window.location.replace(withLocalePrefix("/login", locale))
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-xl text-primary">
-            <User className="h-6 w-6" />
-          </div>
-          User Center
-        </h1>
-        <p className="text-muted-foreground font-medium">Manage your personal account and access security tokens.</p>
+    <div className="space-y-6 p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">{t("title")}</h2>
+          <p className="text-sm text-muted-foreground">{t("description")}</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Left Column: Account Summary */}
-        <div className="md:col-span-1 space-y-6">
-          <Card className="glass-card border-none shadow-xl overflow-hidden">
-            <div className="h-24 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent relative">
-              <div className="absolute -bottom-10 left-6">
-                <div className="h-20 w-20 rounded-2xl glass border-2 border-white/20 flex items-center justify-center shadow-2xl shadow-black/40">
-                  <User className="h-10 w-10 text-primary" />
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Account Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              {t("accountTitle")}
+            </CardTitle>
+            <CardDescription>{t("accountDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t("fieldUsername")}</Label>
+                <Input
+                  readOnly
+                  value={user?.sub || user?.username || "Operator"}
+                  className="bg-muted"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t("fieldRole")}</Label>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    <Shield className="mr-1 h-3 w-3" />
+                    {t("roleAdmin")}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t("fieldIssuedAt")}</Label>
+                <Input
+                  readOnly
+                  value={user?.iat ? new Date(user.iat * 1000).toLocaleString() : "N/A"}
+                  className="bg-muted font-mono text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t("fieldExpires")}</Label>
+                <Input
+                  readOnly
+                  value={user?.exp ? new Date(user.exp * 1000).toLocaleString() : "N/A"}
+                  className="bg-muted font-mono text-sm"
+                />
+              </div>
+            </motion.div>
+
+            <div className="pt-4 border-t">
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={handleLogout}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                {t("btnLogout")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Access Token */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              {t("tokenTitle")}
+            </CardTitle>
+            <CardDescription>{t("tokenDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t("fieldToken")}</Label>
+              <div className="relative">
+                <Input
+                  readOnly
+                  type={showToken ? "text" : "password"}
+                  value={token || ""}
+                  className="font-mono text-xs pr-24 bg-muted"
+                />
+                <div className="absolute right-1 top-1 flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowToken(!showToken)}
+                    className="h-8 w-8 p-0"
+                  >
+                    {showToken ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleCopy}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
-            <CardContent className="pt-14 pb-6 px-6">
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold tracking-tight">{user?.sub || user?.username || "Operator"}</h2>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                  <Shield className="h-3 w-3 text-primary" />
-                  Administrator
-                </div>
-              </div>
 
-              <div className="mt-8 space-y-3">
-                <Button 
-                    variant="outline" 
-                    className="w-full justify-start glass hover:bg-white/5 border-white/5 h-11"
-                    onClick={() => toast.info("Profile editing coming soon")}
-                >
-                  <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
-                </Button>
-                <Button 
-                    variant="ghost" 
-                    className="w-full justify-start text-red-500 hover:bg-red-500/10 hover:text-red-600 h-11"
-                    onClick={handleLogout}
-                >
-                  <LogOut className="mr-2 h-4 w-4" /> Sign Out
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            <div className="flex gap-3 p-4 rounded-lg border-2 bg-orange-50 border-orange-300">
+              <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-orange-900 leading-relaxed font-medium">
+                {t("tokenWarning")}
+              </p>
+            </div>
 
-          <Card className="glass border-white/5 shadow-lg">
-            <CardHeader className="pb-2">
-               <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                 <Fingerprint className="h-3.5 w-3.5" /> Identity Metadata
-               </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-               <div className="space-y-1">
-                  <span className="text-[10px] text-muted-foreground font-bold uppercase">Subject ID</span>
-                  <p className="text-xs font-mono truncate">{user?.sub || "N/A"}</p>
-               </div>
-               <div className="space-y-1">
-                  <span className="text-[10px] text-muted-foreground font-bold uppercase">Issued At</span>
-                  <p className="text-xs font-mono">{user?.iat ? new Date(user.iat * 1000).toLocaleString() : "N/A"}</p>
-               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column: Security & Token */}
-        <div className="md:col-span-2 space-y-6">
-          <Card className="glass-card border-none shadow-xl">
-            <CardHeader className="pb-4 bg-muted/20">
-               <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
-                     <Key className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle>Access Token</CardTitle>
-                    <CardDescription>Use this JWT to authenticate external API calls.</CardDescription>
-                  </div>
-               </div>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-              <div className="space-y-4">
-                <div className="relative group">
-                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Current Bearer Token</Label>
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-primary/5 blur-xl group-hover:bg-primary/10 transition-colors pointer-events-none" />
-                    <Input 
-                      readOnly 
-                      value={showToken ? (token || "") : (token ? "•".repeat(token.length > 100 ? 100 : token.length) : "")} 
-                      className="font-mono text-[11px] h-32 py-4 pr-12 glass resize-none bg-black/20 focus-visible:ring-primary/20 leading-relaxed overflow-hidden"
-                    />
-                    <div className="absolute right-2 top-2 flex flex-col gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-10 w-10 hover:bg-primary/20 transition-all text-muted-foreground hover:text-primary"
-                        onClick={() => setShowToken(!showToken)}
-                        title={showToken ? "Hide Token" : "Show Token"}
-                      >
-                        {showToken ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-10 w-10 hover:bg-primary/20 transition-all text-primary"
-                        onClick={handleCopy}
-                        title="Copy Token"
-                      >
-                        {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                   <Shield className="h-5 w-5 text-amber-500 shrink-0" />
-                   <p className="text-xs text-amber-200/70 leading-relaxed font-medium">
-                     This token grants full administrative access. Keep it secure and never share it in public environments.
-                   </p>
-                </div>
-              </div>
-
-              <div className="pt-4 flex items-center justify-between border-t border-white/5">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px] glass h-5 bg-primary/5 text-primary border-primary/20">
-                    EXPIRES: {user?.exp ? new Date(user.exp * 1000).toLocaleDateString() : "NEVER"}
-                  </Badge>
-                </div>
-                <Button variant="link" size="sm" className="text-xs text-muted-foreground hover:text-primary gap-1" asChild>
-                   <a href="/docs/api.html" target="_blank">
-                      <ExternalLink className="h-3 w-3" /> API Documentation
-                   </a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="glass border-white/5 relative overflow-hidden group">
-             <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-             <CardContent className="p-6 flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-4">
-                   <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                      <Lock className="h-5 w-5" />
-                   </div>
-                   <div>
-                      <h3 className="font-bold text-sm">Security Settings</h3>
-                      <p className="text-xs text-muted-foreground font-medium">Update your password or enable MFA.</p>
-                   </div>
-                </div>
-                <Button variant="outline" size="sm" className="glass h-9" asChild>
-                   <Link href={withLocalePrefix("/system", locale)}>Manage Security</Link>
-                </Button>
-             </CardContent>
-          </Card>
-        </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t("fieldSubject")}</Label>
+              <Input
+                readOnly
+                value={user?.sub || "N/A"}
+                className="bg-muted font-mono text-xs"
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
-  );
+  )
 }

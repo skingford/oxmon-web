@@ -1,8 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
-import { CertificateDetails } from "@/types/api"
+import { CertificateChainInfo, CertificateDetails, CertSummary } from "@/types/api"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useRequestState } from "@/hooks/use-request-state"
+import { withLocalePrefix } from "@/components/app-locale"
 import {
   Table,
   TableBody,
@@ -11,297 +15,619 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "sonner"
-import { Loader2, ShieldCheck, ShieldAlert, ExternalLink, Search, RefreshCw, Calendar, Lock } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle 
-} from "@/components/ui/dialog"
-import { ChainNode } from "@/types/api"
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronRight as ArrowRight,
+  Loader2,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldX,
+} from "lucide-react"
+import { toast } from "sonner"
+
+const PAGE_LIMIT = 20
+
+type CertificatesQueryState = {
+  certs: CertificateDetails[]
+  summary: CertSummary | null
+}
+
+function formatDateTime(value: string | null, locale: "zh" | "en") {
+  if (!value) {
+    return "-"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "-"
+  }
+
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
+function formatDate(value: string | null, locale: "zh" | "en") {
+  if (!value) {
+    return "-"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "-"
+  }
+
+  return date.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+}
+
+function getDaysUntilExpiry(notAfter: string) {
+  const expiryTime = new Date(notAfter).getTime()
+
+  if (!Number.isFinite(expiryTime)) {
+    return null
+  }
+
+  return Math.ceil((expiryTime - Date.now()) / (24 * 3600 * 1000))
+}
+
+function getCertificateStatusMeta(
+  certificate: CertificateDetails,
+  t: (path: any, values?: Record<string, string | number>) => string
+) {
+  const daysUntilExpiry = getDaysUntilExpiry(certificate.not_after)
+
+  if (daysUntilExpiry === null) {
+    return {
+      className: "border-muted bg-muted text-muted-foreground",
+      label: t("certificates.overview.statusUnknown"),
+      icon: ShieldX,
+    }
+  }
+
+  if (daysUntilExpiry < 0) {
+    return {
+      className: "border-red-500/30 bg-red-500/10 text-red-600",
+      label: t("certificates.overview.statusExpired"),
+      icon: ShieldAlert,
+    }
+  }
+
+  if (!certificate.chain_valid) {
+    return {
+      className: "border-red-500/30 bg-red-500/10 text-red-600",
+      label: t("certificates.overview.statusChainInvalid"),
+      icon: ShieldAlert,
+    }
+  }
+
+  if (daysUntilExpiry <= 30) {
+    return {
+      className: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+      label: t("certificates.overview.statusExpiringSoon", { days: daysUntilExpiry }),
+      icon: ShieldX,
+    }
+  }
+
+  return {
+    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+    label: t("certificates.overview.statusHealthy", { days: daysUntilExpiry }),
+    icon: ShieldCheck,
+  }
+}
 
 export default function CertificatesPage() {
-  const [certs, setCerts] = useState<CertificateDetails[]>([])
-  const [summary, setSummary] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState("")
-  const [chain, setChain] = useState<ChainNode[] | null>(null)
-  const [loadingChain, setLoadingChain] = useState(false)
-  const [isChainOpen, setIsChainOpen] = useState(false)
+  const { t, locale } = useAppTranslations("pages")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  const fetchCerts = async () => {
-    setLoading(true)
-    try {
-      const [response, summaryData] = await Promise.all([
-        api.getCertificates({ limit: 100 }),
-        api.getCertSummary()
-      ])
-      setCerts(response)
-      setSummary(summaryData)
-    } catch (error) {
-      console.error(error)
-      toast.error(getApiErrorMessage(error, "Failed to load certificates"))
-    } finally {
-      setLoading(false)
+  const domainParamValue = searchParams.get("domain") || ""
+  const issuerParamValue = searchParams.get("issuer") || ""
+  const ipParamValue = searchParams.get("ip") || ""
+  const expiryParamValue = searchParams.get("expiry") || ""
+  const rawOffset = Number(searchParams.get("offset") || "0")
+  const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
+
+  const [domainKeyword, setDomainKeyword] = useState(domainParamValue)
+  const [issuerKeyword, setIssuerKeyword] = useState(issuerParamValue)
+  const [ipKeyword, setIpKeyword] = useState(ipParamValue)
+  const [expiryDays, setExpiryDays] = useState(expiryParamValue)
+  const [offset, setOffset] = useState(initialOffset)
+  const [currentPageCount, setCurrentPageCount] = useState(0)
+
+  const [chainDialogOpen, setChainDialogOpen] = useState(false)
+  const [selectedCertificate, setSelectedCertificate] = useState<CertificateDetails | null>(null)
+
+  const {
+    data: certificatesData,
+    loading,
+    refreshing,
+    execute,
+  } = useRequestState<CertificatesQueryState>({
+    certs: [],
+    summary: null,
+  })
+
+  const {
+    data: chainInfo,
+    setData: setChainInfo,
+    loading: loadingChain,
+    execute: executeChain,
+  } = useRequestState<CertificateChainInfo | null>(null, { initialLoading: false })
+
+  const certs = certificatesData.certs
+  const summary = certificatesData.summary
+
+  const expiryLimit = useMemo(() => {
+    const days = Number(expiryDays)
+
+    if (!Number.isFinite(days) || days <= 0) {
+      return undefined
     }
-  }
 
-  const handleViewChain = async (id: string) => {
-    setLoadingChain(true)
-    setIsChainOpen(true)
-    try {
-      const data = await api.getCertificateChain(id)
-      setChain(data.chain)
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load certificate chain"))
-      setIsChainOpen(false)
-    } finally {
-      setLoadingChain(false)
-    }
-  }
+    return Math.floor(Date.now() / 1000) + Math.floor(days) * 24 * 3600
+  }, [expiryDays])
 
-  useEffect(() => {
-    fetchCerts()
-  }, [])
+  const fetchCertificates = useCallback(
+    async (silent = false) => {
+      await execute(
+        async () => {
+          const [certificates, summaryData] = await Promise.all([
+            api.getCertificates({
+              limit: PAGE_LIMIT,
+              offset,
+              issuer__contains: issuerKeyword.trim() || undefined,
+              ip_address__contains: ipKeyword.trim() || undefined,
+              not_after__lte: expiryLimit,
+            }),
+            api.getCertSummary(),
+          ])
 
-  const filteredCerts = certs.filter(cert => 
-    cert.domain.toLowerCase().includes(search.toLowerCase()) ||
-    cert.issuer_cn?.toLowerCase().includes(search.toLowerCase())
+          return {
+            certs: certificates,
+            summary: summaryData,
+          }
+        },
+        {
+          silent,
+          onSuccess: (data) => {
+            setCurrentPageCount(data.certs.length)
+          },
+          onError: (error) => {
+            toast.error(getApiErrorMessage(error, t("certificates.overview.toastFetchError")))
+          },
+        }
+      )
+    },
+    [execute, expiryLimit, ipKeyword, issuerKeyword, offset, t]
   )
 
-  const getStatusBadge = (cert: CertificateDetails) => {
-    const expiry = new Date(cert.not_after)
-    const now = new Date()
-    const daysToExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 3600 * 24))
-    
-    if (!cert.chain_valid || daysToExpiry < 0) {
-      return (
-        <Badge variant="destructive" className="gap-1 px-2 py-0.5 shadow-sm shadow-red-500/10">
-           <ShieldAlert className="h-3 w-3" />
-           {daysToExpiry < 0 ? "Expired" : "Chain Invalid"}
-        </Badge>
-      )
-    }
-    
-    if (daysToExpiry < 30) {
-      return (
-        <Badge variant="warning" className="gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-600 border-amber-500/20 shadow-sm shadow-amber-500/10">
-           <Calendar className="h-3 w-3" />
-           Expiring in {daysToExpiry}d
-        </Badge>
-      )
+  useEffect(() => {
+    fetchCertificates()
+  }, [fetchCertificates])
+
+  useEffect(() => {
+    const nextDomain = searchParams.get("domain") || ""
+    const nextIssuer = searchParams.get("issuer") || ""
+    const nextIp = searchParams.get("ip") || ""
+    const nextExpiry = searchParams.get("expiry") || ""
+    const nextRawOffset = Number(searchParams.get("offset") || "0")
+    const nextOffset = Number.isFinite(nextRawOffset) && nextRawOffset > 0
+      ? Math.floor(nextRawOffset)
+      : 0
+
+    setDomainKeyword((previous) => (previous === nextDomain ? previous : nextDomain))
+    setIssuerKeyword((previous) => (previous === nextIssuer ? previous : nextIssuer))
+    setIpKeyword((previous) => (previous === nextIp ? previous : nextIp))
+    setExpiryDays((previous) => (previous === nextExpiry ? previous : nextExpiry))
+    setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (domainKeyword.trim()) {
+      nextParams.set("domain", domainKeyword)
+    } else {
+      nextParams.delete("domain")
     }
 
-    return (
-      <Badge variant="success" className="gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border-emerald-500/20 shadow-sm shadow-emerald-500/10">
-         <ShieldCheck className="h-3 w-3" />
-         Valid ({daysToExpiry}d)
-      </Badge>
+    if (issuerKeyword.trim()) {
+      nextParams.set("issuer", issuerKeyword)
+    } else {
+      nextParams.delete("issuer")
+    }
+
+    if (ipKeyword.trim()) {
+      nextParams.set("ip", ipKeyword)
+    } else {
+      nextParams.delete("ip")
+    }
+
+    if (expiryDays.trim()) {
+      nextParams.set("expiry", expiryDays)
+    } else {
+      nextParams.delete("expiry")
+    }
+
+    if (offset > 0) {
+      nextParams.set("offset", String(offset))
+    } else {
+      nextParams.delete("offset")
+    }
+
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery === currentQuery) {
+      return
+    }
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    })
+  }, [domainKeyword, expiryDays, ipKeyword, issuerKeyword, offset, pathname, router, searchParams])
+
+  const filteredCerts = useMemo(() => {
+    const keyword = domainKeyword.trim().toLowerCase()
+
+    if (!keyword) {
+      return certs
+    }
+
+    return certs.filter((cert) => cert.domain.toLowerCase().includes(keyword))
+  }, [certs, domainKeyword])
+
+  const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
+  const canGoPrev = offset > 0
+  const canGoNext = currentPageCount >= PAGE_LIMIT
+
+  const handleDomainKeywordChange = (value: string) => {
+    setDomainKeyword(value)
+    setOffset((previous) => (previous === 0 ? previous : 0))
+  }
+
+  const handleIssuerKeywordChange = (value: string) => {
+    setIssuerKeyword(value)
+    setOffset((previous) => (previous === 0 ? previous : 0))
+  }
+
+  const handleIpKeywordChange = (value: string) => {
+    setIpKeyword(value)
+    setOffset((previous) => (previous === 0 ? previous : 0))
+  }
+
+  const handleExpiryDaysChange = (value: string) => {
+    setExpiryDays(value)
+    setOffset((previous) => (previous === 0 ? previous : 0))
+  }
+
+  const handleClearFilters = () => {
+    setDomainKeyword("")
+    setIssuerKeyword("")
+    setIpKeyword("")
+    setExpiryDays("")
+    setOffset(0)
+  }
+
+  const handleViewChain = async (certificate: CertificateDetails) => {
+    setSelectedCertificate(certificate)
+    setChainDialogOpen(true)
+    setChainInfo(null)
+
+    await executeChain(
+      () => api.getCertificateChain(certificate.id),
+      {
+        onError: (error) => {
+          toast.error(getApiErrorMessage(error, t("certificates.overview.toastChainError")))
+        },
+      }
     )
   }
 
-  return (
-    <div className="space-y-8">
-      <AnimatePresence mode="wait">
-        {summary && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
-          >
-            {[
-              { label: "Healthy Assets", count: summary.valid, sub: "Valid certificate chain", color: "text-emerald-500", bg: "bg-emerald-500/10", icon: ShieldCheck },
-              { label: "Critical Risk", count: summary.invalid, sub: "Expired or invalid chain", color: "text-red-500", bg: "bg-red-500/10", icon: ShieldAlert },
-              { label: "Warning Phase", count: summary.expiring_soon, sub: "Expiring within 30 days", color: "text-amber-500", bg: "bg-amber-500/10", icon: Calendar },
-            ].map((stat, i) => (
-              <Card key={i} className="glass border-white/5 relative overflow-hidden group">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{stat.label}</span>
-                    <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-black tracking-tighter">{stat.count}</div>
-                  <p className="text-[10px] text-muted-foreground font-medium mt-1">{stat.sub}</p>
-                </CardContent>
-                <div className={`absolute inset-0 ${stat.bg} opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none`} />
-              </Card>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+  const handleQuickCheck = (domain: string) => {
+    const nextParams = new URLSearchParams({
+      domain,
+      autoCheck: "1",
+    })
 
-      <Card className="glass-card border-none shadow-xl overflow-hidden">
-        <CardHeader className="pb-4 bg-muted/20">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-             <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                <Lock className="h-5 w-5" />
-             </div>
-             <div>
-                <CardTitle>Certificate Inventory</CardTitle>
-                <CardDescription>Managed identity assets and validation status.</CardDescription>
-             </div>
+    router.push(`${withLocalePrefix("/certificates/domains", locale)}?${nextParams.toString()}`)
+  }
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("certificates.overview.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("certificates.overview.description")}</p>
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={() => fetchCertificates(true)}
+          disabled={loading || refreshing}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          {t("certificates.overview.refreshButton")}
+        </Button>
+      </div>
+
+      {summary ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("certificates.overview.statTotal")}</CardDescription>
+              <CardTitle className="text-3xl">{summary.total_domains}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("certificates.overview.statHealthy")}</CardDescription>
+              <CardTitle className="text-3xl text-emerald-600">{summary.valid}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("certificates.overview.statInvalid")}</CardDescription>
+              <CardTitle className="text-3xl text-red-600">{summary.invalid}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("certificates.overview.statExpiringSoon")}</CardDescription>
+              <CardTitle className="text-3xl text-amber-600">{summary.expiring_soon}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("certificates.overview.filtersTitle")}</CardTitle>
+          <CardDescription>{t("certificates.overview.filtersDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={domainKeyword}
+              onChange={(event) => handleDomainKeywordChange(event.target.value)}
+              placeholder={t("certificates.overview.filterDomainPlaceholder")}
+              className="pl-9"
+            />
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-              <Input
-                placeholder="Search domains..."
-                className="pl-10 glass w-64 h-10 transition-all focus:w-80"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={fetchCerts}
-                className="glass transition-transform active:scale-95"
-            >
-                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <Input
+            value={issuerKeyword}
+            onChange={(event) => handleIssuerKeywordChange(event.target.value)}
+            placeholder={t("certificates.overview.filterIssuerPlaceholder")}
+          />
+          <Input
+            value={ipKeyword}
+            onChange={(event) => handleIpKeywordChange(event.target.value)}
+            placeholder={t("certificates.overview.filterIpPlaceholder")}
+          />
+          <div className="flex gap-2">
+            <Input
+              value={expiryDays}
+              onChange={(event) => handleExpiryDaysChange(event.target.value)}
+              placeholder={t("certificates.overview.filterExpiryDaysPlaceholder")}
+              inputMode="numeric"
+            />
+            <Button type="button" variant="outline" onClick={handleClearFilters}>
+              {t("certificates.overview.clearFilters")}
             </Button>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-6">
-        <div className="rounded-xl border overflow-hidden">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead>Domain Name</TableHead>
-                <TableHead>Health Status</TableHead>
-                <TableHead>Issuer CN</TableHead>
-                <TableHead>Expiration</TableHead>
-                <TableHead>Audit Log</TableHead>
-                <TableHead className="text-right">Link</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <AnimatePresence mode="popLayout">
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("certificates.overview.tableTitle")}</CardTitle>
+          <CardDescription>{t("certificates.overview.tableDescription", { limit: PAGE_LIMIT })}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[35%]">{t("certificates.overview.tableColDomain")}</TableHead>
+                  <TableHead className="w-[25%]">{t("certificates.overview.tableColStatus")}</TableHead>
+                  <TableHead className="w-[25%]">{t("certificates.overview.tableColExpiration")}</TableHead>
+                  <TableHead className="w-[15%] text-right">{t("certificates.overview.tableColActions")}</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-48 text-center text-primary">
-                      <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                    <TableCell colSpan={4} className="h-40 text-center text-muted-foreground">
+                      <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                      {t("certificates.overview.tableLoading")}
                     </TableCell>
                   </TableRow>
                 ) : filteredCerts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic font-medium">
-                      Zero matching certificates found.
+                    <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                      <div className="space-y-1">
+                        <p>
+                          {certs.length === 0
+                            ? t("certificates.overview.tableEmpty")
+                            : t("certificates.overview.tableEmptyFiltered")}
+                        </p>
+                        <p className="text-xs text-muted-foreground/80">
+                          {certs.length === 0
+                            ? t("certificates.overview.tableEmptyHint")
+                            : t("certificates.overview.tableEmptyFilteredHint")}
+                        </p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCerts.map((cert, i) => (
-                    <motion.tr 
-                      key={cert.id}
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.02 }}
-                      className="group hover:bg-muted/30 transition-colors border-b last:border-0"
-                    >
-                      <TableCell className="py-4">
-                        <div className="flex items-center gap-3">
-                           <div className={`p-1.5 rounded-full ${cert.chain_valid ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
-                             <ShieldCheck className="h-3.5 w-3.5" />
-                           </div>
-                           <span className="font-bold tracking-tight text-sm">{cert.domain}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="transition-all transform group-hover:scale-105 origin-left">
-                          {getStatusBadge(cert)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[180px] truncate text-xs font-medium text-muted-foreground" title={cert.issuer_cn || ""}>
-                        {cert.issuer_cn || "Unknown Issue Authority"}
-                      </TableCell>
-                      <TableCell className="text-sm font-semibold">
-                        {new Date(cert.not_after).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </TableCell>
-                      <TableCell className="text-[11px] text-muted-foreground font-mono">
-                        Last scan: {new Date(cert.last_checked).toLocaleTimeString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 hover:text-primary transition-all active:scale-95"
-                            onClick={() => handleViewChain(cert.id)}
-                            title="View Certificate Chain"
-                          >
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-primary transition-all active:scale-95" asChild>
-                            <a href={`https://${cert.domain}`} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </motion.tr>
-                  ))
-                )}
-              </AnimatePresence>
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
+                  filteredCerts.map((cert) => {
+                    const statusMeta = getCertificateStatusMeta(cert, t)
+                    const StatusIcon = statusMeta.icon
+                    const daysUntilExpiry = getDaysUntilExpiry(cert.not_after)
 
-      <Dialog open={isChainOpen} onOpenChange={setIsChainOpen}>
-        <DialogContent className="glass-card !border-white/10 sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-primary" /> Certificate Trust Chain
-            </DialogTitle>
-            <DialogDescription>Full validation hierarchy from Leaf to Root CA.</DialogDescription>
-          </DialogHeader>
-          <div className="py-6 overflow-hidden">
-            {loadingChain ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-xs text-muted-foreground animate-pulse">Reconstructing trust hierarchy...</p>
-              </div>
-            ) : chain ? (
-              <div className="space-y-4 relative">
-                <div className="absolute left-[23px] top-4 bottom-4 w-px bg-gradient-to-b from-primary/50 to-transparent" />
-                {chain.map((node, i) => (
-                  <motion.div 
-                    key={i} 
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="flex items-start gap-4 relative z-10"
-                  >
-                    <div className="h-12 w-12 rounded-full glass border-white/10 flex items-center justify-center shrink-0 shadow-lg shadow-black/20 bg-background/50">
-                      <ShieldCheck className={`h-5 w-5 ${i === 0 ? "text-primary" : "text-muted-foreground"}`} />
-                    </div>
-                    <div className="flex flex-col gap-1 pt-1">
-                       <span className={`text-sm font-bold ${i === 0 ? "text-primary" : "text-foreground"}`}>{node.subject_cn}</span>
-                       <div className="flex flex-col text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                          <span>Issued by: {node.issuer_cn}</span>
-                          <span className="mt-0.5 text-[9px] opacity-70">Expires: {new Date(node.not_after).toLocaleDateString()}</span>
-                       </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground italic">No chain data available.</div>
-            )}
+                    return (
+                      <TableRow
+                        key={cert.id}
+                        className="cursor-pointer hover:bg-muted/40"
+                        onClick={() => router.push(withLocalePrefix(`/certificates/${cert.id}`, locale))}
+                      >
+                        <TableCell>
+                          <div className="space-y-1">
+                            <p className="font-medium">{cert.domain}</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[300px]" title={cert.issuer_cn || ""}>
+                              {cert.issuer_cn || t("certificates.overview.issuerUnknown")}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`gap-1 ${statusMeta.className}`}>
+                            <StatusIcon className="h-3 w-3" />
+                            {statusMeta.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <p className="text-sm">{formatDate(cert.not_after, locale)}</p>
+                            {daysUntilExpiry !== null && daysUntilExpiry > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {t("certificates.overview.daysRemaining", { days: daysUntilExpiry })}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(withLocalePrefix(`/certificates/${cert.id}`, locale))
+                            }}
+                          >
+                            {t("certificates.overview.actionViewDetails")}
+                            <ArrowRight className="ml-1 h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
           </div>
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <span className="mr-2 text-xs text-muted-foreground">
+              {t("certificates.overview.paginationPage", { page: pageNumber })}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canGoPrev || loading}
+              onClick={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              {t("certificates.overview.paginationPrev")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canGoNext || loading}
+              onClick={() => setOffset((previous) => previous + PAGE_LIMIT)}
+            >
+              {t("certificates.overview.paginationNext")}
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={chainDialogOpen}
+        onOpenChange={(open) => {
+          setChainDialogOpen(open)
+
+          if (!open) {
+            setSelectedCertificate(null)
+            setChainInfo(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("certificates.overview.chainDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("certificates.overview.chainDialogDescription", {
+                domain: selectedCertificate?.domain || "-",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingChain ? (
+            <div className="py-10 text-center text-muted-foreground">
+              <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+              {t("certificates.overview.chainLoading")}
+            </div>
+          ) : chainInfo ? (
+            <div className="space-y-3 rounded-md border p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">{t("certificates.overview.chainFieldStatus")}</span>
+                <Badge
+                  className={chainInfo.chain_valid
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                    : "border-red-500/30 bg-red-500/10 text-red-600"}
+                >
+                  {chainInfo.chain_valid
+                    ? t("certificates.overview.chainStatusValid")
+                    : t("certificates.overview.chainStatusInvalid")}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-muted-foreground">{t("certificates.overview.chainFieldCheckedAt")}</span>
+                <span className="text-sm">{formatDateTime(chainInfo.last_checked, locale)}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-sm text-muted-foreground">{t("certificates.overview.chainFieldError")}</span>
+                <p className="text-sm">
+                  {chainInfo.chain_error || t("certificates.overview.chainNoError")}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              {t("certificates.overview.chainNoData")}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
-      </Card>
     </div>
   )
 }
