@@ -4,6 +4,15 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight } from "lucide-react"
+import { withLocalePrefix } from "@/components/app-locale"
+import { isRouteActive } from "@/components/app-navigation"
+import {
+  filterSidebarGroupsByApiPaths,
+  filterSidebarItemsByApiPaths,
+  getSidebarFooterItems,
+  getSidebarMenuGroups,
+} from "@/components/app-sidebar.config"
+import { useAppLocale } from "@/hooks/use-app-locale"
 import {
   Collapsible,
   CollapsibleContent,
@@ -17,42 +26,42 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
-import {
-  sidebarFooterItems,
-  sidebarMenuGroups,
-} from "@/components/app-sidebar.config"
 import { cn } from "@/lib/utils"
 
-function isRouteActive(pathname: string, itemUrl: string, exact = false) {
-  if (exact) {
-    return pathname === itemUrl
-  }
-
-  if (itemUrl === "/") {
-    return pathname === "/"
-  }
-
-  return pathname === itemUrl || pathname.startsWith(`${itemUrl}/`)
+type AppSidebarProps = {
+  supportedApiPaths?: Set<string>
 }
 
-export function AppSidebar() {
+export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
   const pathname = usePathname()
-  const visibleMenuGroups = sidebarMenuGroups
+  const locale = useAppLocale()
+
+  const sidebarMenuGroups = useMemo(() => {
+    const groups = getSidebarMenuGroups(locale)
+    return filterSidebarGroupsByApiPaths(groups, supportedApiPaths)
+  }, [locale, supportedApiPaths])
+
+  const sidebarFooterItems = useMemo(() => {
+    const items = getSidebarFooterItems(locale)
+    return filterSidebarItemsByApiPaths(items, supportedApiPaths)
+  }, [locale, supportedApiPaths])
 
   const activeParentMap = useMemo(() => {
-    return visibleMenuGroups.reduce<Record<string, boolean>>((result, group) => {
+    return sidebarMenuGroups.reduce<Record<string, boolean>>((result, group) => {
       group.items.forEach((item) => {
-        if (!item.children || item.children.length === 0) {
+        const children = item.children ?? []
+
+        if (children.length === 0) {
           return
         }
 
-        const childActive = item.children.some((child) =>
+        const childActive = children.some((child) =>
           isRouteActive(pathname, child.url, child.exact)
         )
 
@@ -62,7 +71,7 @@ export function AppSidebar() {
 
       return result
     }, {})
-  }, [pathname, visibleMenuGroups])
+  }, [pathname, sidebarMenuGroups])
 
   const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>(activeParentMap)
 
@@ -85,15 +94,16 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarContent>
-        {visibleMenuGroups.map((group) => (
+        {sidebarMenuGroups.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const hasChildren = Boolean(item.children && item.children.length > 0)
+                  const children = item.children ?? []
+                  const hasChildren = children.length > 0
                   const childActive = hasChildren
-                    ? item.children!.some((child) => isRouteActive(pathname, child.url, child.exact))
+                    ? children.some((child) => isRouteActive(pathname, child.url, child.exact))
                     : false
                   const itemActive = isRouteActive(pathname, item.url, item.exact) || childActive
                   const isOpen = hasChildren ? (expandedParents[item.url] ?? childActive) : false
@@ -125,13 +135,13 @@ export function AppSidebar() {
 
                           <CollapsibleContent>
                             <SidebarMenuSub>
-                              {item.children!.map((child) => {
+                              {children.map((child) => {
                                 const subActive = isRouteActive(pathname, child.url, child.exact)
 
                                 return (
                                   <SidebarMenuSubItem key={child.url}>
                                     <SidebarMenuSubButton asChild isActive={subActive}>
-                                      <Link href={child.url}>
+                                      <Link href={withLocalePrefix(child.url, locale)}>
                                         <span>{child.title}</span>
                                       </Link>
                                     </SidebarMenuSubButton>
@@ -143,7 +153,7 @@ export function AppSidebar() {
                         </Collapsible>
                       ) : (
                         <SidebarMenuButton asChild isActive={itemActive} tooltip={item.title}>
-                          <Link href={item.url}>
+                          <Link href={withLocalePrefix(item.url, locale)}>
                             <item.icon />
                             <span>{item.title}</span>
                           </Link>
@@ -166,7 +176,7 @@ export function AppSidebar() {
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                  <Link href={item.url}>
+                  <Link href={withLocalePrefix(item.url, locale)}>
                     <item.icon />
                     <span>{item.title}</span>
                   </Link>

@@ -9,8 +9,15 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react"
+import { DEFAULT_APP_LOCALE, type AppLocale } from "@/components/app-locale"
+import {
+  createScopedTranslator,
+  type NavigationLabelKey,
+} from "@/components/app-messages"
 
 type SidebarPath = string
+
+type NavigationTranslate = (path: `labels.${NavigationLabelKey}`) => string
 
 export type SidebarChildItem = {
   title: string
@@ -33,14 +40,17 @@ export type SidebarGroupConfig = {
   items: SidebarItem[]
 }
 
-type SidebarChildItemConfig = Omit<SidebarChildItem, "apiPaths">
+type SidebarChildItemConfig = Omit<SidebarChildItem, "title" | "apiPaths"> & {
+  titleKey: NavigationLabelKey
+}
 
-type SidebarItemConfig = Omit<SidebarItem, "apiPaths" | "children"> & {
+type SidebarItemConfig = Omit<SidebarItem, "title" | "apiPaths" | "children"> & {
+  titleKey: NavigationLabelKey
   children?: SidebarChildItemConfig[]
 }
 
 type SidebarGroupConfigBase = {
-  label: string
+  labelKey: NavigationLabelKey
   items: SidebarItemConfig[]
 }
 
@@ -68,10 +78,21 @@ function hasSupportedApiPaths(apiPaths: string[] | undefined, supportedPaths?: S
   return apiPaths.some((path) => isApiPathSupported(path, supportedPaths))
 }
 
+function resolveSidebarLabel(labelKey: NavigationLabelKey, translate: NavigationTranslate) {
+  return translate(`labels.${labelKey}`)
+}
+
+export function filterSidebarItemsByApiPaths(
+  items: SidebarItem[],
+  supportedPaths?: Set<string>
+): SidebarItem[] {
+  return items.filter((item) => hasSupportedApiPaths(item.apiPaths, supportedPaths))
+}
+
 export function filterSidebarGroupsByApiPaths(
   groups: SidebarGroupConfig[],
   supportedPaths?: Set<string>
-) {
+): SidebarGroupConfig[] {
   return groups
     .map((group) => {
       const items = group.items
@@ -121,97 +142,97 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
 
 const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
   {
-    label: "Overview",
+    labelKey: "groupOverview",
     items: [
       {
-        title: "Dashboard",
+        titleKey: "itemDashboard",
         url: "/",
         icon: LayoutDashboard,
         exact: true,
       },
       {
-        title: "Metrics",
+        titleKey: "itemMetrics",
         url: "/metrics",
         icon: Activity,
       },
     ],
   },
   {
-    label: "Monitoring",
+    labelKey: "groupMonitoring",
     items: [
       {
-        title: "Agents",
+        titleKey: "itemAgents",
         url: "/agents",
         icon: Server,
         children: [
           {
-            title: "All Agents",
+            titleKey: "itemAllAgents",
             url: "/agents",
             exact: true,
           },
           {
-            title: "Whitelist",
+            titleKey: "itemWhitelist",
             url: "/whitelist",
             exact: true,
           },
         ],
       },
       {
-        title: "Alerts",
+        titleKey: "itemAlerts",
         url: "/alerts",
         icon: Bell,
         children: [
           {
-            title: "Active",
+            titleKey: "itemActiveAlerts",
             url: "/alerts",
             exact: true,
           },
           {
-            title: "History",
+            titleKey: "itemAlertHistory",
             url: "/alerts/history",
             exact: true,
           },
           {
-            title: "Rules",
+            titleKey: "itemAlertRules",
             url: "/alerts/rules",
             exact: true,
           },
         ],
       },
       {
-        title: "Certificates",
+        titleKey: "itemCertificates",
         url: "/certificates",
         icon: List,
         children: [
           {
-            title: "Overview",
+            titleKey: "itemCertificateOverview",
             url: "/certificates",
             exact: true,
           },
           {
-            title: "Domains",
+            titleKey: "itemCertificateDomains",
             url: "/certificates/domains",
             exact: true,
           },
           {
-            title: "Status",
+            titleKey: "itemCertificateStatus",
             url: "/certificates/status",
             exact: true,
           },
         ],
       },
       {
-        title: "Notifications",
+        titleKey: "itemNotifications",
         url: "/notifications",
         icon: Inbox,
         children: [
           {
-            title: "Channels",
+            titleKey: "itemNotificationChannels",
             url: "/notifications",
             exact: true,
           },
           {
-            title: "Silence Windows",
+            titleKey: "itemSilenceWindows",
             url: "/notifications/silence",
             exact: true,
           },
@@ -220,10 +241,10 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
     ],
   },
   {
-    label: "Administration",
+    labelKey: "groupAdministration",
     items: [
       {
-        title: "System",
+        titleKey: "itemSystem",
         url: "/system",
         icon: Settings,
         exact: true,
@@ -232,31 +253,48 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
   },
 ]
 
-function withApiPathsForChild(item: SidebarChildItemConfig): SidebarChildItem {
-  return {
-    ...item,
-    apiPaths: sidebarApiPathMap[item.url],
-  }
-}
-
-function withApiPathsForItem(item: SidebarItemConfig): SidebarItem {
-  return {
-    ...item,
-    apiPaths: sidebarApiPathMap[item.url],
-    children: item.children?.map(withApiPathsForChild),
-  }
-}
-
-export const sidebarMenuGroups: SidebarGroupConfig[] = sidebarMenuGroupsBase.map((group) => ({
-  ...group,
-  items: group.items.map(withApiPathsForItem),
-}))
-
-export const sidebarFooterItems: SidebarItem[] = [
+const sidebarFooterItemsBase: SidebarItemConfig[] = [
   {
-    title: "Profile",
+    titleKey: "itemProfile",
     url: "/profile",
     icon: User,
     exact: true,
   },
 ]
+
+function withApiPathsForChild(
+  item: SidebarChildItemConfig,
+  translate: NavigationTranslate
+): SidebarChildItem {
+  return {
+    ...item,
+    title: resolveSidebarLabel(item.titleKey, translate),
+    apiPaths: sidebarApiPathMap[item.url],
+  }
+}
+
+function withApiPathsForItem(item: SidebarItemConfig, translate: NavigationTranslate): SidebarItem {
+  return {
+    ...item,
+    title: resolveSidebarLabel(item.titleKey, translate),
+    apiPaths: sidebarApiPathMap[item.url],
+    children: item.children?.map((child) => withApiPathsForChild(child, translate)),
+  }
+}
+
+export function getSidebarMenuGroups(locale: AppLocale = DEFAULT_APP_LOCALE): SidebarGroupConfig[] {
+  const translate = createScopedTranslator(locale, "navigation")
+
+  return sidebarMenuGroupsBase.map((group) => ({
+    label: resolveSidebarLabel(group.labelKey, translate),
+    items: group.items.map((item) => withApiPathsForItem(item, translate)),
+  }))
+}
+
+export function getSidebarFooterItems(locale: AppLocale = DEFAULT_APP_LOCALE): SidebarItem[] {
+  const translate = createScopedTranslator(locale, "navigation")
+  return sidebarFooterItemsBase.map((item) => withApiPathsForItem(item, translate))
+}
+
+export const sidebarMenuGroups: SidebarGroupConfig[] = getSidebarMenuGroups()
+export const sidebarFooterItems: SidebarItem[] = getSidebarFooterItems()

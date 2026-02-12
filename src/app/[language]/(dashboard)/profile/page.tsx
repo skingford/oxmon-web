@@ -24,12 +24,16 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clearAuthToken } from "@/lib/auth-token";
+import Link from "next/link";
+import { withLocalePrefix } from "@/components/app-locale";
+import { useAppLocale } from "@/hooks/use-app-locale";
 
 export default function ProfilePage() {
   const [token, setToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const locale = useAppLocale();
 
   useEffect(() => {
     const t = getAuthToken();
@@ -60,7 +64,7 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     clearAuthToken();
-    window.location.replace("/login");
+    window.location.replace(withLocalePrefix("/login", locale));
   };
 
   return (
@@ -217,7 +221,7 @@ export default function ProfilePage() {
                    </div>
                 </div>
                 <Button variant="outline" size="sm" className="glass h-9" asChild>
-                   <a href="/system">Manage Security</a>
+                   <Link href={withLocalePrefix("/system", locale)}>Manage Security</Link>
                 </Button>
              </CardContent>
           </Card>

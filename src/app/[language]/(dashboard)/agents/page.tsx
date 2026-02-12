@@ -41,10 +41,13 @@ import { Loader2, Plus, RefreshCw, Trash2, Key, Server, ShieldCheck, Search, Mor
 import Link from "next/link";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { withLocalePrefix } from "@/components/app-locale";
+import { useAppLocale } from "@/hooks/use-app-locale";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function AgentsPage() {
   const [activeTab, setActiveTab] = useState("all-agents");
+  const locale = useAppLocale();
   
   // All Agents State
   const [agents, setAgents] = useState<AgentResponse[]>([]);
@@ -347,7 +350,7 @@ export default function AgentsPage() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Button asChild variant="ghost" size="sm" className="hover:text-primary transition-colors">
-                                    <Link href={`/agents/${agent.agent_id}`}>
+                                    <Link href={withLocalePrefix(`/agents/${agent.agent_id}`, locale)}>
                                       Details
                                     </Link>
                                   </Button>

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api";
 import { getAuthToken, isAuthTokenValid, setAuthToken } from "@/lib/auth-token";
+import { resolveAppLocale, withLocalePrefix } from "@/components/app-locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,18 +17,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true)
+
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = resolveAppLocale(pathname);
+  const agentsPath = withLocalePrefix("/agents", locale);
 
   useEffect(() => {
     const token = getAuthToken()
 
     if (isAuthTokenValid(token)) {
-      router.replace("/agents")
+      router.replace(agentsPath)
       return
     }
 
     setCheckingAuth(false)
-  }, [router])
+  }, [router, agentsPath])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +43,7 @@ export default function LoginPage() {
       setAuthToken(loginData.token);
 
       toast.success("Login successful");
-      router.replace("/agents");
+      router.replace(agentsPath);
     } catch (error) {
       console.error(error);
 

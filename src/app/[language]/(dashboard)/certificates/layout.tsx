@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { withLocalePrefix, stripLocalePrefix } from "@/components/app-locale";
+import { useAppLocale } from "@/hooks/use-app-locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Globe, Activity } from "lucide-react";
 
@@ -12,9 +14,11 @@ export default function CertificatesLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const locale = useAppLocale();
+  const normalizedPathname = stripLocalePrefix(pathname);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       className="p-8 space-y-8"
@@ -28,35 +32,35 @@ export default function CertificatesLayout({
         </div>
       </div>
 
-      <Tabs value={pathname} className="space-y-6">
+      <Tabs value={normalizedPathname} className="space-y-6">
         <TabsList className="bg-muted/50 p-1 glass h-12">
-          <Link href="/certificates">
+          <Link href={withLocalePrefix("/certificates", locale)}>
             <TabsTrigger value="/certificates" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
               <Shield className="h-4 w-4" />
               Certificates List
             </TabsTrigger>
           </Link>
-          <Link href="/certificates/domains">
+          <Link href={withLocalePrefix("/certificates/domains", locale)}>
             <TabsTrigger value="/certificates/domains" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
               <Globe className="h-4 w-4" />
-              Domain Assets
+              Domains
             </TabsTrigger>
           </Link>
-          <Link href="/certificates/status">
+          <Link href={withLocalePrefix("/certificates/status", locale)}>
             <TabsTrigger value="/certificates/status" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
               <Activity className="h-4 w-4" />
-              Live Status
+              Status
             </TabsTrigger>
           </Link>
         </TabsList>
-        
+
         <AnimatePresence mode="wait">
           <motion.div
             key={pathname}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.2 }}
           >
             {children}
           </motion.div>

@@ -14,8 +14,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2, RefreshCw, Activity, Clock, Database, Tag, ShieldCheck, Server } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { withLocalePrefix } from "@/components/app-locale";
+import { useAppLocale } from "@/hooks/use-app-locale";
 import { Badge } from "@/components/ui/badge";
 
 export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +28,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   // Let's use `useParams` for simplicity in client component.
   
   const { id } = use(params);
+  const locale = useAppLocale();
   
   const [metrics, setMetrics] = useState<LatestMetric[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +77,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center space-x-4">
           <Button variant="outline" size="icon" asChild className="glass hover:bg-primary/10 hover:text-primary transition-all active:scale-95">
-            <Link href="/agents">
+            <Link href={withLocalePrefix("/agents", locale)}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
@@ -173,7 +175,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
 
                     <div className="pt-2">
                       <Button variant="ghost" size="sm" asChild className="w-full text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary/5 transition-all">
-                        <Link href={`/metrics?agent_id=${id}&metric_name=${metric.metric_name}`}>
+                        <Link href={`${withLocalePrefix("/metrics", locale)}?agent_id=${encodeURIComponent(id)}&metric_name=${encodeURIComponent(metric.metric_name)}`}>
                           Explore History
                         </Link>
                       </Button>

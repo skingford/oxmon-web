@@ -34,6 +34,7 @@ import {
   EnableRequest,
 } from "@/types/api"
 import { clearAuthToken, getAuthToken, normalizeAuthToken } from "@/lib/auth-token"
+import { resolveAppLocale, stripLocalePrefix, withLocalePrefix } from "@/components/app-locale"
 
 const BASE_URL = ""
 
@@ -132,8 +133,12 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
     if (typeof window !== "undefined") {
       clearAuthToken()
 
-      if (window.location.pathname !== "/login") {
-        window.location.replace("/login")
+      const currentPathname = window.location.pathname
+      const locale = resolveAppLocale(currentPathname)
+      const loginPath = withLocalePrefix("/login", locale)
+
+      if (stripLocalePrefix(currentPathname) !== "/login") {
+        window.location.replace(loginPath)
       }
     }
 

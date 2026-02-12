@@ -1,0 +1,51 @@
+{
+  "navigation": {
+    "labels": {
+      "groupOverview": "概览",
+      "groupMonitoring": "监控",
+      "groupAdministration": "管理",
+      "groupAccount": "账户",
+      "itemDashboard": "仪表盘",
+      "itemMetrics": "指标",
+      "itemAgents": "Agents",
+      "itemAllAgents": "所有 Agents",
+      "itemWhitelist": "白名单",
+      "itemAlerts": "告警",
+      "itemActiveAlerts": "活跃告警",
+      "itemAlertHistory": "历史",
+      "itemAlertRules": "规则",
+      "itemCertificates": "证书",
+      "itemCertificateOverview": "概览",
+      "itemCertificateDomains": "域名",
+      "itemCertificateStatus": "状态",
+      "itemNotifications": "通知",
+      "itemNotificationChannels": "渠道",
+      "itemSilenceWindows": "静默窗口",
+      "itemSystem": "系统",
+      "itemProfile": "个人设置",
+      "itemAgentDetail": "Agent 详情",
+      "switchLanguage": "语言",
+      "languageChinese": "中文",
+      "languageEnglish": "English"
+    }
+  },
+  "header": {
+    "descriptions": {
+      "overviewDescription": "快速查看集群概况与运行健康状态。",
+      "metricsDescription": "按条件筛选原始指标数据并查看趋势图。",
+      "agentsDescription": "管理在线 Agent 与白名单访问控制。",
+      "whitelistDescription": "管理受信任 Agent 与发现令牌。",
+      "alertsDescription": "跟踪活跃告警并快速执行处理动作。",
+      "alertsHistoryDescription": "查看历史告警事件与处理记录。",
+      "alertsRulesDescription": "配置规则、阈值与静默策略。",
+      "certificatesDescription": "查看证书资产与到期时间线。",
+      "certificateDomainsDescription": "维护域名列表与证书检查计划。",
+      "certificateStatusDescription": "按域名查看最新证书检查状态。",
+      "notificationsDescription": "配置通知渠道、接收人并进行发送测试。",
+      "silenceWindowsDescription": "设置告警静默时间窗口，避免计划性噪音。",
+      "systemDescription": "调整运行配置并执行存储清理。",
+      "profileDescription": "更新账号信息与凭据安全设置。",
+      "agentDetailDescription": "查看该 Agent 的实时指标与健康状态。"
+    }
+  }
+}

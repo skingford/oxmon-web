@@ -1,0 +1,51 @@
+{
+  "navigation": {
+    "labels": {
+      "groupOverview": "Overview",
+      "groupMonitoring": "Monitoring",
+      "groupAdministration": "Administration",
+      "groupAccount": "Account",
+      "itemDashboard": "Dashboard",
+      "itemMetrics": "Metrics",
+      "itemAgents": "Agents",
+      "itemAllAgents": "All Agents",
+      "itemWhitelist": "Whitelist",
+      "itemAlerts": "Alerts",
+      "itemActiveAlerts": "Active",
+      "itemAlertHistory": "History",
+      "itemAlertRules": "Rules",
+      "itemCertificates": "Certificates",
+      "itemCertificateOverview": "Overview",
+      "itemCertificateDomains": "Domains",
+      "itemCertificateStatus": "Status",
+      "itemNotifications": "Notifications",
+      "itemNotificationChannels": "Channels",
+      "itemSilenceWindows": "Silence Windows",
+      "itemSystem": "System",
+      "itemProfile": "Profile",
+      "itemAgentDetail": "Agent Detail",
+      "switchLanguage": "Language",
+      "languageChinese": "中文",
+      "languageEnglish": "English"
+    }
+  },
+  "header": {
+    "descriptions": {
+      "overviewDescription": "Cluster overview and runtime health at a glance.",
+      "metricsDescription": "Explore raw metric points with filters and trend charts.",
+      "agentsDescription": "Manage active agents and whitelist-based access.",
+      "whitelistDescription": "Manage trusted agents and their discovery tokens.",
+      "alertsDescription": "Track active alerts and take response actions quickly.",
+      "alertsHistoryDescription": "Review historical alert events and handling records.",
+      "alertsRulesDescription": "Configure alert rules, thresholds, and silence policy.",
+      "certificatesDescription": "Inspect certificate inventory and expiration timeline.",
+      "certificateDomainsDescription": "Manage domain list and certificate check scheduling.",
+      "certificateStatusDescription": "Review latest certificate check status by domain.",
+      "notificationsDescription": "Configure delivery channels, recipients, and test messages.",
+      "silenceWindowsDescription": "Set silence windows to suppress planned alert noise.",
+      "systemDescription": "Tune runtime configuration and manage storage cleanup.",
+      "profileDescription": "Update account and credential security settings.",
+      "agentDetailDescription": "Inspect real-time metrics and health for this agent."
+    }
+  }
+}

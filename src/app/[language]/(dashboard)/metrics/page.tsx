@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Area, AreaChart, Brush, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { Activity, ArrowDown, ArrowUp, ArrowUpDown, Database, Download, FileJson2, Filter, Link2, Loader2, RefreshCw, RotateCcw, Server } from "lucide-react"
@@ -121,7 +121,7 @@ function toCsvCell(value: unknown) {
   return text
 }
 
-export default function MetricsPage() {
+function MetricsPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -820,5 +820,21 @@ export default function MetricsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+function MetricsPageFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+  )
+}
+
+export default function MetricsPage() {
+  return (
+    <Suspense fallback={<MetricsPageFallback />}>
+      <MetricsPageContent />
+    </Suspense>
   )
 }
