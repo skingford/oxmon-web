@@ -3,18 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  Activity,
-  Bell,
-  ChevronRight,
-  Inbox,
-  LayoutDashboard,
-  List,
-  Server,
-  Settings,
-  Shield,
-  User,
-} from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import {
   Collapsible,
   CollapsibleContent,
@@ -23,6 +12,7 @@ import {
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -33,105 +23,11 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
+import {
+  sidebarFooterItems,
+  sidebarMenuGroups,
+} from "@/components/app-sidebar.config"
 import { cn } from "@/lib/utils"
-
-type MenuItem = {
-  title: string
-  url: string
-  icon: React.ComponentType<{ className?: string }>
-  exact?: boolean
-  children?: Array<{
-    title: string
-    url: string
-    exact?: boolean
-  }>
-}
-
-type MenuGroup = {
-  label: string
-  items: MenuItem[]
-}
-
-const menuGroups: MenuGroup[] = [
-  {
-    label: "Overview",
-    items: [
-      {
-        title: "Dashboard",
-        url: "/",
-        icon: LayoutDashboard,
-        exact: true,
-      },
-      {
-        title: "Metrics",
-        url: "/metrics",
-        icon: Activity,
-      },
-    ],
-  },
-  {
-    label: "Monitoring",
-    items: [
-      {
-        title: "Agents",
-        url: "/agents",
-        icon: Server,
-      },
-      {
-        title: "Whitelist",
-        url: "/whitelist",
-        icon: Shield,
-        exact: true,
-      },
-      {
-        title: "Alerts",
-        url: "/alerts",
-        icon: Bell,
-        children: [
-          { title: "Active", url: "/alerts", exact: true },
-          { title: "History", url: "/alerts/history", exact: true },
-          { title: "Rules", url: "/alerts/rules", exact: true },
-        ],
-      },
-      {
-        title: "Certificates",
-        url: "/certificates",
-        icon: List,
-        children: [
-          { title: "Overview", url: "/certificates", exact: true },
-          { title: "Domains", url: "/certificates/domains", exact: true },
-          { title: "Status", url: "/certificates/status", exact: true },
-        ],
-      },
-      {
-        title: "Notifications",
-        url: "/notifications",
-        icon: Inbox,
-        children: [
-          { title: "Channels", url: "/notifications", exact: true },
-          { title: "Silence Windows", url: "/notifications/silence", exact: true },
-        ],
-      },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
-      {
-        title: "System",
-        url: "/system",
-        icon: Settings,
-        exact: true,
-      },
-      {
-        title: "Profile",
-        url: "/profile",
-        icon: User,
-        exact: true,
-      },
-    ],
-  },
-]
 
 function isRouteActive(pathname: string, itemUrl: string, exact = false) {
   if (exact) {
@@ -147,9 +43,10 @@ function isRouteActive(pathname: string, itemUrl: string, exact = false) {
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const visibleMenuGroups = sidebarMenuGroups
 
   const activeParentMap = useMemo(() => {
-    return menuGroups.reduce<Record<string, boolean>>((result, group) => {
+    return visibleMenuGroups.reduce<Record<string, boolean>>((result, group) => {
       group.items.forEach((item) => {
         if (!item.children || item.children.length === 0) {
           return
@@ -165,7 +62,7 @@ export function AppSidebar() {
 
       return result
     }, {})
-  }, [pathname])
+  }, [pathname, visibleMenuGroups])
 
   const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>(activeParentMap)
 
@@ -188,7 +85,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarContent>
-        {menuGroups.map((group) => (
+        {visibleMenuGroups.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -260,6 +157,25 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          {sidebarFooterItems.map((item) => {
+            const isActive = isRouteActive(pathname, item.url, item.exact)
+
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                  <Link href={item.url}>
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
+          })}
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   )
 }
