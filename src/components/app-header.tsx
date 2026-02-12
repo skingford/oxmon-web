@@ -69,12 +69,12 @@ export function AppHeader({
             className="hidden sm:block"
           />
 
-          <h1 className="truncate text-sm font-semibold md:text-base">{resolvedTitle}</h1>
+          {/* <h1 className="truncate text-sm font-semibold md:text-base">{resolvedTitle}</h1>
           {resolvedDescription ? (
             <p className="hidden truncate text-xs text-muted-foreground md:block md:text-sm">
               {resolvedDescription}
             </p>
-          ) : null}
+          ) : null} */}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
