@@ -227,7 +227,7 @@ export default function DashboardPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-end justify-between">
                   <span
-                    className={`text-xl font-semibold ${onlineRate >= 50 ? "text-green-600" : "text-red-600"}`}
+                    className={`text-xl font-semibold ${onlineRate >= 50 ? "text-emerald-600" : "text-red-600"}`}
                   >
                     {onlineRate}%
                   </span>
@@ -235,7 +235,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`h-full ${onlineRate >= 50 ? "bg-green-500" : "bg-red-500"}`}
+                    className={`h-full ${onlineRate >= 50 ? "bg-emerald-500" : "bg-red-500"}`}
                     style={{ width: `${Math.max(Math.min(onlineRate, 100), 0)}%` }}
                   />
                 </div>
@@ -304,7 +304,7 @@ export default function DashboardPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between rounded-md border p-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <ShieldCheck className="h-4 w-4 text-green-600" />
+                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
                     <span>有效证书</span>
                   </div>
                   <span className="text-sm font-semibold tabular-nums">{overview.cert_summary.valid}</span>
@@ -318,7 +318,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-center justify-between rounded-md border p-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
                     <span>即将过期</span>
                   </div>
                   <span className="text-sm font-semibold tabular-nums">{overview.cert_summary.expiring_soon}</span>

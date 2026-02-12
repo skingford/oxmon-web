@@ -7,14 +7,16 @@ import { withLocalePrefix, stripLocalePrefix } from "@/components/app-locale";
 import { useAppLocale } from "@/hooks/use-app-locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Globe, Activity } from "lucide-react";
+import { useAppTranslations } from "@/hooks/use-app-translations";
 
 export default function CertificatesLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+    const { t, locale } = useAppTranslations("pages")
   const pathname = usePathname();
-  const locale = useAppLocale();
+  // const locale = useAppLocale();
   const normalizedPathname = stripLocalePrefix(pathname);
 
   return (
@@ -25,15 +27,15 @@ export default function CertificatesLayout({
     >
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-4xl font-extrabold tracking-tight text-gradient text-glow">Identity & Privacy</h2>
+          <h2 className="text-4xl font-extrabold tracking-tight text-glow">{t("certificates.overview.title")}</h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Manage SSL/TLS certificates and monitored domains.
+           {t("certificates.overview.description")}
           </p>
         </div>
       </div>
 
       <Tabs value={normalizedPathname} className="space-y-6">
-        <TabsList className="bg-muted/50 p-1 glass h-12">
+        <TabsList className="bg-muted/50 p-1 glass h-12 mb-0">
           <Link href={withLocalePrefix("/certificates", locale)}>
             <TabsTrigger value="/certificates" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
               <Shield className="h-4 w-4" />

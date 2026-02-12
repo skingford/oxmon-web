@@ -92,6 +92,14 @@ function parseOptionalNonNegativeInt(value: string) {
   return Math.floor(numberValue)
 }
 
+function getCountAwareKey<One extends string, Many extends string>(
+  oneKey: One,
+  manyKey: Many,
+  count: number
+): One | Many {
+  return count === 1 ? oneKey : manyKey
+}
+
 function getDomainStatusMeta(
   enabled: boolean,
   t: (path: any, values?: Record<string, string | number>) => string
@@ -156,8 +164,21 @@ export default function DomainsPage() {
   const [clearAdvancedDialogOpen, setClearAdvancedDialogOpen] = useState(false)
   const [autoCreating, setAutoCreating] = useState(false)
 
-  const autoCreateHasAdvancedDraft = Boolean(
-    autoCreatePort.trim() || autoCreateCheckInterval.trim() || autoCreateNote.trim()
+  const autoCreateAdvancedFilledCount = [autoCreatePort, autoCreateCheckInterval, autoCreateNote].reduce(
+    (count, value) => (value.trim() ? count + 1 : count),
+    0
+  )
+  const autoCreateHasAdvancedDraft = autoCreateAdvancedFilledCount > 0
+  const autoCreateAdvancedResetCount = Math.max(1, autoCreateAdvancedFilledCount)
+  const autoCreateAdvancedResetTitleKey = getCountAwareKey(
+    "certificates.domains.autoCreateAdvancedResetDialogTitleOne",
+    "certificates.domains.autoCreateAdvancedResetDialogTitleMany",
+    autoCreateAdvancedResetCount
+  )
+  const autoCreateAdvancedResetConfirmKey = getCountAwareKey(
+    "certificates.domains.autoCreateAdvancedResetDialogConfirmOne",
+    "certificates.domains.autoCreateAdvancedResetDialogConfirmMany",
+    autoCreateAdvancedResetCount
   )
 
   const {
@@ -181,10 +202,7 @@ export default function DomainsPage() {
   }
 
   const clearAutoCreateAdvancedDraft = () => {
-    const clearedCount = [autoCreatePort, autoCreateCheckInterval, autoCreateNote].reduce(
-      (count, value) => (value.trim() ? count + 1 : count),
-      0
-    )
+    const clearedCount = autoCreateAdvancedFilledCount
 
     setAutoCreatePort("")
     setAutoCreateCheckInterval("")
@@ -193,9 +211,11 @@ export default function DomainsPage() {
     setClearAdvancedDialogOpen(false)
 
     if (clearedCount > 0) {
-      const successKey = clearedCount === 1
-        ? "certificates.domains.toastAutoCreateAdvancedResetSuccessOne"
-        : "certificates.domains.toastAutoCreateAdvancedResetSuccessMany"
+      const successKey = getCountAwareKey(
+        "certificates.domains.toastAutoCreateAdvancedResetSuccessOne",
+        "certificates.domains.toastAutoCreateAdvancedResetSuccessMany",
+        clearedCount
+      )
 
       toast.success(t(successKey, {
         count: clearedCount,
@@ -1121,15 +1141,23 @@ export default function DomainsPage() {
           <AlertDialog open={clearAdvancedDialogOpen} onOpenChange={setClearAdvancedDialogOpen}>
             <AlertDialogContent size="sm">
               <AlertDialogHeader>
-                <AlertDialogTitle>{t("certificates.domains.autoCreateAdvancedResetDialogTitle")}</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {t(autoCreateAdvancedResetTitleKey, {
+                    count: autoCreateAdvancedResetCount,
+                  })}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  {t("certificates.domains.autoCreateAdvancedResetDialogDescription")}
+                  {t("certificates.domains.autoCreateAdvancedResetDialogDescription", {
+                    count: autoCreateAdvancedResetCount,
+                  })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>{t("certificates.domains.cancelButton")}</AlertDialogCancel>
                 <AlertDialogAction variant="destructive" onClick={clearAutoCreateAdvancedDraft}>
-                  {t("certificates.domains.autoCreateAdvancedResetDialogConfirm")}
+                  {t(autoCreateAdvancedResetConfirmKey, {
+                    count: autoCreateAdvancedResetCount,
+                  })}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

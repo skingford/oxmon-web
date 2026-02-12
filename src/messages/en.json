@@ -352,10 +352,10 @@
     },
     "certificates": {
       "overview": {
-        "title": "Certificate Overview",
-        "description": "Paginated certificate health and chain validation details",
+        "title": "Certificate Management",
+        "description": "Manage SSL/TLS certificates and monitored domains",
         "refreshButton": "Refresh",
-        "statTotal": "Total Domains",
+        "statTotal": "Total",
         "statHealthy": "Healthy",
         "statInvalid": "Invalid",
         "statExpiringSoon": "Expiring Soon",
@@ -408,8 +408,8 @@
         "actionViewDetails": "View Details"
       },
       "domains": {
-        "title": "Monitored Domains",
-        "description": "Manage monitored domains with create, batch import, manual check, and history",
+        "title": "Domain Management",
+        "description": "Manage domain list and certificate check schedules",
         "refreshButton": "Refresh",
         "addButton": "Add Domain",
         "addDialogTitle": "Add Monitored Domain",
@@ -493,9 +493,11 @@
         "autoCreateAdvancedHint": "Optional: set port, check interval and note before creating",
         "autoCreateAdvancedToggle": "Advanced Options (Optional)",
         "autoCreateAdvancedReset": "Clear Memory",
-        "autoCreateAdvancedResetDialogTitle": "Clear advanced parameters?",
-        "autoCreateAdvancedResetDialogDescription": "This clears remembered port, interval, and note values.",
-        "autoCreateAdvancedResetDialogConfirm": "Clear",
+        "autoCreateAdvancedResetDialogTitleOne": "Clear 1 advanced parameter?",
+        "autoCreateAdvancedResetDialogTitleMany": "Clear {count} advanced parameters?",
+        "autoCreateAdvancedResetDialogDescription": "This will clear {count} remembered advanced parameter value(s).",
+        "autoCreateAdvancedResetDialogConfirmOne": "Clear 1 item",
+        "autoCreateAdvancedResetDialogConfirmMany": "Clear {count} items",
         "toastAutoCreateAdvancedResetSuccessOne": "Cleared 1 advanced parameter",
         "toastAutoCreateAdvancedResetSuccessMany": "Cleared {count} advanced parameters",
         "autoCreateSubmit": "Create & Check",
@@ -515,7 +517,7 @@
       },
       "status": {
         "title": "Check Status",
-        "description": "View latest certificate check status across all domains",
+        "description": "View latest certificate check status for all domains",
         "checkAllButton": "Check All",
         "refreshButton": "Refresh",
         "statTotal": "Items in Page",
