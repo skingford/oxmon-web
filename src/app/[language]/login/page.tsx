@@ -21,18 +21,35 @@ export default function LoginPage() {
   const router = useRouter();
   const pathname = usePathname();
   const locale = resolveAppLocale(pathname);
-  const agentsPath = withLocalePrefix("/agents", locale);
+  const dashboardPath = withLocalePrefix("/", locale);
 
   useEffect(() => {
-    const token = getAuthToken()
+    const timeoutId = window.setTimeout(() => {
+      setCheckingAuth(false)
+    }, 3000)
 
-    if (isAuthTokenValid(token)) {
-      router.replace(agentsPath)
-      return
+    let redirected = false
+
+    try {
+      const token = getAuthToken()
+
+      if (isAuthTokenValid(token)) {
+        redirected = true
+        router.replace(dashboardPath)
+        return
+      }
+    } catch {
+      // Ignore invalid token parsing errors and fall back to login form.
     }
 
-    setCheckingAuth(false)
-  }, [router, agentsPath])
+    if (!redirected) {
+      setCheckingAuth(false)
+    }
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [router, dashboardPath])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +60,7 @@ export default function LoginPage() {
       setAuthToken(loginData.token);
 
       toast.success("Login successful");
-      router.replace(agentsPath);
+      router.replace(dashboardPath);
     } catch (error) {
       console.error(error);
 

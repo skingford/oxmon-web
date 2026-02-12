@@ -24,6 +24,10 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "groupOverview",
     descriptionKey: "overviewDescription",
   },
+  "/dashboard": {
+    titleKey: "groupOverview",
+    descriptionKey: "overviewDescription",
+  },
   "/metrics": {
     titleKey: "itemMetrics",
     descriptionKey: "metricsDescription",

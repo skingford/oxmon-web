@@ -17,7 +17,7 @@ export interface AgentWhitelistDetail {
 
 export interface AddAgentRequest {
   agent_id: string;
-  description?: string;
+  description?: string | null;
 }
 
 export interface AddAgentResponse {
@@ -25,6 +25,15 @@ export interface AddAgentResponse {
   agent_id: string;
   token: string;
   created_at: string;
+}
+
+export interface UpdateAgentRequest {
+  description?: string | null;
+}
+
+export interface RegenerateTokenResponse {
+  agent_id: string;
+  token: string;
 }
 
 export interface LoginRequest {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api";
 import { AgentWhitelistDetail } from "@/types/api";
 import {
   Table,
@@ -46,6 +46,18 @@ export default function WhitelistPage() {
   const [newAgentDesc, setNewAgentDesc] = useState("");
   const [adding, setAdding] = useState(false);
 
+  const getStatusAwareMessage = (
+    error: unknown,
+    fallback: string,
+    statusMessages?: Partial<Record<number, string>>
+  ) => {
+    if (error instanceof ApiRequestError && statusMessages?.[error.status]) {
+      return statusMessages[error.status] as string;
+    }
+
+    return getApiErrorMessage(error, fallback);
+  };
+
   const fetchAgents = async () => {
     setLoading(true);
     try {
@@ -53,7 +65,7 @@ export default function WhitelistPage() {
       setAgents(data);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to fetch whitelist");
+      toast.error(getApiErrorMessage(error, "Failed to fetch whitelist"));
     } finally {
       setLoading(false);
     }
@@ -67,21 +79,22 @@ export default function WhitelistPage() {
     e.preventDefault();
     setAdding(true);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token");
-      
       const res = await api.addWhitelistAgent({ 
         agent_id: newAgentId, 
-        description: newAgentDesc 
-      }, token);
+        description: newAgentDesc || null,
+      });
       
       toast.success(`Agent added with token: ${res.token}`);
       setIsAddOpen(false);
       setNewAgentId("");
       setNewAgentDesc("");
-      fetchAgents();
+      await fetchAgents();
     } catch (error) {
-      toast.error("Failed to add agent");
+      toast.error(
+        getStatusAwareMessage(error, "Failed to add agent", {
+          409: "Agent ID already exists",
+        })
+      );
     } finally {
       setAdding(false);
     }
@@ -90,22 +103,22 @@ export default function WhitelistPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to remove this agent from whitelist?")) return;
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token");
-      await api.deleteWhitelistAgent(id, token);
+      await api.deleteWhitelistAgent(id);
       toast.success("Agent removed");
-      fetchAgents();
+      await fetchAgents();
     } catch (error) {
-      toast.error("Failed to remove agent");
+      toast.error(
+        getStatusAwareMessage(error, "Failed to remove agent", {
+          404: "Agent not found or already removed",
+        })
+      );
     }
   };
 
   const handleRegenerateToken = async (id: string) => {
     if (!confirm("Regenerate token will invalidate the old one. Continue?")) return;
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token");
-      const res = await api.regenerateToken(id, token);
+      const res = await api.regenerateToken(id);
       
       // Show token in a dialog or toast
       // For simplicity using alert or toast with duration
@@ -119,7 +132,11 @@ export default function WhitelistPage() {
         },
       });
     } catch (error) {
-      toast.error("Failed to regenerate token");
+      toast.error(
+        getStatusAwareMessage(error, "Failed to regenerate token", {
+          404: "Agent not found",
+        })
+      );
     }
   };
 

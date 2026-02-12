@@ -1,261 +1,393 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { api, getApiErrorMessage } from "@/lib/api"
-import { DashboardOverview } from "@/types/api"
+import { type DashboardOverview } from "@/types/api"
+import { withLocalePrefix } from "@/components/app-locale"
+import { useAppLocale } from "@/hooks/use-app-locale"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  AlertCircle,
+  AlertTriangle,
+  Bell,
+  CheckCircle2,
+  Clock3,
+  HardDrive,
+  RefreshCw,
+  Server,
+  ShieldCheck,
+  ShieldX,
+} from "lucide-react"
 import { toast } from "sonner"
-import { AlertCircle, CheckCircle2, Server, HardDrive, Clock, Activity, Bell, ArrowUpRight } from "lucide-react"
-import { Loader2 } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  Cell,
-  PieChart,
-  Pie
-} from "recharts"
 
-export default function DashboardPage() {
-  const [loading, setLoading] = useState(true)
-  const [data, setData] = useState<DashboardOverview | null>(null)
-  const [health, setHealth] = useState<any>(null)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [overview, healthData] = await Promise.all([
-          api.getDashboardOverview(),
-          api.getHealth()
-        ])
-        setData(overview)
-        setHealth(healthData)
-      } catch (error) {
-        console.error(error)
-        toast.error(getApiErrorMessage(error, "Failed to load dashboard data"))
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-        <motion.div
-           initial={{ opacity: 0, scale: 0.8 }}
-           animate={{ opacity: 1, scale: 1 }}
-           transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
-        >
-          <div className="relative">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <div className="absolute inset-0 blur-xl bg-primary/20 rounded-full" />
-          </div>
-        </motion.div>
-      </div>
-    )
+function formatUptime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "-"
   }
 
-  if (!data) return null
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  if (days > 0) {
+    return `${days} 天 ${hours} 小时`
   }
 
-  const formatUptime = (secs: number) => {
-    const days = Math.floor(secs / (24 * 3600))
-    const hours = Math.floor((secs % (24 * 3600)) / 3600)
-    const mins = Math.floor((secs % 3600) / 60)
-    return `${days}d ${hours}h ${mins}m`
+  if (hours > 0) {
+    return `${hours} 小时 ${minutes} 分钟`
   }
 
-  const alertData = Object.entries(data.alerts_by_severity).map(([name, value]) => ({
-    name: name.toLowerCase().replace("_", " "),
-    value
-  }))
+  return `${minutes} 分钟`
+}
 
-  const certData = [
-    { name: "Valid", value: data.cert_summary.valid, color: "var(--color-chart-2)" },
-    { name: "Invalid", value: data.cert_summary.invalid, color: "var(--color-destructive)" },
-    { name: "Expiring Soon", value: data.cert_summary.expiring_soon, color: "var(--color-chart-4)" }
-  ].filter(c => c.value > 0)
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return "-"
   }
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    show: { y: 0, opacity: 1 }
+  if (bytes === 0) {
+    return "0 B"
   }
 
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"]
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const value = bytes / Math.pow(1024, exponent)
+
+  return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[exponent]}`
+}
+
+function formatPercent(numerator: number, denominator: number) {
+  if (denominator <= 0) {
+    return 0
+  }
+
+  return Math.round((numerator / denominator) * 100)
+}
+
+function DashboardOverviewSkeleton() {
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="p-6 space-y-8"
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gradient">Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Real-time overview of your infrastructure health.</p>
-        </div>
-        {health && (
-           <div className="flex items-center gap-3 glass px-4 py-2 rounded-xl border-white/5 shadow-inner">
-              <div className="flex flex-col items-end">
-                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Service Health</span>
-                 <span className="text-xs font-mono font-bold text-emerald-500 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Operational
-                 </span>
-              </div>
-              <div className="h-8 w-px bg-white/10" />
-              <div className="flex flex-col">
-                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Version</span>
-                 <span className="text-xs font-mono font-bold">v{health.version}</span>
-              </div>
-           </div>
-        )}
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[
-          { title: "Active Agents", value: `${data.active_agents} / ${data.total_agents}`, sub: "Online / Total", icon: Server, color: "text-blue-500" },
-          { title: "Alerts (24h)", value: data.alerts_24h, sub: "Last 24 hours", icon: Bell, color: "text-red-500" },
-          { title: "Storage Usage", value: formatBytes(data.storage_total_bytes), sub: `${data.partition_count} Partitions`, icon: HardDrive, color: "text-purple-500" },
-          { title: "System Uptime", value: formatUptime(data.uptime_secs), sub: "Server running", icon: Clock, color: "text-green-500" }
-        ].map((item, i) => (
-          <motion.div key={i} variants={itemVariants}>
-            <Card className="glass-card overflow-hidden group">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-                <item.icon className={`h-4 w-4 ${item.color} group-hover:scale-110 transition-transform`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{item.value}</div>
-                <p className="text-xs text-muted-foreground">{item.sub}</p>
-              </CardContent>
-              <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                 <ArrowUpRight className="h-3 w-3 text-muted-foreground" />
-              </div>
-            </Card>
-          </motion.div>
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Card key={index}>
+            <CardHeader className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-7 w-28" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-3 w-2/3" />
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        <motion.div variants={itemVariants} className="col-span-full lg:col-span-4">
-          <Card className="glass-card h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Alerts Severity Distribution
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              {alertData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={alertData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsla(var(--border), 0.3)" />
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                      style={{ textTransform: "capitalize" }}
-                    />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: "8px" }}
-                      cursor={{ fill: "var(--accent)", opacity: 0.1 }}
-                    />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
-                      {alertData.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={
-                            entry.name === "critical" ? "var(--color-destructive)" :
-                            entry.name === "warning" ? "var(--color-chart-4)" :
-                            entry.name === "info" ? "var(--color-chart-2)" : "var(--color-muted-foreground)"
-                          } 
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-2">
-                   <CheckCircle2 className="h-10 w-10 text-green-500/20" />
-                   <p>System reporting zero healthy issues.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="space-y-2">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-56" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-9 w-full" />
+            ))}
+          </CardContent>
+        </Card>
 
-        <motion.div variants={itemVariants} className="col-span-full lg:col-span-3">
-          <Card className="glass-card h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                Certificates Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center h-[300px] space-y-4">
-               <div className="w-full h-[200px]">
-                 <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={certData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {certData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                 </ResponsiveContainer>
-               </div>
-               <div className="grid grid-cols-3 gap-8 w-full">
-                  {certData.map((item, i) => (
-                    <div key={i} className="flex flex-col items-center">
-                       <span className="text-2xl font-bold">{item.value}</span>
-                       <span className="text-[10px] uppercase text-muted-foreground tracking-wider">{item.name}</span>
-                    </div>
-                  ))}
-               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <Card>
+          <CardHeader className="space-y-2">
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="h-3 w-52" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Skeleton key={index} className="h-6 w-full" />
+            ))}
+          </CardContent>
+        </Card>
       </div>
-    </motion.div>
+    </div>
   )
 }
 
-import { ShieldCheck as OriginalShieldCheck } from "lucide-react"
+export default function DashboardPage() {
+  const locale = useAppLocale()
+  const [overview, setOverview] = useState<DashboardOverview | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-const ShieldCheck = OriginalShieldCheck
+  const alertsPath = useMemo(() => withLocalePrefix("/alerts", locale), [locale])
+  const certificatesPath = useMemo(() => withLocalePrefix("/certificates", locale), [locale])
+  const systemPath = useMemo(() => withLocalePrefix("/system", locale), [locale])
+
+  const fetchOverview = useCallback(async (silent = false) => {
+    if (silent) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
+
+    try {
+      const data = await api.getDashboardOverview()
+      setOverview(data)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "加载仪表盘概览失败"))
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchOverview()
+  }, [fetchOverview])
+
+  const onlineRate = useMemo(() => {
+    if (!overview) {
+      return 0
+    }
+
+    return formatPercent(overview.active_agents, overview.total_agents)
+  }, [overview])
+
+  const severityStats = useMemo(() => {
+    if (!overview) {
+      return []
+    }
+
+    const predefinedOrder = ["critical", "warning", "info"]
+    const allEntries = Object.entries(overview.alerts_by_severity || {})
+
+    return allEntries.sort(([left], [right]) => {
+      const leftIndex = predefinedOrder.indexOf(left.toLowerCase())
+      const rightIndex = predefinedOrder.indexOf(right.toLowerCase())
+
+      if (leftIndex === -1 && rightIndex === -1) {
+        return left.localeCompare(right)
+      }
+
+      if (leftIndex === -1) {
+        return 1
+      }
+
+      if (rightIndex === -1) {
+        return -1
+      }
+
+      return leftIndex - rightIndex
+    })
+  }, [overview])
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">仪表盘概览</h1>
+          <p className="text-sm text-muted-foreground">基于 /v1/dashboard/overview 的实时系统总览</p>
+        </div>
+        <Button variant="outline" onClick={() => fetchOverview(true)} disabled={refreshing}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          刷新
+        </Button>
+      </div>
+
+      {loading && !overview ? (
+        <DashboardOverviewSkeleton />
+      ) : !overview ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
+            <AlertCircle className="h-10 w-10 text-destructive/70" />
+            <div>
+              <p className="text-base font-medium">无法加载仪表盘数据</p>
+              <p className="text-sm text-muted-foreground">请检查登录状态或稍后重试</p>
+            </div>
+            <Button onClick={() => fetchOverview()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              重试
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription className="flex items-center gap-2">
+                  <Server className="h-4 w-4" />
+                  Agent 在线率
+                </CardDescription>
+                <CardTitle className="text-3xl font-semibold tabular-nums">
+                  {overview.active_agents} / {overview.total_agents}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-end justify-between">
+                  <span
+                    className={`text-xl font-semibold ${onlineRate >= 50 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {onlineRate}%
+                  </span>
+                  <span className="text-xs text-muted-foreground">活跃 / 总数</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full ${onlineRate >= 50 ? "bg-green-500" : "bg-red-500"}`}
+                    style={{ width: `${Math.max(Math.min(onlineRate, 100), 0)}%` }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription className="flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  24 小时告警
+                </CardDescription>
+                <CardTitle className="text-3xl font-semibold tabular-nums">{overview.alerts_24h}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-xs text-muted-foreground">按严重级别分布</p>
+                <div className="flex flex-wrap gap-2">
+                  {severityStats.length === 0 ? (
+                    <Badge variant="secondary">暂无告警</Badge>
+                  ) : (
+                    severityStats.map(([severity, count]) => {
+                      const key = severity.toLowerCase()
+                      const badgeVariant =
+                        key === "critical" ? "destructive" : key === "warning" ? "warning" : "secondary"
+
+                      return (
+                        <Badge key={severity} variant={badgeVariant} className="capitalize">
+                          {severity}: {count}
+                        </Badge>
+                      )
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription className="flex items-center gap-2">
+                  <Clock3 className="h-4 w-4" />
+                  服务运行时长
+                </CardDescription>
+                <CardTitle className="text-3xl font-semibold tabular-nums">
+                  {formatUptime(overview.uptime_secs)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between">
+                  <span>存储分区</span>
+                  <span className="font-medium text-foreground">{overview.partition_count}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>存储总大小</span>
+                  <span className="font-medium text-foreground">{formatBytes(overview.storage_total_bytes)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">证书健康摘要</CardTitle>
+                <CardDescription>来自 cert_summary 字段</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <ShieldCheck className="h-4 w-4 text-green-600" />
+                    <span>有效证书</span>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums">{overview.cert_summary.valid}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <ShieldX className="h-4 w-4 text-red-600" />
+                    <span>无效证书</span>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums">{overview.cert_summary.invalid}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <span>即将过期</span>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums">{overview.cert_summary.expiring_soon}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <span>监控域名总数</span>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums">{overview.cert_summary.total_domains}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">快捷入口</CardTitle>
+                <CardDescription>继续处理告警、证书和系统维护</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                <Link href={alertsPath} className="rounded-md border p-3 transition-colors hover:bg-muted/40">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">活跃告警</p>
+                      <p className="text-xs text-muted-foreground">查看并处理当前告警事件</p>
+                    </div>
+                    <Badge variant={overview.alerts_24h > 0 ? "destructive" : "secondary"}>
+                      {overview.alerts_24h}
+                    </Badge>
+                  </div>
+                </Link>
+
+                <Link
+                  href={certificatesPath}
+                  className="rounded-md border p-3 transition-colors hover:bg-muted/40"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">证书总览</p>
+                      <p className="text-xs text-muted-foreground">关注证书健康与到期风险</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>域名</span>
+                      <span className="font-semibold text-foreground tabular-nums">
+                        {overview.cert_summary.total_domains}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+
+                <Link href={systemPath} className="rounded-md border p-3 transition-colors hover:bg-muted/40">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">系统设置</p>
+                      <p className="text-xs text-muted-foreground">查看分区数与存储总量</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <HardDrive className="h-4 w-4" />
+                      <span className="font-semibold text-foreground">
+                        {formatBytes(overview.storage_total_bytes)}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}

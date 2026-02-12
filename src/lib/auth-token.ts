@@ -1,10 +1,6 @@
 const TOKEN_STORAGE_KEY = "token"
 
-function decodeJwtPayload(token: string) {
-  if (typeof window === "undefined") {
-    return null
-  }
-
+function decodeJwtPayloadRaw(token: string) {
   const payloadPart = token.split(".")[1]
 
   if (!payloadPart) {
@@ -22,6 +18,14 @@ function decodeJwtPayload(token: string) {
   } catch {
     return null
   }
+}
+
+function decodeJwtPayload(token: string) {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  return decodeJwtPayloadRaw(token)
 }
 
 export function normalizeAuthToken(rawToken?: string | null) {

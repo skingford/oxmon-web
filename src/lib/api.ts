@@ -32,8 +32,14 @@ import {
   SilenceWindow,
   CreateSilenceWindowRequest,
   EnableRequest,
+  RegenerateTokenResponse,
+  UpdateAgentRequest,
 } from "@/types/api"
-import { clearAuthToken, getAuthToken, normalizeAuthToken } from "@/lib/auth-token"
+import {
+  clearAuthToken,
+  getAuthToken,
+  normalizeAuthToken,
+} from "@/lib/auth-token"
 import { resolveAppLocale, stripLocalePrefix, withLocalePrefix } from "@/components/app-locale"
 
 const BASE_URL = ""
@@ -192,26 +198,33 @@ export const api = {
   getWhitelist: (params: PaginationParams) =>
     request<AgentWhitelistDetail[]>(`/v1/agents/whitelist${buildQueryString(params)}`),
 
-  addWhitelistAgent: (data: AddAgentRequest, token: string) =>
+  addWhitelistAgent: (data: AddAgentRequest, token?: string) =>
     request<AddAgentResponse>("/v1/agents/whitelist", {
       method: "POST",
       body: data,
       token,
     }),
 
-  deleteWhitelistAgent: (id: string, token: string) =>
-    request<{ description: string }>(`/v1/agents/whitelist/${id}`, {
+  updateWhitelistAgent: (id: string, data: UpdateAgentRequest, token?: string) =>
+    request<AgentWhitelistDetail>(`/v1/agents/whitelist/${id}`, {
+      method: "PUT",
+      body: data,
+      token,
+    }),
+
+  deleteWhitelistAgent: (id: string, token?: string) =>
+    request<void>(`/v1/agents/whitelist/${id}`, {
       method: "DELETE",
       token,
     }),
 
-  regenerateToken: (id: string, token: string) =>
-    request<{ token: string }>(`/v1/agents/whitelist/${id}/token`, {
+  regenerateToken: (id: string, token?: string) =>
+    request<RegenerateTokenResponse>(`/v1/agents/whitelist/${id}/token`, {
       method: "POST",
       token,
     }),
 
-  getAgentLatestMetrics: (id: string, token: string) =>
+  getAgentLatestMetrics: (id: string, token?: string) =>
     request<LatestMetric[]>(`/v1/agents/${id}/latest`, { token }),
 
   getActiveAlerts: (params: PaginationParams) =>
@@ -370,12 +383,8 @@ export const api = {
   getAlertSummary: () =>
     request<AlertSummary>("/v1/alerts/summary"),
 
-  updateAgent: (id: string, data: { description: string | null }, token?: string) =>
-    request<AgentWhitelistDetail>(`/v1/agents/whitelist/${id}`, {
-      method: "PUT",
-      body: data,
-      token,
-    }),
+  updateAgent: (id: string, data: UpdateAgentRequest, token?: string) =>
+    api.updateWhitelistAgent(id, data, token),
 
   getHealth: () =>
     request<any>("/v1/health", { requiresAuth: false }),

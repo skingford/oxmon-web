@@ -125,7 +125,7 @@ export function filterSidebarGroupsByApiPaths(
 }
 
 export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
-  "/": ["/v1/dashboard/overview"],
+  "/dashboard": ["/v1/dashboard/overview"],
   "/metrics": ["/v1/metrics"],
   "/agents": ["/v1/agents"],
   "/whitelist": ["/v1/agents/whitelist"],
@@ -146,7 +146,7 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
     items: [
       {
         titleKey: "itemDashboard",
-        url: "/",
+        url: "/dashboard",
         icon: LayoutDashboard,
         exact: true,
       },

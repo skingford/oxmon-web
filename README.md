@@ -55,6 +55,12 @@ src/
    bun run start
    ```
 
+## 🔐 Auth Session
+
+- Login returns a JWT token.
+- Client stores JWT in `localStorage` for API requests.
+- Login state redirect is handled on client side (login page checks token validity and redirects to dashboard).
+
 ## 🎯 Features
 
 - 🖥️ **Agent Management** - Remote terminal, telemetry charts

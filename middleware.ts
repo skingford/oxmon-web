@@ -5,6 +5,7 @@ const LOCALES = ["zh", "en"] as const
 type AppLocale = (typeof LOCALES)[number]
 
 const ROOT_ROUTES = [
+  "dashboard",
   "agents",
   "alerts",
   "certificates",
@@ -28,20 +29,7 @@ function resolveDefaultLocale(): AppLocale {
   return "zh"
 }
 
-function resolveDefaultDashboardEntry() {
-  const routeCandidate = process.env.NEXT_PUBLIC_DEFAULT_DASHBOARD_ENTRY
-    ?.replace(/^\/+/, "")
-    .toLowerCase()
-
-  if (routeCandidate && ROOT_ROUTE_SET.has(routeCandidate) && routeCandidate !== "login") {
-    return routeCandidate
-  }
-
-  return "agents"
-}
-
 const DEFAULT_LOCALE = resolveDefaultLocale()
-const DEFAULT_DASHBOARD_ENTRY = resolveDefaultDashboardEntry()
 
 function resolveLocale(pathname: string): AppLocale | null {
   const matched = pathname.match(/^\/(zh|en)(?:\/|$)/)
@@ -65,7 +53,7 @@ function normalizePathname(pathname: string) {
   const segments = pathname.split("/").filter(Boolean)
 
   if (segments.length === 0) {
-    return `/${DEFAULT_LOCALE}`
+    return `/${DEFAULT_LOCALE}/login`
   }
 
   const [firstSegment, secondSegment] = segments
@@ -76,7 +64,7 @@ function normalizePathname(pathname: string) {
 
   if (isLocaleCandidate(firstSegment) && (!secondSegment || ROOT_ROUTE_SET.has(secondSegment))) {
     if (!secondSegment) {
-      return `/${DEFAULT_LOCALE}`
+      return `/${DEFAULT_LOCALE}/login`
     }
 
     return `/${DEFAULT_LOCALE}/${segments.slice(1).join("/")}`
@@ -92,7 +80,7 @@ export function middleware(request: NextRequest) {
   if (locale) {
     if (pathname === `/${locale}` || pathname === `/${locale}/`) {
       const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = `/${locale}/${DEFAULT_DASHBOARD_ENTRY}`
+      redirectUrl.pathname = `/${locale}/login`
       return NextResponse.redirect(redirectUrl)
     }
 
