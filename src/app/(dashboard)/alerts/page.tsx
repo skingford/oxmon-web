@@ -20,7 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, RefreshCw, CheckCircle, AlertTriangle, AlertCircle, Info } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle, AlertTriangle, AlertCircle, Info, HandMetal, Check } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -52,12 +52,23 @@ export default function ActiveAlertsPage() {
 
   const handleResolve = async (id: string) => {
     try {
-      const token = localStorage.getItem("token");
-      await api.resolveAlert(id, token || undefined);
+      const token = localStorage.getItem("token") || undefined;
+      await api.resolveAlert(id, token);
       toast.success("Alert resolved");
       fetchAlerts();
     } catch (error) {
       toast.error("Failed to resolve alert");
+    }
+  };
+
+  const handleAcknowledge = async (id: string) => {
+    try {
+      const token = localStorage.getItem("token") || undefined;
+      await api.acknowledgeAlert(id, token);
+      toast.success("Alert acknowledged");
+      fetchAlerts();
+    } catch (error) {
+      toast.error("Failed to acknowledge alert");
     }
   };
 
@@ -178,18 +189,38 @@ export default function ActiveAlertsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs font-medium">
-                        {new Date(alert.timestamp).toLocaleString()}
+                        <div className="flex flex-col gap-1">
+                          <span>{new Date(alert.timestamp).toLocaleString()}</span>
+                          {alert.acknowledged_at && (
+                            <Badge variant="outline" className="text-[9px] h-4 py-0 px-1 border-primary/20 text-primary w-fit bg-primary/5">
+                              Ack at {new Date(alert.acknowledged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleResolve(alert.id)}
-                          className="h-8 w-8 hover:text-green-600 hover:bg-green-500/10 transition-all active:scale-90"
-                          title="Acknowledge & Resolve"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          {!alert.acknowledged_at && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleAcknowledge(alert.id)}
+                              className="h-8 w-8 hover:text-primary hover:bg-primary/10 transition-all active:scale-90"
+                              title="Acknowledge Alert"
+                            >
+                              <HandMetal className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleResolve(alert.id)}
+                            className="h-8 w-8 hover:text-green-600 hover:bg-green-500/10 transition-all active:scale-90"
+                            title="Resolve Alert"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </motion.tr>
                   ))

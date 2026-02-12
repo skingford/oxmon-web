@@ -29,6 +29,7 @@ import { ChainNode } from "@/types/api"
 
 export default function CertificatesPage() {
   const [certs, setCerts] = useState<CertificateDetails[]>([])
+  const [summary, setSummary] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [chain, setChain] = useState<ChainNode[] | null>(null)
@@ -38,8 +39,12 @@ export default function CertificatesPage() {
   const fetchCerts = async () => {
     setLoading(true)
     try {
-      const response = await api.getCertificates({ limit: 100 })
+      const [response, summaryData] = await Promise.all([
+        api.getCertificates({ limit: 100 }),
+        api.getCertSummary()
+      ])
       setCerts(response)
+      setSummary(summaryData)
     } catch (error) {
       console.error(error)
       toast.error(getApiErrorMessage(error, "Failed to load certificates"))
@@ -103,8 +108,39 @@ export default function CertificatesPage() {
   }
 
   return (
-    <Card className="glass-card border-none shadow-xl overflow-hidden">
-      <CardHeader className="pb-4 bg-muted/20">
+    <div className="space-y-8">
+      <AnimatePresence mode="wait">
+        {summary && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          >
+            {[
+              { label: "Healthy Assets", count: summary.valid, sub: "Valid certificate chain", color: "text-emerald-500", bg: "bg-emerald-500/10", icon: ShieldCheck },
+              { label: "Critical Risk", count: summary.invalid, sub: "Expired or invalid chain", color: "text-red-500", bg: "bg-red-500/10", icon: ShieldAlert },
+              { label: "Warning Phase", count: summary.expiring_soon, sub: "Expiring within 30 days", color: "text-amber-500", bg: "bg-amber-500/10", icon: Calendar },
+            ].map((stat, i) => (
+              <Card key={i} className="glass border-white/5 relative overflow-hidden group">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{stat.label}</span>
+                    <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-black tracking-tighter">{stat.count}</div>
+                  <p className="text-[10px] text-muted-foreground font-medium mt-1">{stat.sub}</p>
+                </CardContent>
+                <div className={`absolute inset-0 ${stat.bg} opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none`} />
+              </Card>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <Card className="glass-card border-none shadow-xl overflow-hidden">
+        <CardHeader className="pb-4 bg-muted/20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
              <div className="p-2 bg-primary/10 rounded-lg text-primary">
@@ -265,6 +301,7 @@ export default function CertificatesPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+      </Card>
+    </div>
   )
 }

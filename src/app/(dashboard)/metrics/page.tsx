@@ -48,11 +48,14 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+import { useSearchParams } from "next/navigation"
+
 export default function MetricsPage() {
+  const searchParams = useSearchParams()
   const [agents, setAgents] = useState<string[]>([])
   const [metricNames, setMetricNames] = useState<string[]>([])
-  const [selectedAgent, setSelectedAgent] = useState<string>("")
-  const [selectedMetric, setSelectedMetric] = useState<string>("")
+  const [selectedAgent, setSelectedAgent] = useState<string>(searchParams.get("agent_id") || "")
+  const [selectedMetric, setSelectedMetric] = useState<string>(searchParams.get("metric_name") || "")
   const [dataPoints, setDataPoints] = useState<MetricDataPointResponse[]>([])
   const [summary, setSummary] = useState<MetricSummaryResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -75,6 +78,12 @@ export default function MetricsPage() {
     }
     loadOptions()
   }, [])
+
+  useEffect(() => {
+    if (!fetchingOptions && selectedAgent && selectedMetric) {
+      handleQuery()
+    }
+  }, [fetchingOptions, selectedAgent, selectedMetric])
 
   const handleQuery = async () => {
     if (!selectedAgent || !selectedMetric) {

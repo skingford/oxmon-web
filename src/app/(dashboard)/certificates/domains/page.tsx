@@ -94,10 +94,10 @@ export default function DomainsPage() {
     setChecking(id)
     try {
       const result = await api.checkSingleDomain(id)
-      if (result.is_success) {
+      if (result.is_valid && result.chain_valid) {
         toast.success(`Check completed`, { description: `${result.domain} is healthy.` })
       } else {
-        toast.error(`Security Warning`, { description: `${result.domain} validation failed: ${result.error_message}` })
+        toast.error(`Security Warning`, { description: `${result.domain} validation failed: ${result.error || 'Unknown error'}` })
       }
       fetchDomains()
     } catch (error) {
@@ -379,17 +379,17 @@ export default function DomainsPage() {
                 <div className="py-24 text-center text-muted-foreground italic text-sm">No historical audits recorded for this asset.</div>
              ) : (
                 <div className="divide-y divide-white/5">
-                   {auditHistory.map((item, i) => (
+                    {auditHistory.map((item, i) => (
                       <div key={i} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
                          <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
-                               <div className={`h-2 w-2 rounded-full ${item.is_success ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                               <span className="text-xs font-bold">{item.is_success ? 'Security Passed' : 'Security Failed'}</span>
+                               <div className={`h-2 w-2 rounded-full ${(item.is_valid && item.chain_valid) ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                               <span className="text-xs font-bold">{(item.is_valid && item.chain_valid) ? 'Security Passed' : 'Security Failed'}</span>
                             </div>
                             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{new Date(item.checked_at).toLocaleString()}</span>
                          </div>
-                         {!item.is_success && (
-                            <span className="text-[10px] text-red-500/80 font-medium italic max-w-[200px] truncate">{item.error_message}</span>
+                         {!(item.is_valid && item.chain_valid) && (
+                            <span className="text-[10px] text-red-500/80 font-medium italic max-w-[200px] truncate">{item.error}</span>
                          )}
                          {item.certificate_id && (
                             <Badge variant="outline" className="text-[9px] font-mono glass border-white/5">CERT:{item.certificate_id.slice(0, 8)}</Badge>

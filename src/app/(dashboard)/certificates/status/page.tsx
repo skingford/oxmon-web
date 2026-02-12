@@ -69,6 +69,23 @@ export default function CertificateStatusPage() {
             </div>
             <Button 
                 variant="outline" 
+                size="sm" 
+                onClick={async () => {
+                  try {
+                    await api.checkAllDomains();
+                    toast.success("Global check sequence initiated");
+                    fetchStatus();
+                  } catch (e) {
+                    toast.error("Global audit failed to start");
+                  }
+                }}
+                className="glass h-10 gap-2 px-4 hover:bg-primary/10 hover:text-primary transition-all border-white/5 shadow-lg shadow-primary/5"
+            >
+                <ShieldCheck className="h-4 w-4" />
+                Audit All
+            </Button>
+            <Button 
+                variant="outline" 
                 size="icon" 
                 onClick={fetchStatus}
                 className="glass transition-transform active:scale-95"
@@ -117,13 +134,13 @@ export default function CertificateStatusPage() {
                         {status.domain}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={status.is_success ? "success" : "destructive"} className="gap-1.5 h-6 px-2">
-                           {status.is_success ? (
+                        <Badge variant={(status.is_valid && status.chain_valid) ? "success" : "destructive"} className="gap-1.5 h-6 px-2">
+                           {(status.is_valid && status.chain_valid) ? (
                              <CheckCircle2 className="h-3 w-3" />
                            ) : (
                              <XCircle className="h-3 w-3" />
                            )}
-                           {status.is_success ? "Healthy" : "Failed"}
+                           {(status.is_valid && status.chain_valid) ? "Healthy" : "Failed"}
                         </Badge>
                       </TableCell>
                       <TableCell>

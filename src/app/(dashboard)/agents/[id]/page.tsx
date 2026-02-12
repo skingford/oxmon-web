@@ -149,7 +149,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
                   <CardContent className="space-y-4">
                     <div className="flex items-baseline gap-2">
                        <span className="text-4xl font-black tracking-tighter text-primary">{metric.value}</span>
-                       <span className="text-xs text-muted-foreground font-medium uppercase tracking-tighter">Units</span>
+                       <span className="text-xs text-muted-foreground font-medium uppercase tracking-tighter">Value</span>
                     </div>
                     
                     <div className="flex items-center justify-between py-2 border-y border-white/5">
@@ -170,6 +170,14 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
                         ))}
                       </div>
                     )}
+
+                    <div className="pt-2">
+                      <Button variant="ghost" size="sm" asChild className="w-full text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary/5 transition-all">
+                        <Link href={`/metrics?agent_id=${id}&metric_name=${metric.metric_name}`}>
+                          Explore History
+                        </Link>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>

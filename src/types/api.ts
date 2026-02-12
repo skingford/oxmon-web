@@ -56,6 +56,7 @@ export interface AlertEventResponse {
   value: number;
   threshold: number;
   timestamp: string;
+  acknowledged_at: string | null;
   resolved_at: string | null;
 }
 
@@ -203,12 +204,23 @@ export interface CertificateChainInfo {
 }
 
 export interface CertCheckResult {
+  id: string;
   domain_id: string;
   domain: string;
-  is_success: boolean;
-  error_message: string | null;
+  is_valid: boolean;
+  chain_valid: boolean;
+  not_before: string | null;
+  not_after: string | null;
+  days_until_expiry: number | null;
+  issuer: string | null;
+  subject: string | null;
+  san_list: string[] | null;
+  resolved_ips: string[] | null;
+  error: string | null;
   checked_at: string;
-  certificate_id: string | null;
+  created_at?: string;
+  updated_at?: string;
+  certificate_id?: string | null;
 }
 
 export interface CertDomain {
