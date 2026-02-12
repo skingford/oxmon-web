@@ -283,11 +283,35 @@ export interface MetricSummaryResponse {
 export interface CreateChannelRequest {
   name: string;
   channel_type: string;
-  description?: string;
+  description?: string | null;
+  min_severity?: string;
+  config_json?: string;
+  recipients?: string[];
+}
+
+export interface UpdateChannelConfigRequest {
+  name?: string;
+  channel_type?: string;
+  description?: string | null;
   min_severity?: string;
   enabled?: boolean;
-  config_json: string;
+  config_json?: string;
   recipients?: string[];
+}
+
+export interface ChannelConfig {
+  id?: string;
+  name?: string;
+  channel_type?: string;
+  description?: string | null;
+  min_severity?: string;
+  enabled?: boolean;
+  recipient_type?: string | null;
+  recipients?: string[];
+  created_at?: string;
+  updated_at?: string;
+  config_json?: string | null;
+  config?: Record<string, unknown> | null;
 }
 
 export interface SetRecipientsRequest {
@@ -296,20 +320,20 @@ export interface SetRecipientsRequest {
 
 export interface SilenceWindow {
   id: string;
-  name: string;
-  agent_pattern: string;
-  metric_pattern: string;
   start_time: string;
   end_time: string;
-  created_at: string;
+  recurrence?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  name?: string;
+  agent_pattern?: string;
+  metric_pattern?: string;
 }
 
 export interface CreateSilenceWindowRequest {
-  name: string;
-  agent_pattern: string;
-  metric_pattern: string;
   start_time: string;
   end_time: string;
+  recurrence?: string | null;
 }
 
 export interface AlertSummary {

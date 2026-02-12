@@ -6,6 +6,7 @@ import {
   ApiResponseEnvelope,
   CertificateDetails,
   ChannelOverview,
+  ChannelConfig,
   CreateAlertRuleRequest,
   DashboardOverview,
   LoginRequest,
@@ -24,6 +25,7 @@ import {
   MetricDataPointResponse,
   MetricSummaryResponse,
   CreateChannelRequest,
+  UpdateChannelConfigRequest,
   SetRecipientsRequest,
   SilenceWindow,
   CreateSilenceWindowRequest,
@@ -306,13 +308,13 @@ export const api = {
 
   // Notifications - Advanced
   listChannelConfigs: (params: PaginationParams) =>
-    request<any[]>(`/v1/notifications/channels/config${buildQueryString(params)}`),
+    request<ChannelConfig[]>(`/v1/notifications/channels/config${buildQueryString(params)}`),
 
   createChannelConfig: (data: CreateChannelRequest) =>
-    request("/v1/notifications/channels/config", { method: "POST", body: data }),
+    request<ChannelConfig>("/v1/notifications/channels/config", { method: "POST", body: data }),
 
-  updateChannelConfig: (id: string, data: any) =>
-    request(`/v1/notifications/channels/config/${id}`, { method: "PUT", body: data }),
+  updateChannelConfig: (id: string, data: UpdateChannelConfigRequest) =>
+    request<ChannelConfig>(`/v1/notifications/channels/config/${id}`, { method: "PUT", body: data }),
 
   deleteChannelConfig: (id: string) =>
     request(`/v1/notifications/channels/config/${id}`, { method: "DELETE" }),
@@ -330,7 +332,7 @@ export const api = {
     request<SilenceWindow[]>(`/v1/notifications/silence-windows${buildQueryString(params)}`),
 
   createSilenceWindow: (data: CreateSilenceWindowRequest) =>
-    request("/v1/notifications/silence-windows", { method: "POST", body: data }),
+    request<Partial<SilenceWindow>>("/v1/notifications/silence-windows", { method: "POST", body: data }),
 
   deleteSilenceWindow: (id: string) =>
     request(`/v1/notifications/silence-windows/${id}`, { method: "DELETE" }),

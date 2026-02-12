@@ -1,8 +1,30 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
-import { ChannelOverview, CreateChannelRequest } from "@/types/api"
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
+import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import {
+  ChannelConfig,
+  ChannelOverview,
+  CreateChannelRequest,
+  UpdateChannelConfigRequest,
+} from "@/types/api"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useRequestState } from "@/hooks/use-request-state"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -11,453 +33,1121 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { toast } from "sonner"
-import { 
-  Loader2, 
-  Mail, 
-  Bell, 
-  Webhook, 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Share2, 
-  Radio, 
-  Smartphone,
-  Send,
-  Users,
-  CheckCircle2,
-  XCircle
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Bell,
+  CheckCircle2,
+  CircleOff,
+  FilterX,
+  Loader2,
+  Mail,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  Share2,
+  Smartphone,
+  Trash2,
+  TriangleAlert,
+  Users,
+  Webhook,
+} from "lucide-react"
+import { toast } from "sonner"
 
-export default function NotificationsPage() {
-  const [channels, setChannels] = useState<ChannelOverview[]>([])
-  const [loading, setLoading] = useState(true)
-  const [testingId, setTestingId] = useState<string | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isRecipientsDialogOpen, setIsRecipientsDialogOpen] = useState(false)
-  const [editingChannelId, setEditingChannelId] = useState<string | null>(null)
-  const [recipientInput, setRecipientInput] = useState("")
-  const [loadingRecipients, setLoadingRecipients] = useState(false)
-  const [channelForm, setChannelForm] = useState<CreateChannelRequest>({
+const PAGE_LIMIT = 100
+
+type NotificationsQueryState = {
+  channels: ChannelOverview[]
+  configMap: Record<string, string>
+}
+
+type NotificationStatusFilter = "all" | "enabled" | "disabled"
+
+type ChannelFormState = {
+  name: string
+  channelType: string
+  description: string
+  minSeverity: string
+  enabled: boolean
+  recipientsInput: string
+  configJson: string
+}
+
+function formatDateTime(value: string | null, locale: "zh" | "en") {
+  if (!value) {
+    return "-"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "-"
+  }
+
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
+function normalizeRecipientsInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+function getInitialFormState(): ChannelFormState {
+  return {
     name: "",
-    channel_type: "email",
+    channelType: "email",
     description: "",
-    min_severity: "info",
+    minSeverity: "info",
     enabled: true,
-    config_json: "{}",
-    recipients: []
+    recipientsInput: "",
+    configJson: "{}",
+  }
+}
+
+function createConfigMap(rows: ChannelConfig[] | unknown[]): Record<string, string> {
+  const map: Record<string, string> = {}
+
+  rows.forEach((row) => {
+    if (!row || typeof row !== "object") {
+      return
+    }
+
+    const record = row as Record<string, unknown>
+    const id = typeof record.id === "string" ? record.id : null
+
+    if (!id) {
+      return
+    }
+
+    if (typeof record.config_json === "string") {
+      map[id] = record.config_json
+      return
+    }
+
+    if (record.config_json && typeof record.config_json === "object") {
+      map[id] = JSON.stringify(record.config_json, null, 2)
+      return
+    }
+
+    if (record.config && typeof record.config === "object") {
+      map[id] = JSON.stringify(record.config, null, 2)
+    }
   })
 
-  const fetchChannels = async () => {
-    setLoading(true)
-    try {
-      const response = await api.listChannels({ limit: 100 })
-      setChannels(response)
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load notification channels"))
-    } finally {
-      setLoading(false)
-    }
+  return map
+}
+
+function getChannelTypeLabel(
+  type: string,
+  t: (path: any, values?: Record<string, string | number>) => string
+) {
+  const normalized = type.toLowerCase()
+
+  if (normalized === "email") {
+    return t("notifications.typeEmail")
   }
+
+  if (normalized === "webhook") {
+    return t("notifications.typeWebhook")
+  }
+
+  if (normalized === "slack") {
+    return t("notifications.typeSlack")
+  }
+
+  if (normalized === "sms") {
+    return t("notifications.typeSms")
+  }
+
+  return type || t("notifications.typeUnknown")
+}
+
+function getSeverityLabel(
+  severity: string,
+  t: (path: any, values?: Record<string, string | number>) => string
+) {
+  const normalized = severity.toLowerCase()
+
+  if (normalized === "critical") {
+    return t("notifications.severityCritical")
+  }
+
+  if (normalized === "warning") {
+    return t("notifications.severityWarning")
+  }
+
+  if (normalized === "info") {
+    return t("notifications.severityInfo")
+  }
+
+  return t("notifications.severityUnknown")
+}
+
+function getSeverityClassName(severity: string) {
+  const normalized = severity.toLowerCase()
+
+  if (normalized === "critical") {
+    return "border-red-500/30 bg-red-500/10 text-red-600"
+  }
+
+  if (normalized === "warning") {
+    return "border-amber-500/30 bg-amber-500/10 text-amber-600"
+  }
+
+  if (normalized === "info") {
+    return "border-blue-500/30 bg-blue-500/10 text-blue-600"
+  }
+
+  return "border-muted bg-muted text-muted-foreground"
+}
+
+function getChannelIcon(channelType: string) {
+  const normalized = channelType.toLowerCase()
+
+  if (normalized === "email") {
+    return <Mail className="h-4 w-4" />
+  }
+
+  if (normalized === "webhook") {
+    return <Webhook className="h-4 w-4" />
+  }
+
+  if (normalized === "slack") {
+    return <Share2 className="h-4 w-4" />
+  }
+
+  if (normalized === "sms") {
+    return <Smartphone className="h-4 w-4" />
+  }
+
+  return <Bell className="h-4 w-4" />
+}
+
+export default function NotificationsPage() {
+  const { t, locale } = useAppTranslations("pages")
+  const {
+    data,
+    loading,
+    refreshing,
+    execute,
+  } = useRequestState<NotificationsQueryState>({
+    channels: [],
+    configMap: {},
+  })
+
+  const channels = data.channels
+  const configMap = data.configMap
+
+  const [searchKeyword, setSearchKeyword] = useState("")
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [severityFilter, setSeverityFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<NotificationStatusFilter>("all")
+
+  const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false)
+  const [editingChannel, setEditingChannel] = useState<ChannelOverview | null>(null)
+  const [formSubmitting, setFormSubmitting] = useState(false)
+  const [channelForm, setChannelForm] = useState<ChannelFormState>(getInitialFormState)
+
+  const [isRecipientsDialogOpen, setIsRecipientsDialogOpen] = useState(false)
+  const [recipientsDialogChannel, setRecipientsDialogChannel] = useState<ChannelOverview | null>(null)
+  const [recipientsLoading, setRecipientsLoading] = useState(false)
+  const [recipientsSaving, setRecipientsSaving] = useState(false)
+  const [recipientsInput, setRecipientsInput] = useState("")
+
+  const [testingId, setTestingId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deleteDialogChannel, setDeleteDialogChannel] = useState<ChannelOverview | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const fetchChannels = useCallback(
+    async (silent = false) => {
+      await execute(
+        async () => {
+          const [channelRows, configRows] = await Promise.all([
+            api.listChannels({ limit: PAGE_LIMIT, offset: 0 }),
+            api.listChannelConfigs({ limit: PAGE_LIMIT, offset: 0 }).catch(() => []),
+          ])
+
+          return {
+            channels: channelRows,
+            configMap: createConfigMap(configRows),
+          }
+        },
+        {
+          silent,
+          onError: (error) => {
+            toast.error(getApiErrorMessage(error, t("notifications.toastFetchError")))
+          },
+        }
+      )
+    },
+    [execute, t]
+  )
 
   useEffect(() => {
     fetchChannels()
-  }, [])
+  }, [fetchChannels])
 
-  const handleTestChannel = async (id: string) => {
-    setTestingId(id)
+  const stats = useMemo(() => {
+    const total = channels.length
+    const enabled = channels.filter((channel) => channel.enabled).length
+    const disabled = total - enabled
+    const missingRecipients = channels.filter((channel) => channel.recipients.length === 0).length
+
+    return {
+      total,
+      enabled,
+      disabled,
+      missingRecipients,
+    }
+  }, [channels])
+
+  const availableTypes = useMemo(() => {
+    const typeSet = new Set<string>()
+
+    channels.forEach((channel) => {
+      if (channel.channel_type) {
+        typeSet.add(channel.channel_type)
+      }
+    })
+
+    return Array.from(typeSet).sort((left, right) => left.localeCompare(right))
+  }, [channels])
+
+  const filteredChannels = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase()
+
+    return channels
+      .filter((channel) => {
+        if (statusFilter === "enabled" && !channel.enabled) {
+          return false
+        }
+
+        if (statusFilter === "disabled" && channel.enabled) {
+          return false
+        }
+
+        if (severityFilter !== "all" && channel.min_severity.toLowerCase() !== severityFilter.toLowerCase()) {
+          return false
+        }
+
+        if (typeFilter !== "all" && channel.channel_type.toLowerCase() !== typeFilter.toLowerCase()) {
+          return false
+        }
+
+        if (!keyword) {
+          return true
+        }
+
+        const searchableText = [
+          channel.name,
+          channel.channel_type,
+          channel.description || "",
+          channel.min_severity,
+          channel.recipients.join(" "),
+        ]
+          .join(" ")
+          .toLowerCase()
+
+        return searchableText.includes(keyword)
+      })
+      .sort((left, right) => {
+        const leftTime = new Date(left.updated_at).getTime()
+        const rightTime = new Date(right.updated_at).getTime()
+        return rightTime - leftTime
+      })
+  }, [channels, searchKeyword, severityFilter, statusFilter, typeFilter])
+
+  const hasActiveFilters = Boolean(searchKeyword.trim()) || typeFilter !== "all" || severityFilter !== "all" || statusFilter !== "all"
+
+  const resetFilters = () => {
+    setSearchKeyword("")
+    setTypeFilter("all")
+    setSeverityFilter("all")
+    setStatusFilter("all")
+  }
+
+  const getStatusAwareMessage = (
+    error: unknown,
+    fallback: string,
+    statusMessages?: Partial<Record<number, string>>
+  ) => {
+    if (error instanceof ApiRequestError && statusMessages?.[error.status]) {
+      return statusMessages[error.status] as string
+    }
+
+    return getApiErrorMessage(error, fallback)
+  }
+
+  const openCreateDialog = () => {
+    setEditingChannel(null)
+    setChannelForm(getInitialFormState())
+    setIsChannelDialogOpen(true)
+  }
+
+  const openEditDialog = (channel: ChannelOverview) => {
+    setEditingChannel(channel)
+    setChannelForm({
+      name: channel.name,
+      channelType: channel.channel_type,
+      description: channel.description || "",
+      minSeverity: channel.min_severity || "info",
+      enabled: channel.enabled,
+      recipientsInput: channel.recipients.join("\n"),
+      configJson: configMap[channel.id] || "{}",
+    })
+    setIsChannelDialogOpen(true)
+  }
+
+  const handleSubmitChannel = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const name = channelForm.name.trim()
+    const channelType = channelForm.channelType.trim()
+    const recipients = normalizeRecipientsInput(channelForm.recipientsInput)
+
+    if (!name) {
+      toast.error(t("notifications.toastNameRequired"))
+      return
+    }
+
+    if (!channelType) {
+      toast.error(t("notifications.toastTypeRequired"))
+      return
+    }
+
+    const configInput = channelForm.configJson.trim()
+    let normalizedConfig = "{}"
+
+    if (configInput) {
+      try {
+        normalizedConfig = JSON.stringify(JSON.parse(configInput))
+      } catch {
+        toast.error(t("notifications.toastConfigInvalid"))
+        return
+      }
+    }
+
+    setFormSubmitting(true)
+
     try {
-      await api.testChannel(id)
-      toast.success("Test notification sent successfully")
+      const basePayload: CreateChannelRequest = {
+        name,
+        channel_type: channelType,
+        description: channelForm.description.trim() || undefined,
+        min_severity: channelForm.minSeverity,
+        recipients,
+        config_json: normalizedConfig,
+      }
+
+      if (editingChannel) {
+        const payload: UpdateChannelConfigRequest = {
+          ...basePayload,
+          enabled: channelForm.enabled,
+        }
+
+        await api.updateChannelConfig(editingChannel.id, payload)
+        toast.success(t("notifications.toastUpdateSuccess"))
+      } else {
+        await api.createChannelConfig(basePayload)
+        toast.success(t("notifications.toastCreateSuccess"))
+      }
+
+      setIsChannelDialogOpen(false)
+      setEditingChannel(null)
+      setChannelForm(getInitialFormState())
+      await fetchChannels(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Test notification failed"))
+      toast.error(
+        getApiErrorMessage(
+          error,
+          editingChannel ? t("notifications.toastUpdateError") : t("notifications.toastCreateError")
+        )
+      )
+    } finally {
+      setFormSubmitting(false)
+    }
+  }
+
+  const handleOpenRecipientsDialog = async (channel: ChannelOverview) => {
+    setRecipientsDialogChannel(channel)
+    setIsRecipientsDialogOpen(true)
+    setRecipientsLoading(true)
+
+    try {
+      const recipients = await api.getRecipients(channel.id)
+      setRecipientsInput(recipients.join("\n"))
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("notifications.toastRecipientsFetchError")))
+      setIsRecipientsDialogOpen(false)
+      setRecipientsDialogChannel(null)
+    } finally {
+      setRecipientsLoading(false)
+    }
+  }
+
+  const handleUpdateRecipients = async () => {
+    if (!recipientsDialogChannel) {
+      return
+    }
+
+    setRecipientsSaving(true)
+
+    try {
+      await api.setRecipients(recipientsDialogChannel.id, {
+        recipients: normalizeRecipientsInput(recipientsInput),
+      })
+
+      toast.success(t("notifications.toastRecipientsUpdateSuccess"))
+      setIsRecipientsDialogOpen(false)
+      setRecipientsDialogChannel(null)
+      setRecipientsInput("")
+      await fetchChannels(true)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("notifications.toastRecipientsUpdateError")))
+    } finally {
+      setRecipientsSaving(false)
+    }
+  }
+
+  const handleToggleEnabled = async (channel: ChannelOverview) => {
+    setTogglingId(channel.id)
+
+    try {
+      await api.updateChannelConfig(channel.id, {
+        enabled: !channel.enabled,
+      })
+
+      toast.success(
+        channel.enabled
+          ? t("notifications.toastToggleDisableSuccess")
+          : t("notifications.toastToggleEnableSuccess")
+      )
+
+      await fetchChannels(true)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("notifications.toastToggleError")))
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const handleTestChannel = async (channel: ChannelOverview) => {
+    setTestingId(channel.id)
+
+    try {
+      await api.testChannel(channel.id)
+      toast.success(t("notifications.toastTestSuccess"))
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("notifications.toastTestError")))
     } finally {
       setTestingId(null)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this channel?")) return
-    try {
-      await api.deleteChannelConfig(id)
-      toast.success("Channel deleted")
-      fetchChannels()
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Delete failed"))
+  const handleDeleteChannel = async () => {
+    if (!deleteDialogChannel) {
+      return
     }
-  }
 
-  const handleToggle = async (channel: ChannelOverview) => {
+    setDeletingId(deleteDialogChannel.id)
+
     try {
-      await api.updateChannelConfig(channel.id, { ...channel, enabled: !channel.enabled })
-      toast.success(`Channel ${!channel.enabled ? 'enabled' : 'disabled'}`)
-      fetchChannels()
+      await api.deleteChannelConfig(deleteDialogChannel.id)
+      toast.success(t("notifications.toastDeleteSuccess"))
+      setDeleteDialogChannel(null)
+      await fetchChannels(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to update channel status"))
-    }
-  }
-
-  const handleOpenCreate = () => {
-    setEditingChannelId(null)
-    setChannelForm({
-      name: "",
-      channel_type: "email",
-      description: "",
-      min_severity: "info",
-      enabled: true,
-      config_json: "{}",
-      recipients: []
-    })
-    setIsDialogOpen(true)
-  }
-
-  const handleOpenRecipients = async (id: string) => {
-    setEditingChannelId(id)
-    setIsRecipientsDialogOpen(true)
-    setLoadingRecipients(true)
-    try {
-      const data = await api.getRecipients(id)
-      setRecipientInput(data.join(", "))
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load recipients"))
-      setIsRecipientsDialogOpen(false)
+      toast.error(
+        getStatusAwareMessage(error, t("notifications.toastDeleteError"), {
+          404: t("notifications.toastDeleteNotFound"),
+        })
+      )
     } finally {
-      setLoadingRecipients(false)
+      setDeletingId(null)
     }
   }
 
-  const handleUpdateRecipients = async () => {
-    if (!editingChannelId) return
-    setLoadingRecipients(true)
-    try {
-      const list = recipientInput.split(",").map(r => r.trim()).filter(Boolean)
-      await api.setRecipients(editingChannelId, { recipients: list })
-      toast.success("Recipients updated")
-      setIsRecipientsDialogOpen(false)
-      fetchChannels()
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Update failed"))
-    } finally {
-      setLoadingRecipients(false)
-    }
-  }
-
-  const handleOpenEdit = (channel: ChannelOverview) => {
-    setEditingChannelId(channel.id)
-    setChannelForm({
-      name: channel.name,
-      channel_type: channel.channel_type,
-      description: channel.description || "",
-      min_severity: channel.min_severity,
-      enabled: channel.enabled,
-      config_json: JSON.stringify((channel as any).config || {}, null, 2),
-      recipients: channel.recipients
-    })
-    setIsDialogOpen(true)
-  }
-
-  const handleSubmit = async () => {
-    try {
-      if (editingChannelId) {
-        await api.updateChannelConfig(editingChannelId, channelForm)
-        toast.success("Notification channel updated")
-      } else {
-        await api.createChannelConfig(channelForm)
-        toast.success("Notification channel created")
-      }
-      setIsDialogOpen(false)
-      fetchChannels()
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, editingChannelId ? "Update failed" : "Create failed"))
-    }
-  }
-
-  const getChannelIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "email": return <Mail className="h-4 w-4" />
-      case "webhook": return <Webhook className="h-4 w-4" />
-      case "slack": return <Share2 className="h-4 w-4" />
-      case "sms": return <Smartphone className="h-4 w-4" />
-      default: return <Bell className="h-4 w-4" />
-    }
-  }
+  const severityOptions = ["info", "warning", "critical"]
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-           <h2 className="text-2xl font-bold tracking-tight">Active Channels</h2>
-           <p className="text-muted-foreground text-sm">Manage where and how system alerts are delivered.</p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">{t("notifications.title")}</h2>
+          <p className="text-sm text-muted-foreground">{t("notifications.description")}</p>
         </div>
-        <Button onClick={handleOpenCreate} className="h-10 shadow-lg shadow-primary/20 transition-all hover:shadow-primary/40">
-          <Plus className="h-4 w-4 mr-2" /> New Endpoint
-        </Button>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="glass-card !border-white/10 sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>{editingChannelId ? "Edit Endpoint" : "Configure Channel"}</DialogTitle>
-              <DialogDescription>
-                {editingChannelId ? "Update existing terminal parameters." : "Define a new communication terminal for incident routing."}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Channel Name</Label>
-                  <Input 
-                    placeholder="e.g. SRE Email List" 
-                    value={channelForm.name}
-                    onChange={e => setChannelForm({...channelForm, name: e.target.value})}
-                    className="glass-card border-white/5"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select value={channelForm.channel_type} onValueChange={v => setChannelForm({...channelForm, channel_type: v})}>
-                    <SelectTrigger className="glass-card border-white/5">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="glass">
-                      <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="webhook">Webhook</SelectItem>
-                      <SelectItem value="slack">Slack</SelectItem>
-                      <SelectItem value="sms">SMS</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Minimum Severity</Label>
-                <Select value={channelForm.min_severity} onValueChange={v => setChannelForm({...channelForm, min_severity: v})}>
-                  <SelectTrigger className="glass-card border-white/5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="glass">
-                    <SelectItem value="info">Info (All Alerts)</SelectItem>
-                    <SelectItem value="warning">Warning & Above</SelectItem>
-                    <SelectItem value="critical">Critical Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Recipients (Comma separated)</Label>
-                <Textarea 
-                  placeholder="admin@example.com, tech@example.com"
-                  value={channelForm.recipients?.join(", ")}
-                  onChange={e => setChannelForm({...channelForm, recipients: e.target.value.split(",").map(r => r.trim()).filter(Boolean)})}
-                  className="glass-card border-white/5 h-20"
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fetchChannels(true)}
+            disabled={refreshing}
+          >
+            {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            {t("notifications.refreshButton")}
+          </Button>
+          <Button type="button" onClick={openCreateDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t("notifications.createButton")}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("notifications.statTotal")}</CardDescription>
+            <CardTitle className="text-2xl">{stats.total}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("notifications.statEnabled")}</CardDescription>
+            <CardTitle className="text-2xl text-emerald-600">{stats.enabled}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("notifications.statDisabled")}</CardDescription>
+            <CardTitle className="text-2xl text-muted-foreground">{stats.disabled}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("notifications.statNoRecipients")}</CardDescription>
+            <CardTitle className="text-2xl text-amber-600">{stats.missingRecipients}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="space-y-4">
+          <div>
+            <CardTitle>{t("notifications.filtersTitle")}</CardTitle>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchKeyword}
+                onChange={(event) => setSearchKeyword(event.target.value)}
+                placeholder={t("notifications.searchPlaceholder")}
+                className="pl-9"
+              />
+            </div>
+
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("notifications.filterTypeLabel")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("notifications.filterTypeAll")}</SelectItem>
+                {availableTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {getChannelTypeLabel(type, t)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={severityFilter} onValueChange={setSeverityFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("notifications.filterSeverityLabel")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("notifications.filterSeverityAll")}</SelectItem>
+                {severityOptions.map((severity) => (
+                  <SelectItem key={severity} value={severity}>
+                    {getSeverityLabel(severity, t)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2">
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as NotificationStatusFilter)}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("notifications.filterStatusLabel")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("notifications.filterStatusAll")}</SelectItem>
+                  <SelectItem value="enabled">{t("notifications.filterStatusEnabled")}</SelectItem>
+                  <SelectItem value="disabled">{t("notifications.filterStatusDisabled")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={resetFilters}
+                disabled={!hasActiveFilters}
+                title={t("notifications.clearFilters")}
+              >
+                <FilterX className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("notifications.tableTitle")}</CardTitle>
+          <CardDescription>{t("notifications.tableDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("notifications.tableColName")}</TableHead>
+                <TableHead>{t("notifications.tableColType")}</TableHead>
+                <TableHead>{t("notifications.tableColSeverity")}</TableHead>
+                <TableHead>{t("notifications.tableColRecipients")}</TableHead>
+                <TableHead>{t("notifications.tableColStatus")}</TableHead>
+                <TableHead>{t("notifications.tableColUpdated")}</TableHead>
+                <TableHead className="text-right">{t("notifications.tableColActions")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell colSpan={7} className="h-16 text-muted-foreground">
+                      {t("notifications.tableLoading")}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : filteredChannels.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                    <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+                      <TriangleAlert className="h-5 w-5" />
+                      <p>{hasActiveFilters ? t("notifications.tableEmptyFiltered") : t("notifications.tableEmpty")}</p>
+                      {!hasActiveFilters ? (
+                        <p className="text-xs">{t("notifications.tableEmptyHint")}</p>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredChannels.map((channel) => {
+                  const recipients = channel.recipients || []
+                  const statusKey = channel.enabled ? "notifications.statusEnabled" : "notifications.statusDisabled"
+                  const recipientCountKey = recipients.length === 1
+                    ? "notifications.recipientCountOne"
+                    : "notifications.recipientCountMany"
+
+                  return (
+                    <TableRow key={channel.id}>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">{channel.name}</p>
+                          <p className="line-clamp-1 text-xs text-muted-foreground">
+                            {channel.description || "-"}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="text-primary">{getChannelIcon(channel.channel_type)}</span>
+                          <span className="text-sm">{getChannelTypeLabel(channel.channel_type, t)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getSeverityClassName(channel.min_severity)}>
+                          {getSeverityLabel(channel.min_severity, t)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {recipients.length > 0 ? (
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap gap-1">
+                              {recipients.slice(0, 2).map((recipient) => (
+                                <Badge key={recipient} variant="secondary" className="max-w-[180px] truncate">
+                                  {recipient}
+                                </Badge>
+                              ))}
+                              {recipients.length > 2 ? (
+                                <span className="text-xs text-muted-foreground">
+                                  {t("notifications.recipientMore", {
+                                    count: recipients.length - 2,
+                                  })}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {t(recipientCountKey, { count: recipients.length })}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {t("notifications.recipientNone")}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={channel.enabled}
+                            onCheckedChange={() => handleToggleEnabled(channel)}
+                            disabled={togglingId === channel.id}
+                            aria-label={t("notifications.toggleLabel")}
+                          />
+                          <Badge variant={channel.enabled ? "secondary" : "outline"}>
+                            {channel.enabled ? (
+                              <CheckCircle2 className="mr-1 h-3 w-3 text-emerald-600" />
+                            ) : (
+                              <CircleOff className="mr-1 h-3 w-3 text-muted-foreground" />
+                            )}
+                            {t(statusKey)}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDateTime(channel.updated_at, locale)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(channel)}
+                            title={t("notifications.actionEdit")}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenRecipientsDialog(channel)}
+                            title={t("notifications.actionRecipients")}
+                          >
+                            <Users className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={testingId === channel.id || !channel.enabled}
+                            onClick={() => handleTestChannel(channel)}
+                            title={t("notifications.actionTest")}
+                          >
+                            {testingId === channel.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteDialogChannel(channel)}
+                            title={t("notifications.actionDelete")}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={isChannelDialogOpen}
+        onOpenChange={(open) => {
+          setIsChannelDialogOpen(open)
+          if (!open) {
+            setEditingChannel(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingChannel ? t("notifications.dialogEditTitle") : t("notifications.dialogCreateTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {editingChannel
+                ? t("notifications.dialogEditDescription")
+                : t("notifications.dialogCreateDescription")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="min-w-0 space-y-4" onSubmit={handleSubmitChannel}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor="channel-name">{t("notifications.fieldName")}</Label>
+                <Input
+                  id="channel-name"
+                  value={channelForm.name}
+                  onChange={(event) =>
+                    setChannelForm((previous) => ({
+                      ...previous,
+                      name: event.target.value,
+                    }))
+                  }
+                  placeholder={t("notifications.fieldNamePlaceholder")}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Configuration (JSON)</Label>
-                <Textarea 
-                  placeholder='{"url": "...", "method": "POST"}'
-                  value={channelForm.config_json}
-                  onChange={e => setChannelForm({...channelForm, config_json: e.target.value})}
-                  className="glass-card border-white/5 font-mono text-xs h-24"
+
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor="channel-type">{t("notifications.fieldType")}</Label>
+                <Input
+                  id="channel-type"
+                  value={channelForm.channelType}
+                  onChange={(event) =>
+                    setChannelForm((previous) => ({
+                      ...previous,
+                      channelType: event.target.value,
+                    }))
+                  }
+                  placeholder={t("notifications.fieldTypePlaceholder")}
                 />
               </div>
             </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="min-w-0 space-y-2">
+                <Label>{t("notifications.fieldSeverity")}</Label>
+                <Select
+                  value={channelForm.minSeverity}
+                  onValueChange={(value) =>
+                    setChannelForm((previous) => ({
+                      ...previous,
+                      minSeverity: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {severityOptions.map((severity) => (
+                      <SelectItem key={severity} value={severity}>
+                        {getSeverityLabel(severity, t)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {editingChannel ? (
+                <div className="min-w-0 space-y-2">
+                  <Label>{t("notifications.fieldEnabled")}</Label>
+                  <div className="flex h-10 items-center rounded-md border px-3">
+                    <Switch
+                      checked={channelForm.enabled}
+                      onCheckedChange={(checked) =>
+                        setChannelForm((previous) => ({
+                          ...previous,
+                          enabled: checked,
+                        }))
+                      }
+                    />
+                    <span className="ml-3 text-sm text-muted-foreground">
+                      {channelForm.enabled ? t("notifications.statusEnabled") : t("notifications.statusDisabled")}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="channel-description">{t("notifications.fieldDescription")}</Label>
+              <Input
+                id="channel-description"
+                value={channelForm.description}
+                onChange={(event) =>
+                  setChannelForm((previous) => ({
+                    ...previous,
+                    description: event.target.value,
+                  }))
+                }
+                placeholder={t("notifications.fieldDescriptionPlaceholder")}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="channel-recipients">{t("notifications.fieldRecipients")}</Label>
+              <Textarea
+                id="channel-recipients"
+                value={channelForm.recipientsInput}
+                onChange={(event) =>
+                  setChannelForm((previous) => ({
+                    ...previous,
+                    recipientsInput: event.target.value,
+                  }))
+                }
+                placeholder={t("notifications.fieldRecipientsPlaceholder")}
+                className="min-h-[96px]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="channel-config">{t("notifications.fieldConfigJson")}</Label>
+              <Textarea
+                id="channel-config"
+                value={channelForm.configJson}
+                onChange={(event) =>
+                  setChannelForm((previous) => ({
+                    ...previous,
+                    configJson: event.target.value,
+                  }))
+                }
+                placeholder={t("notifications.fieldConfigPlaceholder")}
+                className="min-h-[160px] font-mono text-xs"
+              />
+            </div>
+
             <DialogFooter>
-              <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSubmit} className="bg-primary hover:bg-primary/90 text-white">
-                {editingChannelId ? "Update Endpoint" : "Save Channel"}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsChannelDialogOpen(false)
+                  setEditingChannel(null)
+                }}
+                disabled={formSubmitting}
+              >
+                {t("notifications.dialogCancel")}
+              </Button>
+              <Button type="submit" disabled={formSubmitting}>
+                {formSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {editingChannel ? t("notifications.dialogUpdateSubmit") : t("notifications.dialogCreateSubmit")}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-        <Dialog open={isRecipientsDialogOpen} onOpenChange={setIsRecipientsDialogOpen}>
-          <DialogContent className="glass-card !border-white/10 sm:max-w-[400px]">
-             <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                   <Users className="h-5 w-5 text-primary" /> Manage Recipients
-                </DialogTitle>
-                <DialogDescription>Update delivery targets for this channel.</DialogDescription>
-             </DialogHeader>
-             <div className="py-4 space-y-4">
-                {loadingRecipients ? (
-                   <div className="flex flex-col items-center justify-center py-8 gap-2">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <span className="text-xs text-muted-foreground">Retrieving registry...</span>
-                   </div>
-                ) : (
-                   <div className="space-y-4">
-                      <div className="space-y-2">
-                         <Label>Recipient List (Comma separated)</Label>
-                         <Textarea 
-                            placeholder="user1@example.com, user2@example.com"
-                            value={recipientInput}
-                            onChange={e => setRecipientInput(e.target.value)}
-                            className="glass-card border-white/5 font-mono text-xs h-32"
-                         />
-                         <p className="text-[10px] text-muted-foreground leading-tight italic">
-                            Duplicates and empty values will be automatically sanitized on sync.
-                         </p>
-                      </div>
-                   </div>
-                )}
-             </div>
-             <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsRecipientsDialogOpen(false)}>Close</Button>
-                <Button onClick={handleUpdateRecipients} disabled={loadingRecipients} className="bg-primary hover:bg-primary/90">
-                   {loadingRecipients ? <Loader2 className="h-4 w-4 animate-spin" /> : "Synchronize Recipients"}
-                </Button>
-             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+      <Dialog
+        open={isRecipientsDialogOpen}
+        onOpenChange={(open) => {
+          setIsRecipientsDialogOpen(open)
 
-      <Card className="glass border-white/10 overflow-hidden">
-        <Table>
-          <TableHeader className="bg-white/5">
-            <TableRow className="border-white/5 hover:bg-transparent">
-              <TableHead className="py-4">Endpoint</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Severity</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[200px]">Recipients</TableHead>
-              <TableHead className="text-right px-6">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i} className="border-white/5 animate-pulse">
-                  <TableCell colSpan={6} className="h-20 bg-white/5 rounded-lg m-2" />
-                </TableRow>
-              ))
-            ) : channels.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">
-                  No notification channels discovered in system registry.
-                </TableCell>
-              </TableRow>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                {channels.map((channel, i) => (
-                  <motion.tr 
-                    key={channel.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="group border-white/5 hover:bg-white/5 transition-all"
-                  >
-                    <TableCell className="py-5 font-bold">
-                      <div className="flex flex-col">
-                        <span>{channel.name}</span>
-                        <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">{channel.description}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 glass rounded-md border-white/5 text-primary">
-                           {getChannelIcon(channel.channel_type)}
-                        </div>
-                        <span className="capitalize text-xs font-semibold">{channel.channel_type}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`capitalize text-[10px] px-2 h-5 tracking-wide ${
-                         channel.min_severity === 'critical' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                         channel.min_severity === 'warning' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                         'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                      }`}>
-                        {channel.min_severity}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Switch 
-                          checked={channel.enabled} 
-                          onCheckedChange={() => handleToggle(channel)}
-                          className="data-[state=checked]:bg-emerald-500" 
-                        />
-                        <span className={`text-[10px] font-bold uppercase tracking-widest ${channel.enabled ? "text-emerald-500" : "text-muted-foreground opacity-50"}`}>
-                          {channel.enabled ? "Active" : "Disabled"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {channel.recipients.slice(0, 2).map((r, i) => (
-                          <Badge key={i} variant="secondary" className="text-[9px] px-1.5 py-0 h-4 glass border-white/5 font-mono text-muted-foreground whitespace-nowrap">
-                            {r}
-                          </Badge>
-                        ))}
-                        {channel.recipients.length > 2 && (
-                          <span className="text-[9px] text-muted-foreground">+{channel.recipients.length - 2} more</span>
-                        )}
-                        {channel.recipients.length === 0 && (
-                          <XCircle className="h-3 w-3 text-red-500/40" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-1 items-center">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleOpenEdit(channel)}
-                          className="h-8 w-8 hover:bg-white/5"
-                          title="Edit Config"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleOpenRecipients(channel.id)}
-                          className="h-8 w-8 hover:text-primary hover:bg-primary/10 transition-all"
-                          title="Manage Recipients"
-                        >
-                          <Users className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleTestChannel(channel.id)}
-                          disabled={testingId === channel.id || !channel.enabled}
-                          className="h-8 w-8 hover:text-blue-500 hover:bg-blue-500/10 transition-all"
-                          title="Send test notification"
-                        >
-                          {testingId === channel.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleDelete(channel.id)}
-                          className="h-8 w-8 text-red-500/60 hover:text-red-600 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+          if (!open) {
+            setRecipientsDialogChannel(null)
+            setRecipientsInput("")
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("notifications.recipientsDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("notifications.recipientsDialogDescription", {
+                name: recipientsDialogChannel?.name || "-",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+
+          {recipientsLoading ? (
+            <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {t("notifications.recipientsDialogLoading")}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="recipients-input">{t("notifications.recipientsDialogField")}</Label>
+              <Textarea
+                id="recipients-input"
+                value={recipientsInput}
+                onChange={(event) => setRecipientsInput(event.target.value)}
+                className="min-h-[180px]"
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("notifications.recipientsDialogHint")}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsRecipientsDialogOpen(false)}
+              disabled={recipientsSaving}
+            >
+              {t("notifications.recipientsDialogCancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleUpdateRecipients}
+              disabled={recipientsLoading || recipientsSaving}
+            >
+              {recipientsSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("notifications.recipientsDialogSubmit")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={Boolean(deleteDialogChannel)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDialogChannel(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("notifications.deleteDialogTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("notifications.deleteDialogDescription", {
+                name: deleteDialogChannel?.name || "-",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingId)}>
+              {t("notifications.dialogCancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDeleteChannel}
+              disabled={Boolean(deletingId)}
+            >
+              {deletingId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("notifications.deleteDialogConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

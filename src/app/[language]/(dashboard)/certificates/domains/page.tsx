@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { pickCountKey } from "@/lib/i18n-count"
 import { CertCheckResult, CertDomain } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
@@ -92,14 +93,6 @@ function parseOptionalNonNegativeInt(value: string) {
   return Math.floor(numberValue)
 }
 
-function getCountAwareKey<One extends string, Many extends string>(
-  oneKey: One,
-  manyKey: Many,
-  count: number
-): One | Many {
-  return count === 1 ? oneKey : manyKey
-}
-
 function getDomainStatusMeta(
   enabled: boolean,
   t: (path: any, values?: Record<string, string | number>) => string
@@ -170,12 +163,12 @@ export default function DomainsPage() {
   )
   const autoCreateHasAdvancedDraft = autoCreateAdvancedFilledCount > 0
   const autoCreateAdvancedResetCount = Math.max(1, autoCreateAdvancedFilledCount)
-  const autoCreateAdvancedResetTitleKey = getCountAwareKey(
+  const autoCreateAdvancedResetTitleKey = pickCountKey(
     "certificates.domains.autoCreateAdvancedResetDialogTitleOne",
     "certificates.domains.autoCreateAdvancedResetDialogTitleMany",
     autoCreateAdvancedResetCount
   )
-  const autoCreateAdvancedResetConfirmKey = getCountAwareKey(
+  const autoCreateAdvancedResetConfirmKey = pickCountKey(
     "certificates.domains.autoCreateAdvancedResetDialogConfirmOne",
     "certificates.domains.autoCreateAdvancedResetDialogConfirmMany",
     autoCreateAdvancedResetCount
@@ -211,7 +204,7 @@ export default function DomainsPage() {
     setClearAdvancedDialogOpen(false)
 
     if (clearedCount > 0) {
-      const successKey = getCountAwareKey(
+      const successKey = pickCountKey(
         "certificates.domains.toastAutoCreateAdvancedResetSuccessOne",
         "certificates.domains.toastAutoCreateAdvancedResetSuccessMany",
         clearedCount

@@ -1,321 +1,1229 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Plus, 
-  Search, 
-  Trash2, 
-  Clock, 
-  ShieldOff, 
-  Calendar as CalendarIcon, 
-  Filter, 
-  RefreshCw,
-  MoreHorizontal,
-  AlertTriangle,
-  Server,
-  Database
-} from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { api, getApiErrorMessage } from "@/lib/api"
-import { SilenceWindow } from "@/types/api"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table"
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
+import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { CreateSilenceWindowRequest, SilenceWindow } from "@/types/api"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  FilterX,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldOff,
+  Trash2,
+} from "lucide-react"
+import { toast } from "sonner"
 
-export default function SilenceWindowsPage() {
-  const [windows, setWindows] = useState<SilenceWindow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [newWindow, setNewWindow] = useState({
-    name: "",
-    agent_pattern: "*",
-    metric_pattern: "*",
-    start_time: "",
-    end_time: ""
+const PAGE_LIMIT = 100
+
+type SilenceStatus = "active" | "scheduled" | "expired" | "unknown"
+type SilenceStatusFilter = "all" | SilenceStatus
+type WindowOriginMode = "replaced" | "cloned"
+
+type SilenceFormState = {
+  startTime: string
+  endTime: string
+  recurrence: string
+}
+
+type WindowOriginMeta = {
+  sourceId: string
+  mode: WindowOriginMode
+  createdAt: number
+}
+
+const DAY_IN_MS = 24 * 60 * 60 * 1000
+const WINDOW_ORIGIN_TTL_OPTIONS = [1, 7, 30] as const
+const WINDOW_ORIGIN_TTL_DEFAULT_DAYS = 7
+const WINDOW_ORIGIN_STORAGE_KEY = "oxmon.notifications.silence.window-origins.v1"
+const WINDOW_ORIGIN_TTL_STORAGE_KEY = "oxmon.notifications.silence.window-origins.ttl-days.v1"
+
+function sanitizeWindowOrigins(value: unknown): Record<string, WindowOriginMeta> {
+  if (!value || typeof value !== "object") {
+    return {}
+  }
+
+  const next: Record<string, WindowOriginMeta> = {}
+
+  Object.entries(value as Record<string, unknown>).forEach(([windowId, meta]) => {
+    if (!windowId || typeof meta !== "object" || !meta) {
+      return
+    }
+
+    const sourceId = (meta as Record<string, unknown>).sourceId
+    const mode = (meta as Record<string, unknown>).mode
+    const createdAt = (meta as Record<string, unknown>).createdAt
+
+    if (typeof sourceId !== "string") {
+      return
+    }
+
+    if (mode !== "replaced" && mode !== "cloned") {
+      return
+    }
+
+    const normalizedCreatedAt =
+      typeof createdAt === "number" && Number.isFinite(createdAt) && createdAt > 0
+        ? createdAt
+        : Date.now()
+
+    next[windowId] = {
+      sourceId,
+      mode,
+      createdAt: normalizedCreatedAt,
+    }
   })
 
-  useEffect(() => {
-    fetchWindows()
-  }, [])
+  return next
+}
 
-  const fetchWindows = async () => {
-    try {
-      const data = await api.listSilenceWindows({ limit: 100 })
-      setWindows(data)
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load silence windows"))
-    } finally {
-      setLoading(false)
+function normalizeWindowOriginTtlDays(value: unknown) {
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed)) {
+    return WINDOW_ORIGIN_TTL_DEFAULT_DAYS
+  }
+
+  if (!WINDOW_ORIGIN_TTL_OPTIONS.includes(parsed as (typeof WINDOW_ORIGIN_TTL_OPTIONS)[number])) {
+    return WINDOW_ORIGIN_TTL_DEFAULT_DAYS
+  }
+
+  return parsed as (typeof WINDOW_ORIGIN_TTL_OPTIONS)[number]
+}
+
+function readWindowOriginTtlDaysFromStorage() {
+  if (typeof window === "undefined") {
+    return WINDOW_ORIGIN_TTL_DEFAULT_DAYS
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(WINDOW_ORIGIN_TTL_STORAGE_KEY)
+    return normalizeWindowOriginTtlDays(rawValue)
+  } catch {
+    return WINDOW_ORIGIN_TTL_DEFAULT_DAYS
+  }
+}
+
+function isWindowOriginExpired(originMeta: WindowOriginMeta, ttlMs: number, now = Date.now()) {
+  return now - originMeta.createdAt > ttlMs
+}
+
+function filterActiveWindowOrigins(
+  origins: Record<string, WindowOriginMeta>,
+  ttlMs: number,
+  now = Date.now()
+) {
+  const entries = Object.entries(origins).filter(([, meta]) => !isWindowOriginExpired(meta, ttlMs, now))
+
+  if (entries.length === Object.keys(origins).length) {
+    return origins
+  }
+
+  return Object.fromEntries(entries)
+}
+
+function readWindowOriginsFromStorage(ttlMs: number): Record<string, WindowOriginMeta> {
+  if (typeof window === "undefined") {
+    return {}
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(WINDOW_ORIGIN_STORAGE_KEY)
+
+    if (!rawValue) {
+      return {}
+    }
+
+    const parsed = sanitizeWindowOrigins(JSON.parse(rawValue))
+    return filterActiveWindowOrigins(parsed, ttlMs)
+  } catch {
+    return {}
+  }
+}
+
+function getInitialFormState(): SilenceFormState {
+  return {
+    startTime: "",
+    endTime: "",
+    recurrence: "",
+  }
+}
+
+function parseDate(value: string | null | undefined) {
+  if (!value) {
+    return null
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date
+}
+
+function normalizeRecurrence(value: string | null | undefined) {
+  return (value || "").trim()
+}
+
+function toLocalDatetimeInputValue(value: string | null | undefined) {
+  const date = parseDate(value)
+
+  if (!date) {
+    return ""
+  }
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
+  const date = parseDate(value)
+
+  if (!date) {
+    return "-"
+  }
+
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
+function getWindowStatus(window: SilenceWindow, currentTime = Date.now()): SilenceStatus {
+  const startTime = parseDate(window.start_time)?.getTime()
+  const endTime = parseDate(window.end_time)?.getTime()
+
+  if (!startTime || !endTime) {
+    return "unknown"
+  }
+
+  if (currentTime < startTime) {
+    return "scheduled"
+  }
+
+  if (currentTime > endTime) {
+    return "expired"
+  }
+
+  return "active"
+}
+
+function formatDuration(milliseconds: number, locale: "zh" | "en") {
+  const totalMinutes = Math.floor(milliseconds / 60000)
+
+  if (totalMinutes < 0) {
+    return "-"
+  }
+
+  const days = Math.floor(totalMinutes / (24 * 60))
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+  const minutes = totalMinutes % 60
+
+  if (locale === "zh") {
+    if (days > 0) {
+      return `${days} 天 ${hours} 小时`
+    }
+
+    if (hours > 0) {
+      return `${hours} 小时 ${minutes} 分钟`
+    }
+
+    return `${minutes} 分钟`
+  }
+
+  if (days > 0) {
+    return `${days}d ${hours}h`
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  }
+
+  return `${minutes}m`
+}
+
+function getStatusMeta(
+  status: SilenceStatus,
+  t: (path: any, values?: Record<string, string | number>) => string
+) {
+  if (status === "active") {
+    return {
+      label: t("notifications.silenceStatusActive"),
+      className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
     }
   }
 
-  const handleCreate = async () => {
-    if (!newWindow.name || !newWindow.start_time || !newWindow.end_time) {
-      toast.error("Please fill in all required fields")
+  if (status === "scheduled") {
+    return {
+      label: t("notifications.silenceStatusScheduled"),
+      className: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+    }
+  }
+
+  if (status === "expired") {
+    return {
+      label: t("notifications.silenceStatusExpired"),
+      className: "border-muted bg-muted text-muted-foreground",
+    }
+  }
+
+  return {
+    label: t("notifications.silenceStatusUnknown"),
+    className: "border-red-500/30 bg-red-500/10 text-red-600",
+  }
+}
+
+function toSilencePayload(form: SilenceFormState): CreateSilenceWindowRequest | null {
+  if (!form.startTime || !form.endTime) {
+    return null
+  }
+
+  const startDate = parseDate(form.startTime)
+  const endDate = parseDate(form.endTime)
+
+  if (!startDate || !endDate) {
+    return null
+  }
+
+  if (endDate.getTime() <= startDate.getTime()) {
+    return null
+  }
+
+  const payload: CreateSilenceWindowRequest = {
+    start_time: startDate.toISOString(),
+    end_time: endDate.toISOString(),
+  }
+
+  const recurrenceValue = normalizeRecurrence(form.recurrence)
+
+  if (recurrenceValue) {
+    payload.recurrence = recurrenceValue
+  }
+
+  return payload
+}
+
+function isWindowMatchingPayload(window: SilenceWindow, payload: CreateSilenceWindowRequest) {
+  const windowStart = parseDate(window.start_time)?.getTime()
+  const windowEnd = parseDate(window.end_time)?.getTime()
+  const payloadStart = parseDate(payload.start_time)?.getTime()
+  const payloadEnd = parseDate(payload.end_time)?.getTime()
+
+  if (!windowStart || !windowEnd || !payloadStart || !payloadEnd) {
+    return false
+  }
+
+  if (windowStart !== payloadStart || windowEnd !== payloadEnd) {
+    return false
+  }
+
+  return normalizeRecurrence(window.recurrence) === normalizeRecurrence(payload.recurrence)
+}
+
+function resolveCreatedWindowId(
+  windows: SilenceWindow[],
+  payload: CreateSilenceWindowRequest,
+  excludedId?: string
+) {
+  const matched = windows
+    .filter((window) => window.id !== excludedId)
+    .filter((window) => isWindowMatchingPayload(window, payload))
+    .sort((left, right) => {
+      const rightCreated = parseDate(right.created_at)?.getTime() || 0
+      const leftCreated = parseDate(left.created_at)?.getTime() || 0
+
+      if (rightCreated !== leftCreated) {
+        return rightCreated - leftCreated
+      }
+
+      const rightUpdated = parseDate(right.updated_at)?.getTime() || 0
+      const leftUpdated = parseDate(left.updated_at)?.getTime() || 0
+
+      if (rightUpdated !== leftUpdated) {
+        return rightUpdated - leftUpdated
+      }
+
+      return right.id.localeCompare(left.id)
+    })
+
+  if (matched.length === 0) {
+    return null
+  }
+
+  return matched[0].id
+}
+
+export default function SilenceWindowsPage() {
+  const { t, locale } = useAppTranslations("pages")
+  const {
+    data: windows,
+    loading,
+    refreshing,
+    execute,
+  } = useRequestState<SilenceWindow[]>([])
+
+  const [searchKeyword, setSearchKeyword] = useState("")
+  const [statusFilter, setStatusFilter] = useState<SilenceStatusFilter>("all")
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [createForm, setCreateForm] = useState<SilenceFormState>(getInitialFormState)
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingWindow, setEditingWindow] = useState<SilenceWindow | null>(null)
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editForm, setEditForm] = useState<SilenceFormState>(getInitialFormState)
+  const [replaceOriginalAfterEdit, setReplaceOriginalAfterEdit] = useState(true)
+
+  const [windowOriginTtlDays, setWindowOriginTtlDays] = useState<(typeof WINDOW_ORIGIN_TTL_OPTIONS)[number]>(
+    () => readWindowOriginTtlDaysFromStorage()
+  )
+  const windowOriginTtlMs = useMemo(() => windowOriginTtlDays * DAY_IN_MS, [windowOriginTtlDays])
+  const [windowOrigins, setWindowOrigins] = useState<Record<string, WindowOriginMeta>>(() =>
+    readWindowOriginsFromStorage(windowOriginTtlDays * DAY_IN_MS)
+  )
+
+  const [deleteDialogWindow, setDeleteDialogWindow] = useState<SilenceWindow | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const fetchWindows = useCallback(
+    async (silent = false) => {
+      return await execute(
+        () => api.listSilenceWindows({ limit: PAGE_LIMIT, offset: 0 }),
+        {
+          silent,
+          onError: (error) => {
+            toast.error(getApiErrorMessage(error, t("notifications.silenceToastFetchError")))
+          },
+        }
+      )
+    },
+    [execute, t]
+  )
+
+  useEffect(() => {
+    fetchWindows()
+  }, [fetchWindows])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
       return
     }
 
     try {
-      // API expectation for timestamps might vary, ensuring ISO strings
-      const payload = {
-        ...newWindow,
-        start_time: new Date(newWindow.start_time).toISOString(),
-        end_time: new Date(newWindow.end_time).toISOString()
-      }
-      await api.createSilenceWindow(payload)
-      toast.success("Silence window created successfully")
-      setIsDialogOpen(false)
-      fetchWindows()
-      setNewWindow({
-        name: "",
-        agent_pattern: "*",
-        metric_pattern: "*",
-        start_time: "",
-        end_time: ""
-      })
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create silence window"))
+      window.localStorage.setItem(WINDOW_ORIGIN_TTL_STORAGE_KEY, String(windowOriginTtlDays))
+    } catch {
+      return
     }
-  }
+  }, [windowOriginTtlDays])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this silence window?")) return
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
 
     try {
-      await api.deleteSilenceWindow(id)
-      toast.success("Silence window deleted")
-      fetchWindows()
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Delete failed"))
-    }
-  }
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.05
+      if (Object.keys(windowOrigins).length === 0) {
+        window.localStorage.removeItem(WINDOW_ORIGIN_STORAGE_KEY)
+        return
       }
+
+      window.localStorage.setItem(WINDOW_ORIGIN_STORAGE_KEY, JSON.stringify(windowOrigins))
+    } catch {
+      return
+    }
+  }, [windowOrigins])
+
+  useEffect(() => {
+    setWindowOrigins((previous) => {
+      const next = filterActiveWindowOrigins(previous, windowOriginTtlMs)
+
+      if (next === previous) {
+        return previous
+      }
+
+      return next
+    })
+  }, [windowOriginTtlMs])
+
+  useEffect(() => {
+    setWindowOrigins((previous) => {
+      if (Object.keys(previous).length === 0) {
+        return previous
+      }
+
+      const existingWindowIds = new Set(windows.map((window) => window.id))
+      const now = Date.now()
+      const nextEntries = Object.entries(previous).filter(([windowId, meta]) => {
+        if (!existingWindowIds.has(windowId)) {
+          return false
+        }
+
+        return !isWindowOriginExpired(meta, windowOriginTtlMs, now)
+      })
+
+      if (nextEntries.length === Object.keys(previous).length) {
+        return previous
+      }
+
+      return Object.fromEntries(nextEntries)
+    })
+  }, [windowOriginTtlMs, windows])
+
+  const stats = useMemo(() => {
+    const currentTime = Date.now()
+    const total = windows.length
+    const active = windows.filter((window) => getWindowStatus(window, currentTime) === "active").length
+    const scheduled = windows.filter((window) => getWindowStatus(window, currentTime) === "scheduled").length
+    const expired = windows.filter((window) => getWindowStatus(window, currentTime) === "expired").length
+
+    return {
+      total,
+      active,
+      scheduled,
+      expired,
+    }
+  }, [windows])
+
+  const filteredWindows = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase()
+
+    return windows
+      .filter((window) => {
+        const status = getWindowStatus(window)
+
+        if (statusFilter !== "all" && statusFilter !== status) {
+          return false
+        }
+
+        if (!keyword) {
+          return true
+        }
+
+        const searchableText = [
+          window.id,
+          window.recurrence || "",
+          window.start_time,
+          window.end_time,
+          windowOrigins[window.id]?.sourceId || "",
+        ]
+          .join(" ")
+          .toLowerCase()
+
+        return searchableText.includes(keyword)
+      })
+      .sort((left, right) => {
+        const leftTime = parseDate(left.start_time)?.getTime() || 0
+        const rightTime = parseDate(right.start_time)?.getTime() || 0
+        return rightTime - leftTime
+      })
+  }, [searchKeyword, statusFilter, windowOrigins, windows])
+
+  const hasActiveFilters = Boolean(searchKeyword.trim()) || statusFilter !== "all"
+  const originMarksCount = Object.keys(windowOrigins).length
+  const hasWindowOrigins = originMarksCount > 0
+
+  const resetFilters = () => {
+    setSearchKeyword("")
+    setStatusFilter("all")
+  }
+
+  const clearWindowOrigins = () => {
+    setWindowOrigins({})
+    toast.success(t("notifications.silenceToastClearOriginsSuccess"))
+  }
+
+  const handleWindowOriginTtlDaysChange = (value: string) => {
+    setWindowOriginTtlDays(normalizeWindowOriginTtlDays(value))
+  }
+
+  const getStatusAwareMessage = (
+    error: unknown,
+    fallback: string,
+    statusMessages?: Partial<Record<number, string>>
+  ) => {
+    if (error instanceof ApiRequestError && statusMessages?.[error.status]) {
+      return statusMessages[error.status] as string
+    }
+
+    return getApiErrorMessage(error, fallback)
+  }
+
+  const validateFormAndGetPayload = (form: SilenceFormState) => {
+    if (!form.startTime || !form.endTime) {
+      toast.error(t("notifications.silenceToastTimeRequired"))
+      return null
+    }
+
+    const payload = toSilencePayload(form)
+
+    if (!payload) {
+      const startDate = parseDate(form.startTime)
+      const endDate = parseDate(form.endTime)
+
+      if (!startDate || !endDate) {
+        toast.error(t("notifications.silenceToastTimeInvalid"))
+      } else {
+        toast.error(t("notifications.silenceToastTimeOrderInvalid"))
+      }
+
+      return null
+    }
+
+    return payload
+  }
+
+  const handleCreateWindow = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const payload = validateFormAndGetPayload(createForm)
+
+    if (!payload) {
+      return
+    }
+
+    setCreateSubmitting(true)
+
+    try {
+      await api.createSilenceWindow(payload)
+      toast.success(t("notifications.silenceToastCreateSuccess"))
+      setIsCreateDialogOpen(false)
+      setCreateForm(getInitialFormState())
+      await fetchWindows(true)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("notifications.silenceToastCreateError")))
+    } finally {
+      setCreateSubmitting(false)
     }
   }
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    show: { y: 0, opacity: 1 }
+  const openEditDialog = (window: SilenceWindow) => {
+    setEditingWindow(window)
+    setEditForm({
+      startTime: toLocalDatetimeInputValue(window.start_time),
+      endTime: toLocalDatetimeInputValue(window.end_time),
+      recurrence: window.recurrence || "",
+    })
+    setReplaceOriginalAfterEdit(true)
+    setIsEditDialogOpen(true)
   }
 
-  const isActive = (win: SilenceWindow) => {
-    const now = new Date()
-    return now >= new Date(win.start_time) && now <= new Date(win.end_time)
+  const handleEditWindow = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!editingWindow) {
+      return
+    }
+
+    const payload = validateFormAndGetPayload(editForm)
+
+    if (!payload) {
+      return
+    }
+
+    setEditSubmitting(true)
+
+    try {
+      const createdWindow = await api.createSilenceWindow(payload)
+      let originMode: WindowOriginMode = replaceOriginalAfterEdit ? "replaced" : "cloned"
+
+      if (replaceOriginalAfterEdit) {
+        try {
+          await api.deleteSilenceWindow(editingWindow.id)
+          toast.success(t("notifications.silenceToastUpdateSuccess"))
+        } catch {
+          originMode = "cloned"
+          toast.warning(
+            t("notifications.silenceToastReplaceDeleteWarning", {
+              id: editingWindow.id,
+            })
+          )
+          toast.success(t("notifications.silenceToastCloneSuccess"))
+        }
+      } else {
+        toast.success(t("notifications.silenceToastCloneSuccess"))
+      }
+
+      const latestWindows = await fetchWindows(true)
+      const directId = createdWindow && typeof createdWindow.id === "string"
+        ? createdWindow.id
+        : null
+      const resolvedId = latestWindows
+        ? resolveCreatedWindowId(latestWindows, payload, editingWindow.id)
+        : null
+      const targetId = directId || resolvedId
+
+      if (targetId) {
+        setWindowOrigins((previous) => ({
+          ...previous,
+          [targetId]: {
+            sourceId: editingWindow.id,
+            mode: originMode,
+            createdAt: Date.now(),
+          },
+        }))
+      }
+
+      setIsEditDialogOpen(false)
+      setEditingWindow(null)
+      setEditForm(getInitialFormState())
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("notifications.silenceToastUpdateError")))
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  const handleDeleteWindow = async () => {
+    if (!deleteDialogWindow) {
+      return
+    }
+
+    setDeletingId(deleteDialogWindow.id)
+
+    try {
+      await api.deleteSilenceWindow(deleteDialogWindow.id)
+      setWindowOrigins((previous) => {
+        const next = { ...previous }
+        delete next[deleteDialogWindow.id]
+
+        Object.keys(next).forEach((windowId) => {
+          if (next[windowId].sourceId === deleteDialogWindow.id) {
+            delete next[windowId]
+          }
+        })
+
+        return next
+      })
+
+      toast.success(t("notifications.silenceToastDeleteSuccess"))
+      setDeleteDialogWindow(null)
+      await fetchWindows(true)
+    } catch (error) {
+      toast.error(
+        getStatusAwareMessage(error, t("notifications.silenceToastDeleteError"), {
+          404: t("notifications.silenceToastDeleteNotFound"),
+        })
+      )
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="p-8 space-y-8"
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gradient">Silence Windows</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Create maintenance windows to temporarily suppress alerts for specific agents or metrics.</p>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">{t("notifications.silenceTitle")}</h2>
+          <p className="text-sm text-muted-foreground">{t("notifications.silenceDescription")}</p>
         </div>
-        
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/20 transition-all hover:shadow-primary/40 active:scale-95">
-              <Plus className="mr-2 h-4 w-4" /> Create Window
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="glass-card !border-white/10 sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>New Silence Window</DialogTitle>
-              <DialogDescription>Define suppress rules and duration for this maintenance window.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-6 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Window Name</Label>
-                <Input 
-                  id="name" 
-                  placeholder="e.g. Scheduled DB Maintenance" 
-                  value={newWindow.name}
-                  onChange={e => setNewWindow({...newWindow, name: e.target.value})}
-                  className="glass-card border-white/5"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="agent_pattern">Agent Pattern</Label>
-                  <Input 
-                    id="agent_pattern" 
-                    placeholder="*" 
-                    value={newWindow.agent_pattern}
-                    onChange={e => setNewWindow({...newWindow, agent_pattern: e.target.value})}
-                    className="glass-card border-white/5"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="metric_pattern">Metric Pattern</Label>
-                  <Input 
-                    id="metric_pattern" 
-                    placeholder="*" 
-                    value={newWindow.metric_pattern}
-                    onChange={e => setNewWindow({...newWindow, metric_pattern: e.target.value})}
-                    className="glass-card border-white/5"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start_time">Start Time</Label>
-                  <Input 
-                    id="start_time" 
-                    type="datetime-local" 
-                    value={newWindow.start_time}
-                    onChange={e => setNewWindow({...newWindow, start_time: e.target.value})}
-                    className="glass-card border-white/5"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end_time">End Time</Label>
-                  <Input 
-                    id="end_time" 
-                    type="datetime-local" 
-                    value={newWindow.end_time}
-                    onChange={e => setNewWindow({...newWindow, end_time: e.target.value})}
-                    className="glass-card border-white/5"
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">Create Schedule</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fetchWindows(true)}
+            disabled={refreshing}
+          >
+            {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            {t("notifications.silenceRefreshButton")}
+          </Button>
+          <Button type="button" onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t("notifications.silenceCreateButton")}
+          </Button>
+        </div>
       </div>
 
-      <motion.div variants={itemVariants}>
-        <Card className="glass border-white/10 overflow-hidden">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("notifications.silenceStatTotal")}</CardDescription>
+            <CardTitle className="text-2xl">{stats.total}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("notifications.silenceStatActive")}</CardDescription>
+            <CardTitle className="text-2xl text-emerald-600">{stats.active}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("notifications.silenceStatScheduled")}</CardDescription>
+            <CardTitle className="text-2xl text-amber-600">{stats.scheduled}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("notifications.silenceStatExpired")}</CardDescription>
+            <CardTitle className="text-2xl text-muted-foreground">{stats.expired}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>{t("notifications.silenceFiltersTitle")}</CardTitle>
+            <Badge variant={hasWindowOrigins ? "secondary" : "outline"}>
+              {t("notifications.silenceOriginMarksCount", { count: originMarksCount })}
+            </Badge>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchKeyword}
+                onChange={(event) => setSearchKeyword(event.target.value)}
+                placeholder={t("notifications.silenceSearchPlaceholder")}
+                className="pl-9"
+              />
+            </div>
+
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value as SilenceStatusFilter)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t("notifications.silenceFilterStatusLabel")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("notifications.silenceFilterStatusAll")}</SelectItem>
+                <SelectItem value="active">{t("notifications.silenceFilterStatusActive")}</SelectItem>
+                <SelectItem value="scheduled">{t("notifications.silenceFilterStatusScheduled")}</SelectItem>
+                <SelectItem value="expired">{t("notifications.silenceFilterStatusExpired")}</SelectItem>
+                <SelectItem value="unknown">{t("notifications.silenceFilterStatusUnknown")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={String(windowOriginTtlDays)}
+              onValueChange={handleWindowOriginTtlDaysChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t("notifications.silenceOriginTtlLabel")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">{t("notifications.silenceOriginTtlOneDay")}</SelectItem>
+                <SelectItem value="7">{t("notifications.silenceOriginTtlSevenDays")}</SelectItem>
+                <SelectItem value="30">{t("notifications.silenceOriginTtlThirtyDays")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex w-full gap-2 xl:w-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={resetFilters}
+                disabled={!hasActiveFilters}
+                className="flex-1 xl:flex-none"
+              >
+                <FilterX className="mr-2 h-4 w-4" />
+                {t("notifications.silenceClearFilters")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={clearWindowOrigins}
+                disabled={!hasWindowOrigins}
+                className="flex-1 xl:flex-none"
+              >
+                {t("notifications.silenceClearOriginsButton")}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("notifications.silenceTableTitle")}</CardTitle>
+          <CardDescription>{t("notifications.silenceTableDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
           <Table>
             <TableHeader>
-              <TableRow className="border-white/5 hover:bg-transparent">
-                <TableHead className="w-[250px]">Window Name</TableHead>
-                <TableHead>Targets</TableHead>
-                <TableHead>Schedule</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+              <TableRow>
+                <TableHead>{t("notifications.silenceTableColWindow")}</TableHead>
+                <TableHead>{t("notifications.silenceTableColRange")}</TableHead>
+                <TableHead>{t("notifications.silenceTableColRecurrence")}</TableHead>
+                <TableHead>{t("notifications.silenceTableColStatus")}</TableHead>
+                <TableHead>{t("notifications.silenceTableColCreatedAt")}</TableHead>
+                <TableHead className="text-right">{t("notifications.silenceTableColActions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i} className="border-white/5 animate-pulse">
-                    <TableCell colSpan={5} className="h-16 bg-white/5" />
+                Array.from({ length: 4 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell colSpan={6} className="h-16 text-muted-foreground">
+                      {t("notifications.silenceTableLoading")}
+                    </TableCell>
                   </TableRow>
                 ))
-              ) : windows.length === 0 ? (
+              ) : filteredWindows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center gap-2">
-                      <ShieldOff className="h-8 w-8 opacity-20" />
-                      <p>No active or scheduled silence windows found.</p>
+                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
+                    <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+                      <ShieldOff className="h-5 w-5" />
+                      <p>
+                        {hasActiveFilters
+                          ? t("notifications.silenceTableEmptyFiltered")
+                          : t("notifications.silenceTableEmpty")}
+                      </p>
+                      {!hasActiveFilters ? (
+                        <p className="text-xs">{t("notifications.silenceTableEmptyHint")}</p>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                <AnimatePresence mode="popLayout">
-                  {windows.map((win) => (
-                    <motion.tr 
-                      key={win.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      className="group border-white/5 hover:bg-white/5 transition-colors"
-                    >
-                      <TableCell className="font-semibold">
-                        <div className="flex flex-col">
-                          <span>{win.name}</span>
-                          <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px]">{win.id}</span>
+                filteredWindows.map((window) => {
+                  const status = getWindowStatus(window)
+                  const statusMeta = getStatusMeta(status, t)
+                  const startDate = parseDate(window.start_time)
+                  const endDate = parseDate(window.end_time)
+                  const duration = startDate && endDate
+                    ? formatDuration(endDate.getTime() - startDate.getTime(), locale)
+                    : t("notifications.silenceDurationUnknown")
+                  const origin = windowOrigins[window.id]
+
+                  return (
+                    <TableRow key={window.id}>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">
+                            {window.name || t("notifications.silenceWindowNameFallback", { id: window.id })}
+                          </p>
+                          <p className="font-mono text-xs text-muted-foreground">{window.id}</p>
+                          {origin ? (
+                            <p className="text-[11px] text-muted-foreground">
+                              {origin.mode === "replaced"
+                                ? t("notifications.silenceOriginReplacedFrom", { id: origin.sourceId })
+                                : t("notifications.silenceOriginClonedFrom", { id: origin.sourceId })}
+                            </p>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline" className="glass border-blue-500/20 text-blue-400 gap-1.5 font-mono text-[10px]">
-                            <Server className="h-3 w-3" /> {win.agent_pattern}
-                          </Badge>
-                          <Badge variant="outline" className="glass border-purple-500/20 text-purple-400 gap-1.5 font-mono text-[10px]">
-                            <Database className="h-3 w-3" /> {win.metric_pattern}
-                          </Badge>
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          <p>{formatDateTime(window.start_time, locale)}</p>
+                          <p>{formatDateTime(window.end_time, locale)}</p>
+                          <p>{t("notifications.silenceDurationLabel", { duration })}</p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="h-3 w-3" /> {new Date(win.start_time).toLocaleString()}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-3 h-px bg-muted-foreground/30 ml-1.5" /> 
-                            {new Date(win.end_time).toLocaleString()}
-                          </div>
-                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {window.recurrence || t("notifications.silenceRecurrenceOnce")}
+                        </span>
                       </TableCell>
                       <TableCell>
-                        {isActive(win) ? (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/20 animate-pulse-slow">
-                            Active Suppressing
-                          </Badge>
-                        ) : new Date(win.start_time) > new Date() ? (
-                          <Badge variant="outline" className="text-amber-400 border-amber-500/20">
-                            Scheduled
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-muted text-muted-foreground border-white/5">
-                            Expired
-                          </Badge>
-                        )}
+                        <Badge variant="outline" className={statusMeta.className}>
+                          {statusMeta.label}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleDelete(win.id)}
-                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all active:scale-90"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDateTime(window.created_at, locale)}
                       </TableCell>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(window)}
+                            title={t("notifications.silenceActionEdit")}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteDialogWindow(window)}
+                            title={t("notifications.silenceActionDelete")}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>
-        </Card>
-      </motion.div>
-    </motion.div>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open)
+          if (!open) {
+            setCreateForm(getInitialFormState())
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("notifications.silenceCreateDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("notifications.silenceCreateDialogDescription")}</DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={handleCreateWindow}>
+            <div className="space-y-2">
+              <Label htmlFor="silence-start-time">{t("notifications.silenceFieldStart")}</Label>
+              <Input
+                id="silence-start-time"
+                type="datetime-local"
+                value={createForm.startTime}
+                onChange={(event) =>
+                  setCreateForm((previous) => ({
+                    ...previous,
+                    startTime: event.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="silence-end-time">{t("notifications.silenceFieldEnd")}</Label>
+              <Input
+                id="silence-end-time"
+                type="datetime-local"
+                value={createForm.endTime}
+                onChange={(event) =>
+                  setCreateForm((previous) => ({
+                    ...previous,
+                    endTime: event.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="silence-recurrence">{t("notifications.silenceFieldRecurrence")}</Label>
+              <Input
+                id="silence-recurrence"
+                value={createForm.recurrence}
+                onChange={(event) =>
+                  setCreateForm((previous) => ({
+                    ...previous,
+                    recurrence: event.target.value,
+                  }))
+                }
+                placeholder={t("notifications.silenceFieldRecurrencePlaceholder")}
+              />
+              <p className="text-xs text-muted-foreground">{t("notifications.silenceFieldRecurrenceHint")}</p>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateDialogOpen(false)}
+                disabled={createSubmitting}
+              >
+                {t("notifications.silenceDialogCancel")}
+              </Button>
+              <Button type="submit" disabled={createSubmitting}>
+                {createSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {createSubmitting
+                  ? t("notifications.silenceDialogCreating")
+                  : t("notifications.silenceDialogCreateSubmit")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+
+          if (!open) {
+            setEditingWindow(null)
+            setEditForm(getInitialFormState())
+            setReplaceOriginalAfterEdit(true)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("notifications.silenceEditDialogTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("notifications.silenceEditDialogDescription", {
+                id: editingWindow?.id || t("notifications.silenceUnknownId"),
+              })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={handleEditWindow}>
+            <div className="space-y-2">
+              <Label htmlFor="silence-edit-start-time">{t("notifications.silenceFieldStart")}</Label>
+              <Input
+                id="silence-edit-start-time"
+                type="datetime-local"
+                value={editForm.startTime}
+                onChange={(event) =>
+                  setEditForm((previous) => ({
+                    ...previous,
+                    startTime: event.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="silence-edit-end-time">{t("notifications.silenceFieldEnd")}</Label>
+              <Input
+                id="silence-edit-end-time"
+                type="datetime-local"
+                value={editForm.endTime}
+                onChange={(event) =>
+                  setEditForm((previous) => ({
+                    ...previous,
+                    endTime: event.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="silence-edit-recurrence">{t("notifications.silenceFieldRecurrence")}</Label>
+              <Input
+                id="silence-edit-recurrence"
+                value={editForm.recurrence}
+                onChange={(event) =>
+                  setEditForm((previous) => ({
+                    ...previous,
+                    recurrence: event.target.value,
+                  }))
+                }
+                placeholder={t("notifications.silenceFieldRecurrencePlaceholder")}
+              />
+              <p className="text-xs text-muted-foreground">{t("notifications.silenceFieldRecurrenceHint")}</p>
+            </div>
+
+            <div className="flex items-start justify-between rounded-md border p-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t("notifications.silenceFieldReplaceOriginal")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("notifications.silenceFieldReplaceOriginalHint")}
+                </p>
+              </div>
+              <Switch
+                checked={replaceOriginalAfterEdit}
+                onCheckedChange={setReplaceOriginalAfterEdit}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={editSubmitting}
+              >
+                {t("notifications.silenceDialogCancel")}
+              </Button>
+              <Button type="submit" disabled={editSubmitting}>
+                {editSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {editSubmitting
+                  ? t("notifications.silenceDialogUpdating")
+                  : t("notifications.silenceDialogUpdateSubmit")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={Boolean(deleteDialogWindow)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDialogWindow(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("notifications.silenceDeleteDialogTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("notifications.silenceDeleteDialogDescription", {
+                id: deleteDialogWindow?.id || t("notifications.silenceUnknownId"),
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingId)}>
+              {t("notifications.silenceDialogCancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDeleteWindow}
+              disabled={Boolean(deletingId)}
+            >
+              {deletingId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("notifications.silenceDeleteDialogConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
