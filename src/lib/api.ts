@@ -1,8 +1,4 @@
 import {
-  AddAgentRequest,
-  AddAgentResponse,
-  AgentResponse,
-  AgentWhitelistDetail,
   AlertEventResponse,
   AlertRuleDetailResponse,
   AlertRuleResponse,
@@ -12,7 +8,6 @@ import {
   ChannelOverview,
   CreateAlertRuleRequest,
   DashboardOverview,
-  LatestMetric,
   LoginRequest,
   LoginResponse,
   PaginationParams,
@@ -32,8 +27,6 @@ import {
   SilenceWindow,
   CreateSilenceWindowRequest,
   EnableRequest,
-  RegenerateTokenResponse,
-  UpdateAgentRequest,
 } from "@/types/api"
 import {
   clearAuthToken,
@@ -41,6 +34,7 @@ import {
   normalizeAuthToken,
 } from "@/lib/auth-token"
 import { resolveAppLocale, stripLocalePrefix, withLocalePrefix } from "@/components/app-locale"
+import { createAgentApiModule } from "@/lib/api/modules/agent"
 
 const BASE_URL = ""
 
@@ -184,6 +178,11 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
   return resolveEnvelopeData<T>(payload, response.status)
 }
 
+const agentApi = createAgentApiModule({
+  request,
+  buildQueryString,
+})
+
 export const api = {
   login: (credentials: LoginRequest) =>
     request<LoginResponse>("/v1/auth/login", {
@@ -192,40 +191,7 @@ export const api = {
       requiresAuth: false,
     }),
 
-  getAgents: (params: PaginationParams) =>
-    request<AgentResponse[]>(`/v1/agents${buildQueryString(params)}`),
-
-  getWhitelist: (params: PaginationParams) =>
-    request<AgentWhitelistDetail[]>(`/v1/agents/whitelist${buildQueryString(params)}`),
-
-  addWhitelistAgent: (data: AddAgentRequest, token?: string) =>
-    request<AddAgentResponse>("/v1/agents/whitelist", {
-      method: "POST",
-      body: data,
-      token,
-    }),
-
-  updateWhitelistAgent: (id: string, data: UpdateAgentRequest, token?: string) =>
-    request<AgentWhitelistDetail>(`/v1/agents/whitelist/${id}`, {
-      method: "PUT",
-      body: data,
-      token,
-    }),
-
-  deleteWhitelistAgent: (id: string, token?: string) =>
-    request<void>(`/v1/agents/whitelist/${id}`, {
-      method: "DELETE",
-      token,
-    }),
-
-  regenerateToken: (id: string, token?: string) =>
-    request<RegenerateTokenResponse>(`/v1/agents/whitelist/${id}/token`, {
-      method: "POST",
-      token,
-    }),
-
-  getAgentLatestMetrics: (id: string, token?: string) =>
-    request<LatestMetric[]>(`/v1/agents/${id}/latest`, { token }),
+  ...agentApi,
 
   getActiveAlerts: (params: PaginationParams) =>
     request<AlertEventResponse[]>(`/v1/alerts/active${buildQueryString(params)}`),
@@ -382,9 +348,6 @@ export const api = {
 
   getAlertSummary: () =>
     request<AlertSummary>("/v1/alerts/summary"),
-
-  updateAgent: (id: string, data: UpdateAgentRequest, token?: string) =>
-    api.updateWhitelistAgent(id, data, token),
 
   getHealth: () =>
     request<any>("/v1/health", { requiresAuth: false }),

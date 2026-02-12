@@ -635,4 +635,4 @@ Tab 项: padding 12px 24px, 14px/500
 
 ## 技术栈
 
-- Next16.1.6 + React 19.2.4 + TypeScript + shadcn + bun
+- Next16.1.6 + React 19.2.4 + TypeScript + shadcn ui + bun

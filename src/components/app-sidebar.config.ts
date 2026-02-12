@@ -128,6 +128,7 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/dashboard": ["/v1/dashboard/overview"],
   "/metrics": ["/v1/metrics"],
   "/agents": ["/v1/agents"],
+  "/agents/": ["/v1/agents"],
   "/whitelist": ["/v1/agents/whitelist"],
   "/alerts": ["/v1/alerts/active"],
   "/alerts/history": ["/v1/alerts/history"],
