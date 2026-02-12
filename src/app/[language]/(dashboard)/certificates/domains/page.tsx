@@ -181,12 +181,26 @@ export default function DomainsPage() {
   }
 
   const clearAutoCreateAdvancedDraft = () => {
+    const clearedCount = [autoCreatePort, autoCreateCheckInterval, autoCreateNote].reduce(
+      (count, value) => (value.trim() ? count + 1 : count),
+      0
+    )
+
     setAutoCreatePort("")
     setAutoCreateCheckInterval("")
     setAutoCreateNote("")
     setAutoCreateAdvancedOpen(false)
     setClearAdvancedDialogOpen(false)
-    toast.success(t("certificates.domains.toastAutoCreateAdvancedResetSuccess"))
+
+    if (clearedCount > 0) {
+      const successKey = clearedCount === 1
+        ? "certificates.domains.toastAutoCreateAdvancedResetSuccessOne"
+        : "certificates.domains.toastAutoCreateAdvancedResetSuccessMany"
+
+      toast.success(t(successKey, {
+        count: clearedCount,
+      }))
+    }
   }
 
   const getStatusAwareMessage = (
@@ -677,10 +691,10 @@ export default function DomainsPage() {
   }, [domains])
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("certificates.domains.title")}</h1>
+          <h2 className="text-2xl font-semibold tracking-tight">{t("certificates.domains.title")}</h2>
           <p className="text-sm text-muted-foreground">{t("certificates.domains.description")}</p>
         </div>
 

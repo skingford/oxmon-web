@@ -218,10 +218,10 @@ export default function CertificateStatusPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("certificates.status.title")}</h1>
+          <h2 className="text-2xl font-semibold tracking-tight">{t("certificates.status.title")}</h2>
           <p className="text-sm text-muted-foreground">{t("certificates.status.description")}</p>
         </div>
 
@@ -368,7 +368,7 @@ export default function CertificateStatusPage() {
                         <TableCell className="text-muted-foreground">
                           {formatDateTime(status.checked_at, locale)}
                         </TableCell>
-                        <TableCell className="max-w-[240px] truncate text-muted-foreground" title={status.error || ""}>
+                        <TableCell className="max-w-60 truncate text-muted-foreground" title={status.error || ""}>
                           {status.error || t("certificates.status.errorNone")}
                         </TableCell>
                       </TableRow>

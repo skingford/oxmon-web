@@ -168,7 +168,7 @@ export default function CertificateDetailPage() {
   const daysUntilExpiry = getDaysUntilExpiry(certificate.not_after)
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button
@@ -179,7 +179,7 @@ export default function CertificateDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{certificate.domain}</h1>
+            <h2 className="text-2xl font-semibold tracking-tight">{certificate.domain}</h2>
             <p className="text-sm text-muted-foreground">{t("certificates.detail.description")}</p>
           </div>
         </div>
