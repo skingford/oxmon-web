@@ -345,3 +345,43 @@ export interface AlertSummary {
 export interface EnableRequest {
   enabled: boolean;
 }
+
+export interface DictionaryItem {
+  id: string;
+  dict_type: string;
+  dict_key: string;
+  dict_label: string;
+  dict_value?: string | null;
+  sort_order: number;
+  enabled: boolean;
+  is_system: boolean;
+  description?: string | null;
+  extra_json?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DictionaryTypeSummary {
+  dict_type: string;
+  count: number;
+}
+
+export interface CreateDictionaryRequest {
+  dict_type: string;
+  dict_key: string;
+  dict_label: string;
+  dict_value?: string | null;
+  sort_order?: number | null;
+  enabled?: boolean | null;
+  description?: string | null;
+  extra_json?: string | null;
+}
+
+export interface UpdateDictionaryRequest {
+  dict_label?: string | null;
+  dict_value?: string | null;
+  sort_order?: number | null;
+  enabled?: boolean | null;
+  description?: string | null;
+  extra_json?: string | null;
+}

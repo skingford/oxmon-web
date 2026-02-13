@@ -1,6 +1,7 @@
 import {
   Activity,
   Bell,
+  BookText,
   Inbox,
   LayoutDashboard,
   List,
@@ -139,6 +140,7 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/notifications": ["/v1/notifications/channels"],
   "/notifications/silence": ["/v1/notifications/silence-windows"],
   "/system": ["/v1/system/config"],
+  "/system/dictionaries": ["/v1/dictionaries"],
 }
 
 const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
@@ -248,6 +250,12 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
         titleKey: "itemSystem",
         url: "/system",
         icon: Settings,
+        exact: true,
+      },
+      {
+        titleKey: "itemSystemDictionaries",
+        url: "/system/dictionaries",
+        icon: BookText,
         exact: true,
       },
     ],

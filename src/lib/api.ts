@@ -30,6 +30,10 @@ import {
   SilenceWindow,
   CreateSilenceWindowRequest,
   EnableRequest,
+  DictionaryItem,
+  DictionaryTypeSummary,
+  CreateDictionaryRequest,
+  UpdateDictionaryRequest,
 } from "@/types/api"
 import {
   clearAuthToken,
@@ -248,6 +252,36 @@ export const api = {
 
   triggerCleanup: () =>
     request("/v1/system/storage/cleanup", { method: "POST" }),
+
+  // Dictionaries
+  listDictionaryTypes: () =>
+    request<DictionaryTypeSummary[]>("/v1/dictionaries/types"),
+
+  listDictionariesByType: async (dictType: string, enabledOnly = false) => {
+    const encodedType = encodeURIComponent(dictType)
+
+    try {
+      return await request<DictionaryItem[]>(`/v1/dictionaries/type/${encodedType}${buildQueryString({ enabled_only: enabledOnly })}`)
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 404) {
+        return request<DictionaryItem[]>(`/v1/dictionaries/type/${encodedType}/${enabledOnly}`)
+      }
+
+      throw error
+    }
+  },
+
+  createDictionary: (data: CreateDictionaryRequest) =>
+    request<DictionaryItem>("/v1/dictionaries", { method: "POST", body: data }),
+
+  getDictionary: (id: string) =>
+    request<DictionaryItem>(`/v1/dictionaries/${id}`),
+
+  updateDictionary: (id: string, data: UpdateDictionaryRequest) =>
+    request<DictionaryItem>(`/v1/dictionaries/${id}`, { method: "PUT", body: data }),
+
+  deleteDictionary: (id: string) =>
+    request(`/v1/dictionaries/${id}`, { method: "DELETE" }),
 
   // Auth - Security
   changePassword: (data: ChangePasswordRequest) =>

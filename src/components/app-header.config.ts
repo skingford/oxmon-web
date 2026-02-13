@@ -76,6 +76,10 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "itemSystem",
     descriptionKey: "systemDescription",
   },
+  "/system/dictionaries": {
+    titleKey: "itemSystemDictionaries",
+    descriptionKey: "systemDictionariesDescription",
+  },
   "/profile": {
     titleKey: "itemProfile",
     descriptionKey: "profileDescription",
