@@ -426,6 +426,27 @@ export default function NotificationsPage() {
     severityFilter !== "all" ||
     statusFilter !== "all" ||
     systemConfigFilter !== "all"
+
+  const severityOptions = CHANNEL_SEVERITY_OPTIONS
+
+  const filterTypeOptions = useMemo(
+    () => availableTypes.map((type) => ({ value: type, label: getChannelTypeLabel(type, t) })),
+    [availableTypes, t]
+  )
+
+  const filterSeverityOptions = useMemo(
+    () => CHANNEL_SEVERITY_OPTIONS.map((severity) => ({ value: severity, label: getSeverityLabel(severity, t) })),
+    [t]
+  )
+
+  const filterSystemConfigOptions = useMemo(
+    () =>
+      availableSystemConfigs.map((item) => ({
+        id: item.id,
+        label: `${item.display_name} (${item.config_key})`,
+      })),
+    [availableSystemConfigs]
+  )
   const currentChannelTypeNormalized = channelForm.channelType.trim().toLowerCase()
   const channelSystemConfigOptions = useMemo<NotificationSystemConfigOption[]>(
     () =>
@@ -665,8 +686,6 @@ export default function NotificationsPage() {
     }
   }
 
-  const severityOptions = CHANNEL_SEVERITY_OPTIONS
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -718,87 +737,23 @@ export default function NotificationsPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="space-y-4">
-          <div>
-            <CardTitle>{t("notifications.filtersTitle")}</CardTitle>
-          </div>
-          <FilterToolbar
-            className="xl:grid-cols-5"
-            search={{
-              value: searchKeyword,
-              onValueChange: setSearchKeyword,
-              placeholder: t("notifications.searchPlaceholder"),
-            }}
-          >
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="h-10 w-full bg-background">
-                <SelectValue placeholder={t("notifications.filterTypeLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("notifications.filterTypeAll")}</SelectItem>
-                {availableTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {getChannelTypeLabel(type, t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={severityFilter} onValueChange={setSeverityFilter}>
-              <SelectTrigger className="h-10 w-full bg-background">
-                <SelectValue placeholder={t("notifications.filterSeverityLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("notifications.filterSeverityAll")}</SelectItem>
-                {severityOptions.map((severity) => (
-                  <SelectItem key={severity} value={severity}>
-                    {getSeverityLabel(severity, t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={systemConfigFilter} onValueChange={setSystemConfigFilter}>
-              <SelectTrigger className="h-10 w-full bg-background">
-                <SelectValue placeholder={t("notifications.filterSystemConfigLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("notifications.filterSystemConfigAll")}</SelectItem>
-                <SelectItem value="unbound">{t("notifications.filterSystemConfigUnbound")}</SelectItem>
-                {availableSystemConfigs.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.display_name} ({item.config_key})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="flex items-center gap-2">
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as NotificationStatusFilter)}>
-                <SelectTrigger className="h-10 w-full bg-background">
-                  <SelectValue placeholder={t("notifications.filterStatusLabel")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("notifications.filterStatusAll")}</SelectItem>
-                  <SelectItem value="enabled">{t("notifications.filterStatusEnabled")}</SelectItem>
-                  <SelectItem value="disabled">{t("notifications.filterStatusDisabled")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={resetFilters}
-                disabled={!hasActiveFilters}
-                title={t("notifications.clearFilters")}
-              >
-                <FilterX className="h-4 w-4" />
-              </Button>
-            </div>
-          </FilterToolbar>
-        </CardHeader>
-      </Card>
+      <NotificationsFiltersCard
+        searchKeyword={searchKeyword}
+        typeFilter={typeFilter}
+        severityFilter={severityFilter}
+        statusFilter={statusFilter}
+        systemConfigFilter={systemConfigFilter}
+        hasActiveFilters={hasActiveFilters}
+        typeOptions={filterTypeOptions}
+        severityOptions={filterSeverityOptions}
+        systemConfigOptions={filterSystemConfigOptions}
+        onSearchKeywordChange={setSearchKeyword}
+        onTypeFilterChange={setTypeFilter}
+        onSeverityFilterChange={setSeverityFilter}
+        onStatusFilterChange={setStatusFilter}
+        onSystemConfigFilterChange={setSystemConfigFilter}
+        onResetFilters={resetFilters}
+      />
 
       <Card>
         <CardHeader>

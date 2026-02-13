@@ -77,7 +77,9 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
   const activeMenuButtonClass =
     "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-xs hover:bg-primary/15 hover:text-primary"
   const activeSubMenuButtonClass =
-    "bg-primary/10 text-primary ring-1 ring-primary/20 hover:bg-primary/15 hover:text-primary"
+    "bg-primary/10 text-primary ring-1 ring-primary/20 before:hidden hover:bg-primary/15 hover:text-primary"
+  const parentSelectedMarkerClass =
+    "text-primary before:absolute before:inset-y-1 before:left-0 before:w-1 before:rounded-r-full before:bg-primary"
 
   useEffect(() => {
     setExpandedParents((previous) => {
@@ -129,7 +131,7 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
                             <SidebarMenuButton
                               isActive={false}
                               tooltip={item.title}
-                              className={undefined}
+                              className={childActive ? parentSelectedMarkerClass : undefined}
                             >
                               <item.icon />
                               <span>{item.title}</span>
