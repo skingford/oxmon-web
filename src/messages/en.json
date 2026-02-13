@@ -840,7 +840,27 @@
       "silenceOriginTtlOneDay": "Keep for 1 day",
       "silenceOriginTtlSevenDays": "Keep for 7 days",
       "silenceOriginTtlThirtyDays": "Keep for 30 days",
-      "silenceOriginMarksCount": "Origin marks: {count}"
+      "silenceOriginMarksCount": "Origin marks: {count}",
+      "silenceFilterOriginOnlyLabel": "Only Origin Marks",
+      "silenceFilterOriginOnlyHint": "Show windows created by replace/clone only",
+      "silenceFilterOriginModeLabel": "Origin Mode",
+      "silenceFilterOriginModeAll": "All Origins",
+      "silenceFilterOriginModeReplaced": "Replaced Only",
+      "silenceFilterOriginModeCloned": "Cloned Only",
+      "silenceOriginReplacedCount": "Replaced: {count}",
+      "silenceOriginClonedCount": "Cloned: {count}",
+      "silenceExportOriginsButton": "Export Origin Marks",
+      "silenceToastExportOriginsSuccess": "Exported {count} origin marks",
+      "silenceToastExportOriginsEmpty": "No origin marks to export",
+      "silenceToastExportOriginsError": "Failed to export origin marks",
+      "silenceImportOriginsButton": "Import Origin Marks",
+      "silenceToastImportOriginsSuccess": "Imported {count} origin marks",
+      "silenceToastImportOriginsEmpty": "No valid origin marks found in file",
+      "silenceToastImportOriginsError": "Failed to import origin marks",
+      "silenceClearFiltersShort": "Clear",
+      "silenceClearOriginsShort": "Clear Marks",
+      "silenceImportOriginsShort": "Import",
+      "silenceExportOriginsShort": "Export"
     }
   },
   "profile": {

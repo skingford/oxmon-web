@@ -840,7 +840,27 @@
       "silenceOriginTtlOneDay": "保留 1 天",
       "silenceOriginTtlSevenDays": "保留 7 天",
       "silenceOriginTtlThirtyDays": "保留 30 天",
-      "silenceOriginMarksCount": "来源标记：{count}"
+      "silenceOriginMarksCount": "来源标记：{count}",
+      "silenceFilterOriginOnlyLabel": "仅看来源标记",
+      "silenceFilterOriginOnlyHint": "只显示由替换/复制产生的窗口",
+      "silenceFilterOriginModeLabel": "来源模式",
+      "silenceFilterOriginModeAll": "全部来源",
+      "silenceFilterOriginModeReplaced": "仅替换创建",
+      "silenceFilterOriginModeCloned": "仅复制创建",
+      "silenceOriginReplacedCount": "替换：{count}",
+      "silenceOriginClonedCount": "复制：{count}",
+      "silenceExportOriginsButton": "导出来源标记",
+      "silenceToastExportOriginsSuccess": "已导出 {count} 条来源标记",
+      "silenceToastExportOriginsEmpty": "暂无可导出的来源标记",
+      "silenceToastExportOriginsError": "导出来源标记失败",
+      "silenceImportOriginsButton": "导入来源标记",
+      "silenceToastImportOriginsSuccess": "已导入 {count} 条来源标记",
+      "silenceToastImportOriginsEmpty": "导入文件中没有可用的来源标记",
+      "silenceToastImportOriginsError": "导入来源标记失败",
+      "silenceClearFiltersShort": "清空筛选",
+      "silenceClearOriginsShort": "清空标记",
+      "silenceImportOriginsShort": "导入标记",
+      "silenceExportOriginsShort": "导出标记"
     }
   },
   "profile": {

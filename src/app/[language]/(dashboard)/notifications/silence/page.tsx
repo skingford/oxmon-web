@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
 import { CreateSilenceWindowRequest, SilenceWindow } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -39,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
+  Download,
   FilterX,
   Loader2,
   Pencil,
@@ -46,6 +47,7 @@ import {
   RefreshCw,
   Search,
   ShieldOff,
+  Upload,
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -55,6 +57,7 @@ const PAGE_LIMIT = 100
 type SilenceStatus = "active" | "scheduled" | "expired" | "unknown"
 type SilenceStatusFilter = "all" | SilenceStatus
 type WindowOriginMode = "replaced" | "cloned"
+type WindowOriginModeFilter = "all" | WindowOriginMode
 
 type SilenceFormState = {
   startTime: string
@@ -175,6 +178,100 @@ function readWindowOriginsFromStorage(ttlMs: number): Record<string, WindowOrigi
   } catch {
     return {}
   }
+}
+
+function normalizeImportedWindowOriginEntry(
+  rawWindowId: unknown,
+  rawSourceId: unknown,
+  rawMode: unknown,
+  rawCreatedAt: unknown
+): { windowId: string; meta: WindowOriginMeta } | null {
+  if (typeof rawWindowId !== "string" || typeof rawSourceId !== "string") {
+    return null
+  }
+
+  if (rawMode !== "replaced" && rawMode !== "cloned") {
+    return null
+  }
+
+  let createdAt = Date.now()
+
+  if (typeof rawCreatedAt === "number" && Number.isFinite(rawCreatedAt) && rawCreatedAt > 0) {
+    createdAt = rawCreatedAt
+  }
+
+  if (typeof rawCreatedAt === "string") {
+    const parsedDate = Date.parse(rawCreatedAt)
+
+    if (Number.isFinite(parsedDate) && parsedDate > 0) {
+      createdAt = parsedDate
+    }
+  }
+
+  return {
+    windowId: rawWindowId,
+    meta: {
+      sourceId: rawSourceId,
+      mode: rawMode,
+      createdAt,
+    },
+  }
+}
+
+function parseImportedWindowOrigins(value: unknown): Record<string, WindowOriginMeta> {
+  if (!value || typeof value !== "object") {
+    return {}
+  }
+
+  const payload = value as Record<string, unknown>
+
+  if (Array.isArray(payload.entries)) {
+    const entries: Record<string, WindowOriginMeta> = {}
+
+    payload.entries.forEach((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return
+      }
+
+      const normalized = normalizeImportedWindowOriginEntry(
+        (entry as Record<string, unknown>).window_id,
+        (entry as Record<string, unknown>).source_id,
+        (entry as Record<string, unknown>).mode,
+        (entry as Record<string, unknown>).created_at
+      )
+
+      if (!normalized) {
+        return
+      }
+
+      const previous = entries[normalized.windowId]
+
+      if (!previous || normalized.meta.createdAt >= previous.createdAt) {
+        entries[normalized.windowId] = normalized.meta
+      }
+    })
+
+    return entries
+  }
+
+  return sanitizeWindowOrigins(payload)
+}
+
+function mergeWindowOrigins(
+  currentOrigins: Record<string, WindowOriginMeta>,
+  importedOrigins: Record<string, WindowOriginMeta>
+) {
+  const next = { ...currentOrigins }
+
+  Object.entries(importedOrigins).forEach(([windowId, importedMeta]) => {
+    const previous = next[windowId]
+
+    if (!previous || importedMeta.createdAt >= previous.createdAt) {
+      next[windowId] = importedMeta
+    }
+  })
+
+  return next
 }
 
 function getInitialFormState(): SilenceFormState {
@@ -411,6 +508,8 @@ export default function SilenceWindowsPage() {
 
   const [searchKeyword, setSearchKeyword] = useState("")
   const [statusFilter, setStatusFilter] = useState<SilenceStatusFilter>("all")
+  const [originModeFilter, setOriginModeFilter] = useState<WindowOriginModeFilter>("all")
+  const [onlyOriginMarked, setOnlyOriginMarked] = useState(false)
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
@@ -429,6 +528,8 @@ export default function SilenceWindowsPage() {
   const [windowOrigins, setWindowOrigins] = useState<Record<string, WindowOriginMeta>>(() =>
     readWindowOriginsFromStorage(windowOriginTtlDays * DAY_IN_MS)
   )
+  const importOriginsInputRef = useRef<HTMLInputElement | null>(null)
+  const [importingOrigins, setImportingOrigins] = useState(false)
 
   const [deleteDialogWindow, setDeleteDialogWindow] = useState<SilenceWindow | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -543,6 +644,19 @@ export default function SilenceWindowsPage() {
           return false
         }
 
+        const origin = windowOrigins[window.id]
+        const hasOrigin = Boolean(origin)
+
+        if (onlyOriginMarked && !hasOrigin) {
+          return false
+        }
+
+        if (originModeFilter !== "all") {
+          if (!origin || origin.mode !== originModeFilter) {
+            return false
+          }
+        }
+
         if (!keyword) {
           return true
         }
@@ -564,15 +678,35 @@ export default function SilenceWindowsPage() {
         const rightTime = parseDate(right.start_time)?.getTime() || 0
         return rightTime - leftTime
       })
-  }, [searchKeyword, statusFilter, windowOrigins, windows])
+  }, [onlyOriginMarked, originModeFilter, searchKeyword, statusFilter, windowOrigins, windows])
 
-  const hasActiveFilters = Boolean(searchKeyword.trim()) || statusFilter !== "all"
+  const hasActiveFilters =
+    Boolean(searchKeyword.trim()) ||
+    statusFilter !== "all" ||
+    originModeFilter !== "all" ||
+    onlyOriginMarked
   const originMarksCount = Object.keys(windowOrigins).length
+  const originModeCounts = useMemo(() => {
+    return Object.values(windowOrigins).reduce(
+      (accumulator, originMeta) => {
+        if (originMeta.mode === "replaced") {
+          accumulator.replaced += 1
+          return accumulator
+        }
+
+        accumulator.cloned += 1
+        return accumulator
+      },
+      { replaced: 0, cloned: 0 }
+    )
+  }, [windowOrigins])
   const hasWindowOrigins = originMarksCount > 0
 
   const resetFilters = () => {
     setSearchKeyword("")
     setStatusFilter("all")
+    setOriginModeFilter("all")
+    setOnlyOriginMarked(false)
   }
 
   const clearWindowOrigins = () => {
@@ -582,6 +716,92 @@ export default function SilenceWindowsPage() {
 
   const handleWindowOriginTtlDaysChange = (value: string) => {
     setWindowOriginTtlDays(normalizeWindowOriginTtlDays(value))
+  }
+
+  const triggerImportWindowOrigins = () => {
+    importOriginsInputRef.current?.click()
+  }
+
+  const handleImportWindowOrigins = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+
+    if (!file) {
+      return
+    }
+
+    setImportingOrigins(true)
+
+    try {
+      const fileContent = await file.text()
+      const parsedContent = JSON.parse(fileContent)
+      const importedOrigins = parseImportedWindowOrigins(parsedContent)
+      const importedCount = Object.keys(importedOrigins).length
+
+      if (importedCount === 0) {
+        toast.error(t("notifications.silenceToastImportOriginsEmpty"))
+        return
+      }
+
+      setWindowOrigins((previous) => {
+        const merged = mergeWindowOrigins(previous, importedOrigins)
+        return filterActiveWindowOrigins(merged, windowOriginTtlMs)
+      })
+
+      toast.success(t("notifications.silenceToastImportOriginsSuccess", { count: importedCount }))
+    } catch {
+      toast.error(t("notifications.silenceToastImportOriginsError"))
+    } finally {
+      setImportingOrigins(false)
+    }
+  }
+
+  const exportWindowOrigins = () => {
+    if (!hasWindowOrigins) {
+      toast.error(t("notifications.silenceToastExportOriginsEmpty"))
+      return
+    }
+
+    try {
+      const exportedAt = new Date()
+      const entries = Object.entries(windowOrigins)
+        .map(([windowId, originMeta]) => ({
+          window_id: windowId,
+          source_id: originMeta.sourceId,
+          mode: originMeta.mode,
+          created_at: new Date(originMeta.createdAt).toISOString(),
+        }))
+        .sort((left, right) => right.created_at.localeCompare(left.created_at))
+
+      const payload = {
+        schema_version: 1,
+        exported_at: exportedAt.toISOString(),
+        ttl_days: windowOriginTtlDays,
+        total: entries.length,
+        mode_counts: originModeCounts,
+        entries,
+      }
+
+      const fileContent = JSON.stringify(payload, null, 2)
+      const blob = new Blob([fileContent], { type: "application/json" })
+      const objectUrl = window.URL.createObjectURL(blob)
+      const downloadLink = document.createElement("a")
+      const fileTimestamp = exportedAt.toISOString().replace(/[:.]/g, "-")
+
+      downloadLink.href = objectUrl
+      downloadLink.download = `silence-origin-marks-${fileTimestamp}.json`
+      downloadLink.style.display = "none"
+
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
+      downloadLink.remove()
+
+      window.URL.revokeObjectURL(objectUrl)
+
+      toast.success(t("notifications.silenceToastExportOriginsSuccess", { count: entries.length }))
+    } catch {
+      toast.error(t("notifications.silenceToastExportOriginsError"))
+    }
   }
 
   const getStatusAwareMessage = (
@@ -812,71 +1032,145 @@ export default function SilenceWindowsPage() {
         <CardHeader className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>{t("notifications.silenceFiltersTitle")}</CardTitle>
-            <Badge variant={hasWindowOrigins ? "secondary" : "outline"}>
-              {t("notifications.silenceOriginMarksCount", { count: originMarksCount })}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={hasWindowOrigins ? "secondary" : "outline"}>
+                {t("notifications.silenceOriginMarksCount", { count: originMarksCount })}
+              </Badge>
+              <Badge variant={originModeCounts.replaced > 0 ? "secondary" : "outline"}>
+                {t("notifications.silenceOriginReplacedCount", { count: originModeCounts.replaced })}
+              </Badge>
+              <Badge variant={originModeCounts.cloned > 0 ? "secondary" : "outline"}>
+                {t("notifications.silenceOriginClonedCount", { count: originModeCounts.cloned })}
+              </Badge>
+            </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchKeyword}
-                onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder={t("notifications.silenceSearchPlaceholder")}
-                className="pl-9"
-              />
+          <div className="space-y-4">
+            <Input
+              ref={importOriginsInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportWindowOrigins}
+            />
+
+            <div className="rounded-lg border bg-muted/20 p-3 sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+                <div className="relative h-10 sm:col-span-2 xl:col-span-6">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchKeyword}
+                    onChange={(event) => setSearchKeyword(event.target.value)}
+                    placeholder={t("notifications.silenceSearchPlaceholder")}
+                    className="h-10 pl-9"
+                  />
+                </div>
+
+                <div className="xl:col-span-2">
+                  <Select
+                    value={statusFilter}
+                    onValueChange={(value) => setStatusFilter(value as SilenceStatusFilter)}
+                  >
+                    <SelectTrigger className="h-10 w-full bg-background">
+                      <SelectValue placeholder={t("notifications.silenceFilterStatusLabel")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("notifications.silenceFilterStatusAll")}</SelectItem>
+                      <SelectItem value="active">{t("notifications.silenceFilterStatusActive")}</SelectItem>
+                      <SelectItem value="scheduled">{t("notifications.silenceFilterStatusScheduled")}</SelectItem>
+                      <SelectItem value="expired">{t("notifications.silenceFilterStatusExpired")}</SelectItem>
+                      <SelectItem value="unknown">{t("notifications.silenceFilterStatusUnknown")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="xl:col-span-2">
+                  <Select
+                    value={originModeFilter}
+                    onValueChange={(value) => setOriginModeFilter(value as WindowOriginModeFilter)}
+                  >
+                    <SelectTrigger className="h-10 w-full bg-background">
+                      <SelectValue placeholder={t("notifications.silenceFilterOriginModeLabel")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("notifications.silenceFilterOriginModeAll")}</SelectItem>
+                      <SelectItem value="replaced">{t("notifications.silenceFilterOriginModeReplaced")}</SelectItem>
+                      <SelectItem value="cloned">{t("notifications.silenceFilterOriginModeCloned")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="xl:col-span-2">
+                  <Select
+                    value={String(windowOriginTtlDays)}
+                    onValueChange={handleWindowOriginTtlDaysChange}
+                  >
+                    <SelectTrigger className="h-10 w-full bg-background">
+                      <SelectValue placeholder={t("notifications.silenceOriginTtlLabel")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">{t("notifications.silenceOriginTtlOneDay")}</SelectItem>
+                      <SelectItem value="7">{t("notifications.silenceOriginTtlSevenDays")}</SelectItem>
+                      <SelectItem value="30">{t("notifications.silenceOriginTtlThirtyDays")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as SilenceStatusFilter)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("notifications.silenceFilterStatusLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("notifications.silenceFilterStatusAll")}</SelectItem>
-                <SelectItem value="active">{t("notifications.silenceFilterStatusActive")}</SelectItem>
-                <SelectItem value="scheduled">{t("notifications.silenceFilterStatusScheduled")}</SelectItem>
-                <SelectItem value="expired">{t("notifications.silenceFilterStatusExpired")}</SelectItem>
-                <SelectItem value="unknown">{t("notifications.silenceFilterStatusUnknown")}</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={String(windowOriginTtlDays)}
-              onValueChange={handleWindowOriginTtlDaysChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("notifications.silenceOriginTtlLabel")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">{t("notifications.silenceOriginTtlOneDay")}</SelectItem>
-                <SelectItem value="7">{t("notifications.silenceOriginTtlSevenDays")}</SelectItem>
-                <SelectItem value="30">{t("notifications.silenceOriginTtlThirtyDays")}</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="flex w-full gap-2 xl:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={resetFilters}
-                disabled={!hasActiveFilters}
-                className="flex-1 xl:flex-none"
-              >
-                <FilterX className="mr-2 h-4 w-4" />
-                {t("notifications.silenceClearFilters")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={clearWindowOrigins}
-                disabled={!hasWindowOrigins}
-                className="flex-1 xl:flex-none"
-              >
-                {t("notifications.silenceClearOriginsButton")}
-              </Button>
+            <div className="rounded-lg border p-3 sm:p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="flex h-10 items-center justify-between rounded-md border bg-background px-3">
+                  <p className="truncate text-sm">{t("notifications.silenceFilterOriginOnlyLabel")}</p>
+                  <Switch checked={onlyOriginMarked} onCheckedChange={setOnlyOriginMarked} />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetFilters}
+                  disabled={!hasActiveFilters}
+                  title={t("notifications.silenceClearFilters")}
+                  aria-label={t("notifications.silenceClearFilters")}
+                  className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
+                >
+                  <FilterX className="h-4 w-4 shrink-0" />
+                  {t("notifications.silenceClearFiltersShort")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={clearWindowOrigins}
+                  disabled={!hasWindowOrigins}
+                  title={t("notifications.silenceClearOriginsButton")}
+                  aria-label={t("notifications.silenceClearOriginsButton")}
+                  className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
+                >
+                  {t("notifications.silenceClearOriginsShort")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={triggerImportWindowOrigins}
+                  disabled={importingOrigins}
+                  title={t("notifications.silenceImportOriginsButton")}
+                  aria-label={t("notifications.silenceImportOriginsButton")}
+                  className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
+                >
+                  {importingOrigins ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Upload className="h-4 w-4 shrink-0" />}
+                  {t("notifications.silenceImportOriginsShort")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={exportWindowOrigins}
+                  disabled={!hasWindowOrigins}
+                  title={t("notifications.silenceExportOriginsButton")}
+                  aria-label={t("notifications.silenceExportOriginsButton")}
+                  className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
+                >
+                  <Download className="h-4 w-4 shrink-0" />
+                  {t("notifications.silenceExportOriginsShort")}
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
