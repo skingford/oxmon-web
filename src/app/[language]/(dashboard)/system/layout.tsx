@@ -24,25 +24,6 @@ export default function SystemLayout({
 
   return (
     <div className="space-y-4">
-      <div className="px-8 pt-6">
-        <Tabs value={activeTab}>
-          <TabsList className="h-11 bg-muted/50 p-1">
-            <Link href={withLocalePrefix("/system", locale)}>
-              <TabsTrigger value="/system" className="flex h-full items-center gap-2 px-5">
-                <Settings className="h-4 w-4" />
-                {t("labels.itemSystem")}
-              </TabsTrigger>
-            </Link>
-            <Link href={withLocalePrefix("/system/dictionaries", locale)}>
-              <TabsTrigger value="/system/dictionaries" className="flex h-full items-center gap-2 px-5">
-                <BookText className="h-4 w-4" />
-                {t("labels.itemSystemDictionaries")}
-              </TabsTrigger>
-            </Link>
-          </TabsList>
-        </Tabs>
-      </div>
-
       {children}
     </div>
   )

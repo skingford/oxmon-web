@@ -1,14 +1,16 @@
 "use client"
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
-import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { api, getApiErrorMessage } from "@/lib/api"
 import {
   CreateDictionaryRequest,
   DictionaryItem,
-  DictionaryTypeSummary,
   UpdateDictionaryRequest,
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useDictionaryTypes } from "@/hooks/use-dictionary-types"
+import { getStatusAwareMessage } from "@/lib/api-error-utils"
+import { formatDateTime, normalizeNullableText, parseOptionalSortOrder } from "@/lib/dictionary-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -102,52 +104,11 @@ function getEditFormFromItem(item: DictionaryItem): DictionaryFormState {
   }
 }
 
-function normalizeNullableText(value: string) {
-  const trimmed = value.trim()
-  return trimmed ? trimmed : null
-}
-
-function parseOptionalSortOrder(value: string) {
-  const trimmed = value.trim()
-
-  if (!trimmed) {
-    return null
-  }
-
-  const parsed = Number(trimmed)
-
-  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
-    return undefined
-  }
-
-  return parsed
-}
-
-function formatDateTime(value: string, locale: "zh" | "en") {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
-export default function SystemDictionariesPage() {
+export default function SystemDictionaryEntriesPage() {
   const { t, locale } = useAppTranslations("system")
 
-  const [typeSummaries, setTypeSummaries] = useState<DictionaryTypeSummary[]>([])
-  const [selectedType, setSelectedType] = useState("")
   const [items, setItems] = useState<DictionaryItem[]>([])
 
-  const [loadingTypes, setLoadingTypes] = useState(true)
   const [loadingItems, setLoadingItems] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -168,53 +129,22 @@ export default function SystemDictionariesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingEnabledId, setTogglingEnabledId] = useState<string | null>(null)
 
-  const getStatusAwareMessage = (
-    error: unknown,
-    fallback: string,
-    statusMessages?: Partial<Record<number, string>>
-  ) => {
-    if (error instanceof ApiRequestError && statusMessages?.[error.status]) {
-      return statusMessages[error.status] as string
-    }
-
-    return getApiErrorMessage(error, fallback)
-  }
-
-  const fetchDictionaryTypes = useCallback(
-    async (silent = false) => {
-      if (!silent) {
-        setLoadingTypes(true)
-      }
-
-      try {
-        const data = await api.listDictionaryTypes()
-        const sortedTypes = data
-          .slice()
-          .sort((left, right) => left.dict_type.localeCompare(right.dict_type))
-
-        setTypeSummaries(sortedTypes)
-        setSelectedType((previous) => {
-          if (previous && sortedTypes.some((typeSummary) => typeSummary.dict_type === previous)) {
-            return previous
-          }
-
-          return sortedTypes[0]?.dict_type || ""
-        })
-
-        return sortedTypes
-      } catch (error) {
-        toast.error(getApiErrorMessage(error, t("dictionaryToastFetchTypesError")))
-        setTypeSummaries([])
-        setSelectedType("")
-        return []
-      } finally {
-        if (!silent) {
-          setLoadingTypes(false)
-        }
-      }
+  const handleTypeFetchError = useCallback(
+    (error: unknown) => {
+      toast.error(getApiErrorMessage(error, t("dictionaryToastFetchTypesError")))
     },
     [t]
   )
+
+  const {
+    typeSummaries,
+    selectedType,
+    setSelectedType,
+    loadingTypes,
+    fetchDictionaryTypes,
+  } = useDictionaryTypes({
+    onError: handleTypeFetchError,
+  })
 
   const fetchDictionaryItems = useCallback(
     async (dictType: string, silent = false) => {
@@ -245,10 +175,6 @@ export default function SystemDictionariesPage() {
   )
 
   useEffect(() => {
-    fetchDictionaryTypes()
-  }, [fetchDictionaryTypes])
-
-  useEffect(() => {
     if (!selectedType) {
       setItems([])
       setLoadingItems(false)
@@ -261,6 +187,10 @@ export default function SystemDictionariesPage() {
   const selectedTypeSummary = useMemo(() => {
     return typeSummaries.find((summary) => summary.dict_type === selectedType) || null
   }, [selectedType, typeSummaries])
+
+  const currentTypeDisplay = selectedTypeSummary
+    ? `${selectedTypeSummary.dict_type_label} (${selectedTypeSummary.dict_type})`
+    : "-"
 
   const stats = useMemo(() => {
     const total = items.length
@@ -351,6 +281,11 @@ export default function SystemDictionariesPage() {
   }
 
   const openCreateDialog = () => {
+    if (!selectedType || typeSummaries.length === 0) {
+      toast.error(t("dictionaryToastNoTypeToCreateEntry"))
+      return
+    }
+
     setCreateForm(getInitialDictionaryForm(selectedType))
     setIsCreateDialogOpen(true)
   }
@@ -383,6 +318,11 @@ export default function SystemDictionariesPage() {
 
     if (!dictType) {
       toast.error(t("dictionaryToastTypeRequired"))
+      return
+    }
+
+    if (!typeSummaries.some((typeSummary) => typeSummary.dict_type === dictType)) {
+      toast.error(t("dictionaryToastTypeInvalid"))
       return
     }
 
@@ -649,12 +589,21 @@ export default function SystemDictionariesPage() {
                   ) : (
                     typeSummaries.map((typeSummary) => (
                       <SelectItem key={typeSummary.dict_type} value={typeSummary.dict_type}>
-                        {typeSummary.dict_type} ({typeSummary.count})
+                        {typeSummary.dict_type_label} ({typeSummary.dict_type}) · {typeSummary.count}
                       </SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                {selectedTypeSummary
+                  ? t("dictionaryTypeSelectedHint", {
+                      label: selectedTypeSummary.dict_type_label,
+                      type: selectedTypeSummary.dict_type,
+                      count: selectedTypeSummary.count,
+                    })
+                  : t("dictionaryTypeEmpty")}
+              </p>
             </div>
 
             <div className="space-y-2 xl:col-span-2">
@@ -718,7 +667,7 @@ export default function SystemDictionariesPage() {
           <CardTitle>{t("dictionaryTableTitle")}</CardTitle>
           <CardDescription>
             {t("dictionaryTableDescription", {
-              type: selectedTypeSummary?.dict_type || "-",
+              type: currentTypeDisplay,
             })}
           </CardDescription>
         </CardHeader>
@@ -844,23 +793,33 @@ export default function SystemDictionariesPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="dictionary-create-type">{t("dictionaryFieldType")}</Label>
-                <Input
-                  id="dictionary-create-type"
-                  value={createForm.dictType}
-                  onChange={(event) =>
+                <Select
+                  value={createForm.dictType || undefined}
+                  onValueChange={(value) =>
                     setCreateForm((previous) => ({
                       ...previous,
-                      dictType: event.target.value,
+                      dictType: value,
                     }))
                   }
-                  list="dictionary-type-options"
-                  placeholder={t("dictionaryTypePlaceholder")}
-                />
-                <datalist id="dictionary-type-options">
-                  {typeSummaries.map((typeSummary) => (
-                    <option key={typeSummary.dict_type} value={typeSummary.dict_type} />
-                  ))}
-                </datalist>
+                  disabled={typeSummaries.length === 0}
+                >
+                  <SelectTrigger id="dictionary-create-type">
+                    <SelectValue placeholder={t("dictionaryTypePlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typeSummaries.length === 0 ? (
+                      <SelectItem value="__empty__" disabled>
+                        {t("dictionaryTypeEmpty")}
+                      </SelectItem>
+                    ) : (
+                      typeSummaries.map((typeSummary) => (
+                        <SelectItem key={typeSummary.dict_type} value={typeSummary.dict_type}>
+                          {typeSummary.dict_type_label} ({typeSummary.dict_type})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

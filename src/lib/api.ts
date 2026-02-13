@@ -31,9 +31,12 @@ import {
   CreateSilenceWindowRequest,
   EnableRequest,
   DictionaryItem,
+  DictionaryType,
   DictionaryTypeSummary,
   CreateDictionaryRequest,
   UpdateDictionaryRequest,
+  CreateDictionaryTypeRequest,
+  UpdateDictionaryTypeRequest,
 } from "@/types/api"
 import {
   clearAuthToken,
@@ -256,6 +259,15 @@ export const api = {
   // Dictionaries
   listDictionaryTypes: () =>
     request<DictionaryTypeSummary[]>("/v1/dictionaries/types"),
+
+  createDictionaryType: (data: CreateDictionaryTypeRequest) =>
+    request<DictionaryType>("/v1/dictionaries/types", { method: "POST", body: data }),
+
+  updateDictionaryType: (dictType: string, data: UpdateDictionaryTypeRequest) =>
+    request<DictionaryType>(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "PUT", body: data }),
+
+  deleteDictionaryType: (dictType: string) =>
+    request(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "DELETE" }),
 
   listDictionariesByType: async (dictType: string, enabledOnly = false) => {
     const encodedType = encodeURIComponent(dictType)

@@ -363,7 +363,30 @@ export interface DictionaryItem {
 
 export interface DictionaryTypeSummary {
   dict_type: string;
+  dict_type_label: string;
   count: number;
+}
+
+export interface DictionaryType {
+  dict_type: string;
+  dict_type_label: string;
+  sort_order: number;
+  description?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDictionaryTypeRequest {
+  dict_type: string;
+  dict_type_label: string;
+  sort_order?: number | null;
+  description?: string | null;
+}
+
+export interface UpdateDictionaryTypeRequest {
+  dict_type_label?: string | null;
+  sort_order?: number | null;
+  description?: string | null;
 }
 
 export interface CreateDictionaryRequest {
