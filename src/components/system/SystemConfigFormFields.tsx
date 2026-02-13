@@ -3,10 +3,10 @@
 import { Dispatch, SetStateAction } from "react"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { Input } from "@/components/ui/input"
+import { JsonTextarea } from "@/components/ui/json-textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 
 export type SystemConfigFormState = {
   configKey: string
@@ -146,17 +146,17 @@ export function SystemConfigFormFields({
 
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-config-json`}>{t("systemConfigFieldConfigJson")}</Label>
-        <Textarea
+        <JsonTextarea
           id={`${idPrefix}-config-json`}
           value={form.configJson}
-          onChange={(event) =>
+          onChange={(value) =>
             setForm((previous) => ({
               ...previous,
-              configJson: event.target.value,
+              configJson: value,
             }))
           }
           placeholder={t("systemConfigFieldConfigJsonPlaceholder")}
-          className="min-h-[180px] font-mono text-xs"
+          className="min-h-[180px]"
         />
       </div>
     </>

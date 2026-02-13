@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonTextarea } from "@/components/ui/json-textarea"
 
 type AlertRuleFormFieldsProps = {
   ruleForm: CreateAlertRuleRequest
@@ -157,12 +157,12 @@ export function AlertRuleFormFields({
         <Label htmlFor="rule-config" className="font-medium text-gray-900">
           {t("rules.fieldConfig")}
         </Label>
-        <Textarea
+        <JsonTextarea
           id="rule-config"
           value={ruleForm.config_json}
-          onChange={(event) => updateRuleForm({ config_json: event.target.value })}
+          onChange={(value) => updateRuleForm({ config_json: value })}
           placeholder={t("rules.placeholderConfig")}
-          className="font-mono text-xs bg-white border-gray-300 text-gray-900"
+          className="bg-white border-gray-300 text-gray-900"
           rows={4}
         />
       </div>

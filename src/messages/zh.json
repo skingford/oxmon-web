@@ -60,6 +60,19 @@
     "toastTokenCopied": "Token 已复制到剪贴板",
     "toastNoToken": "未找到 Token"
   },
+  "common": {
+    "jsonEditor": {
+      "format": "格式化",
+      "repairAndFormat": "修复并格式化",
+      "copy": "复制",
+      "toastFormatted": "JSON 已格式化",
+      "toastRepaired": "JSON 已自动修复并格式化",
+      "toastCopied": "JSON 已复制到剪贴板",
+      "toastCopyFailed": "复制失败，请手动复制",
+      "toastInvalid": "JSON 格式无效",
+      "invalidHint": "JSON 格式无效"
+    }
+  },
   "alerts": {
     "layout": {
       "title": "告警与规则",

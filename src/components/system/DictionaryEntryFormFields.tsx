@@ -2,6 +2,7 @@
 
 import { Dispatch, SetStateAction } from "react"
 import { Input } from "@/components/ui/input"
+import { JsonTextarea } from "@/components/ui/json-textarea"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -130,13 +131,13 @@ export function DictionaryEntryFormFields({
 
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-extra-json`}>{labels.extraJson}</Label>
-        <Textarea
+        <JsonTextarea
           id={`${idPrefix}-extra-json`}
           value={form.extraJson}
-          onChange={(event) =>
+          onChange={(value) =>
             setForm((previous) => ({
               ...previous,
-              extraJson: event.target.value,
+              extraJson: value,
             }))
           }
           rows={3}

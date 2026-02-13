@@ -60,6 +60,19 @@
     "toastTokenCopied": "Token copied to clipboard",
     "toastNoToken": "Token not found"
   },
+  "common": {
+    "jsonEditor": {
+      "format": "Format",
+      "repairAndFormat": "Repair & Format",
+      "copy": "Copy",
+      "toastFormatted": "JSON formatted",
+      "toastRepaired": "JSON repaired and formatted",
+      "toastCopied": "JSON copied to clipboard",
+      "toastCopyFailed": "Copy failed, please copy manually",
+      "toastInvalid": "Invalid JSON format",
+      "invalidHint": "Invalid JSON format"
+    }
+  },
   "alerts": {
     "layout": {
       "title": "Alerts & Rules",

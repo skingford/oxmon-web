@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { JsonTextarea } from "@/components/ui/json-textarea"
 
 export type NotificationChannelFormState = {
   name: string
@@ -207,17 +208,17 @@ export function NotificationChannelFormFields({
 
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-config`}>{t("notifications.fieldConfigJson")}</Label>
-        <Textarea
+        <JsonTextarea
           id={`${idPrefix}-config`}
           value={form.configJson}
-          onChange={(event) =>
+          onChange={(value) =>
             setForm((previous) => ({
               ...previous,
-              configJson: event.target.value,
+              configJson: value,
             }))
           }
           placeholder={t("notifications.fieldConfigPlaceholder")}
-          className="min-h-[160px] font-mono text-xs"
+          className="min-h-[160px]"
         />
       </div>
     </>
