@@ -8,6 +8,7 @@ import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import {
   Dialog,
   DialogContent,
@@ -45,7 +46,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   ShieldOff,
   Upload,
   Trash2,
@@ -1054,17 +1054,16 @@ export default function SilenceWindowsPage() {
             />
 
             <div className="rounded-lg border bg-muted/20 p-3 sm:p-4">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
-                <div className="relative h-10 sm:col-span-2 xl:col-span-6">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={searchKeyword}
-                    onChange={(event) => setSearchKeyword(event.target.value)}
-                    placeholder={t("notifications.silenceSearchPlaceholder")}
-                    className="h-10 pl-9"
-                  />
-                </div>
-
+              <FilterToolbar
+                className="gap-3 sm:grid-cols-2 xl:grid-cols-12"
+                search={{
+                  value: searchKeyword,
+                  onValueChange: setSearchKeyword,
+                  placeholder: t("notifications.silenceSearchPlaceholder"),
+                  fieldClassName: "sm:col-span-2 xl:col-span-6",
+                  inputClassName: "h-10",
+                }}
+              >
                 <div className="xl:col-span-2">
                   <Select
                     value={statusFilter}
@@ -1114,7 +1113,7 @@ export default function SilenceWindowsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              </FilterToolbar>
             </div>
 
             <div className="rounded-lg border p-3 sm:p-4">

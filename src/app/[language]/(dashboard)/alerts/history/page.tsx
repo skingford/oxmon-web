@@ -7,6 +7,7 @@ import { useAppTranslations } from "@/hooks/use-app-translations"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -253,21 +254,20 @@ export default function AlertHistoryPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <div className="space-y-2">
-              <Label htmlFor="filter-agent">{t("history.filterAgent")}</Label>
-              <Input
-                id="filter-agent"
-                placeholder={t("history.filterAgentPlaceholder")}
-                value={filterAgentId}
-                onChange={(e) => setFilterAgentId(e.target.value)}
-              />
-            </div>
-
+          <FilterToolbar
+            className="gap-4 md:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5"
+            search={{
+              value: filterAgentId,
+              onValueChange: setFilterAgentId,
+              placeholder: t("history.filterAgentPlaceholder"),
+              label: t("history.filterAgent"),
+              inputClassName: "h-10",
+            }}
+          >
             <div className="space-y-2">
               <Label htmlFor="filter-severity">{t("history.filterSeverity")}</Label>
               <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                <SelectTrigger id="filter-severity">
+                <SelectTrigger id="filter-severity" className="h-10 w-full bg-background">
                   <SelectValue placeholder={t("history.filterSelectAllPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -282,7 +282,7 @@ export default function AlertHistoryPage() {
             <div className="space-y-2">
               <Label htmlFor="filter-status">{t("history.filterStatus")}</Label>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger id="filter-status">
+                <SelectTrigger id="filter-status" className="h-10 w-full bg-background">
                   <SelectValue placeholder={t("history.filterSelectAllPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -301,6 +301,7 @@ export default function AlertHistoryPage() {
                 type="datetime-local"
                 value={filterTimeFrom}
                 onChange={(e) => setFilterTimeFrom(e.target.value)}
+                className="h-10"
               />
             </div>
 
@@ -311,9 +312,10 @@ export default function AlertHistoryPage() {
                 type="datetime-local"
                 value={filterTimeTo}
                 onChange={(e) => setFilterTimeTo(e.target.value)}
+                className="h-10"
               />
             </div>
-          </div>
+          </FilterToolbar>
 
           <div className="mt-4 flex items-center gap-2">
             <Button onClick={handleApplyFilters}>

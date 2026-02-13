@@ -9,6 +9,7 @@ import { MetricDataPointResponse, MetricSummaryResponse } from "@/types/api"
 import { useRequestState } from "@/hooks/use-request-state"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -574,12 +575,16 @@ function MetricsPageContent() {
               </Select>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <div className="text-sm text-muted-foreground">{t("metrics.labelFilterLabel")}</div>
-              <Input
-                placeholder={t("metrics.labelFilterPlaceholder")}
-                value={labelFilter}
-                onChange={(event) => setLabelFilter(event.target.value)}
+            <div className="md:col-span-2">
+              <FilterToolbar
+                className="md:grid-cols-1 xl:grid-cols-1"
+                search={{
+                  value: labelFilter,
+                  onValueChange: setLabelFilter,
+                  placeholder: t("metrics.labelFilterPlaceholder"),
+                  label: t("metrics.labelFilterLabel"),
+                  inputClassName: "h-10",
+                }}
               />
             </div>
 

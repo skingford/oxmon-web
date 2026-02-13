@@ -10,6 +10,7 @@ import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import {
   Dialog,
   DialogContent,
@@ -862,38 +863,46 @@ export default function DomainsPage() {
           <CardTitle>{t("certificates.domains.filtersTitle")}</CardTitle>
           <CardDescription>{t("certificates.domains.filtersDescription")}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          <Input
-            value={domainKeyword}
-            onChange={(event) => handleDomainKeywordChange(event.target.value)}
-            placeholder={t("certificates.domains.filterDomainPlaceholder")}
-          />
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant={statusFilter === "all" ? "default" : "outline"}
-              onClick={() => handleStatusFilterChange("all")}
-            >
-              {t("certificates.domains.filterStatusAll")}
-            </Button>
-            <Button
-              type="button"
-              variant={statusFilter === "enabled" ? "default" : "outline"}
-              onClick={() => handleStatusFilterChange("enabled")}
-            >
-              {t("certificates.domains.filterStatusEnabled")}
-            </Button>
-            <Button
-              type="button"
-              variant={statusFilter === "disabled" ? "default" : "outline"}
-              onClick={() => handleStatusFilterChange("disabled")}
-            >
-              {t("certificates.domains.filterStatusDisabled")}
-            </Button>
-            <Button type="button" variant="outline" onClick={handleResetFilters}>
-              {t("certificates.domains.clearFilters")}
-            </Button>
-          </div>
+        <CardContent>
+          <FilterToolbar
+            className="gap-3 md:grid-cols-2 xl:grid-cols-2"
+            search={{
+              value: domainKeyword,
+              onValueChange: handleDomainKeywordChange,
+              placeholder: t("certificates.domains.filterDomainPlaceholder"),
+              inputClassName: "h-10",
+            }}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant={statusFilter === "all" ? "default" : "outline"}
+                onClick={() => handleStatusFilterChange("all")}
+                className="h-10"
+              >
+                {t("certificates.domains.filterStatusAll")}
+              </Button>
+              <Button
+                type="button"
+                variant={statusFilter === "enabled" ? "default" : "outline"}
+                onClick={() => handleStatusFilterChange("enabled")}
+                className="h-10"
+              >
+                {t("certificates.domains.filterStatusEnabled")}
+              </Button>
+              <Button
+                type="button"
+                variant={statusFilter === "disabled" ? "default" : "outline"}
+                onClick={() => handleStatusFilterChange("disabled")}
+                className="h-10"
+              >
+                {t("certificates.domains.filterStatusDisabled")}
+              </Button>
+              <Button type="button" variant="outline" onClick={handleResetFilters} className="h-10">
+                {t("certificates.domains.clearFilters")}
+              </Button>
+            </div>
+          </FilterToolbar>
         </CardContent>
       </Card>
 
