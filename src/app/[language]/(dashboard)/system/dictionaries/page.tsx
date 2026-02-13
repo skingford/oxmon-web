@@ -9,6 +9,10 @@ import {
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useDictionaryTypes } from "@/hooks/use-dictionary-types"
+import {
+  DictionaryEntryFormFields,
+  DictionaryEntryFormState,
+} from "@/components/system/DictionaryEntryFormFields"
 import { getStatusAwareMessage } from "@/lib/api-error-utils"
 import { formatDateTime, normalizeNullableText, parseOptionalSortOrder } from "@/lib/dictionary-utils"
 import { Badge } from "@/components/ui/badge"
@@ -34,7 +38,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,17 +60,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-type DictionaryFormState = {
-  dictType: string
-  dictKey: string
-  dictLabel: string
-  dictValue: string
-  sortOrder: string
-  enabled: boolean
-  description: string
-  extraJson: string
-}
-
 type DictionarySortMode =
   | "sort_order_asc"
   | "sort_order_desc"
@@ -78,7 +70,7 @@ type DictionarySortMode =
 
 const DEFAULT_DICTIONARY_SORT_MODE: DictionarySortMode = "sort_order_asc"
 
-function getInitialDictionaryForm(dictType: string): DictionaryFormState {
+function getInitialDictionaryForm(dictType: string): DictionaryEntryFormState {
   return {
     dictType,
     dictKey: "",
@@ -91,7 +83,7 @@ function getInitialDictionaryForm(dictType: string): DictionaryFormState {
   }
 }
 
-function getEditFormFromItem(item: DictionaryItem): DictionaryFormState {
+function getEditFormFromItem(item: DictionaryItem): DictionaryEntryFormState {
   return {
     dictType: item.dict_type,
     dictKey: item.dict_key,
@@ -118,12 +110,12 @@ export default function SystemDictionaryEntriesPage() {
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
-  const [createForm, setCreateForm] = useState<DictionaryFormState>(() => getInitialDictionaryForm(""))
+  const [createForm, setCreateForm] = useState<DictionaryEntryFormState>(() => getInitialDictionaryForm(""))
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<DictionaryItem | null>(null)
   const [editSubmitting, setEditSubmitting] = useState(false)
-  const [editForm, setEditForm] = useState<DictionaryFormState>(() => getInitialDictionaryForm(""))
+  const [editForm, setEditForm] = useState<DictionaryEntryFormState>(() => getInitialDictionaryForm(""))
 
   const [deleteTarget, setDeleteTarget] = useState<DictionaryItem | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -566,7 +558,7 @@ export default function SystemDictionaryEntriesPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2">
               <Label>{t("dictionaryTypeLabel")}</Label>
               <Select
@@ -574,7 +566,7 @@ export default function SystemDictionaryEntriesPage() {
                 onValueChange={(value) => setSelectedType(value)}
                 disabled={loadingTypes || typeSummaries.length === 0}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 w-full bg-background">
                   <SelectValue
                     placeholder={
                       loadingTypes ? t("dictionaryLoading") : t("dictionaryTypePlaceholder")
@@ -595,18 +587,9 @@ export default function SystemDictionaryEntriesPage() {
                   )}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                {selectedTypeSummary
-                  ? t("dictionaryTypeSelectedHint", {
-                      label: selectedTypeSummary.dict_type_label,
-                      type: selectedTypeSummary.dict_type,
-                      count: selectedTypeSummary.count,
-                    })
-                  : t("dictionaryTypeEmpty")}
-              </p>
             </div>
 
-            <div className="space-y-2 xl:col-span-2">
+            <div className="space-y-2">
               <Label>{t("dictionarySearchPlaceholder")}</Label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -614,7 +597,7 @@ export default function SystemDictionaryEntriesPage() {
                   value={searchKeyword}
                   onChange={(event) => setSearchKeyword(event.target.value)}
                   placeholder={t("dictionarySearchPlaceholder")}
-                  className="pl-9"
+                  className="h-10 pl-9"
                 />
               </div>
             </div>
@@ -625,7 +608,7 @@ export default function SystemDictionaryEntriesPage() {
                 value={sortMode}
                 onValueChange={(value) => setSortMode(value as DictionarySortMode)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 w-full bg-background">
                   <SelectValue placeholder={t("dictionarySortPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -639,14 +622,20 @@ export default function SystemDictionaryEntriesPage() {
               </Select>
             </div>
 
-            <div className="flex h-full items-end">
-              <div className="flex h-10 w-full items-center justify-between rounded-md border px-3">
-                <p className="text-sm">{t("dictionaryEnabledOnlyShort")}</p>
-                <Switch checked={enabledOnly} onCheckedChange={setEnabledOnly} />
+            <div className="space-y-2">
+              <Label>{t("dictionaryEnabledOnlyShort")}</Label>
+              <div className="flex h-10 w-full items-center justify-between rounded-md border bg-background px-3">
+                <p className="text-sm text-muted-foreground">{t("dictionaryEnabledOnlyShort")}</p>
+                <Switch
+                  checked={enabledOnly}
+                  onCheckedChange={setEnabledOnly}
+                  aria-label={t("dictionaryEnabledOnlyShort")}
+                />
               </div>
             </div>
 
-            <div className="flex h-full items-end">
+            <div className="space-y-2">
+              <Label className="invisible">{t("dictionaryResetFilters")}</Label>
               <Button
                 type="button"
                 variant="outline"
@@ -659,6 +648,16 @@ export default function SystemDictionaryEntriesPage() {
               </Button>
             </div>
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            {selectedTypeSummary
+              ? t("dictionaryTypeSelectedHint", {
+                  label: selectedTypeSummary.dict_type_label,
+                  type: selectedTypeSummary.dict_type,
+                  count: selectedTypeSummary.count,
+                })
+              : t("dictionaryTypeEmpty")}
+          </p>
         </CardHeader>
       </Card>
 
@@ -837,102 +836,24 @@ export default function SystemDictionaryEntriesPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="dictionary-create-label">{t("dictionaryFieldLabel")}</Label>
-                <Input
-                  id="dictionary-create-label"
-                  value={createForm.dictLabel}
-                  onChange={(event) =>
-                    setCreateForm((previous) => ({
-                      ...previous,
-                      dictLabel: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dictionary-create-value">{t("dictionaryFieldValue")}</Label>
-                <Input
-                  id="dictionary-create-value"
-                  value={createForm.dictValue}
-                  onChange={(event) =>
-                    setCreateForm((previous) => ({
-                      ...previous,
-                      dictValue: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="dictionary-create-sort">{t("dictionaryFieldSortOrder")}</Label>
-                <Input
-                  id="dictionary-create-sort"
-                  value={createForm.sortOrder}
-                  onChange={(event) =>
-                    setCreateForm((previous) => ({
-                      ...previous,
-                      sortOrder: event.target.value,
-                    }))
-                  }
-                  placeholder="0"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t("dictionaryFieldEnabled")}</Label>
-                <div className="flex h-10 items-center justify-between rounded-md border px-3">
-                  <span className="text-sm">
-                    {createForm.enabled ? t("dictionaryStatusEnabled") : t("dictionaryStatusDisabled")}
-                  </span>
-                  <Switch
-                    checked={createForm.enabled}
-                    onCheckedChange={(checked) =>
-                      setCreateForm((previous) => ({
-                        ...previous,
-                        enabled: checked,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dictionary-create-description">{t("dictionaryFieldDescription")}</Label>
-              <Textarea
-                id="dictionary-create-description"
-                value={createForm.description}
-                onChange={(event) =>
-                  setCreateForm((previous) => ({
-                    ...previous,
-                    description: event.target.value,
-                  }))
-                }
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dictionary-create-extra-json">{t("dictionaryFieldExtraJson")}</Label>
-              <Textarea
-                id="dictionary-create-extra-json"
-                value={createForm.extraJson}
-                onChange={(event) =>
-                  setCreateForm((previous) => ({
-                    ...previous,
-                    extraJson: event.target.value,
-                  }))
-                }
-                rows={3}
-                placeholder='{"key":"value"}'
-              />
-              <p className="text-xs text-muted-foreground">{t("dictionaryFieldExtraJsonHint")}</p>
-            </div>
+            <DictionaryEntryFormFields
+              form={createForm}
+              setForm={setCreateForm}
+              idPrefix="dictionary-create"
+              labels={{
+                label: t("dictionaryFieldLabel"),
+                value: t("dictionaryFieldValue"),
+                sortOrder: t("dictionaryFieldSortOrder"),
+                enabled: t("dictionaryFieldEnabled"),
+                statusEnabled: t("dictionaryStatusEnabled"),
+                statusDisabled: t("dictionaryStatusDisabled"),
+                description: t("dictionaryFieldDescription"),
+                extraJson: t("dictionaryFieldExtraJson"),
+                extraJsonHint: t("dictionaryFieldExtraJsonHint"),
+              }}
+              sortPlaceholder="0"
+              extraJsonPlaceholder='{"key":"value"}'
+            />
 
             <DialogFooter>
               <Button
@@ -982,98 +903,22 @@ export default function SystemDictionaryEntriesPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="dictionary-edit-label">{t("dictionaryFieldLabel")}</Label>
-                <Input
-                  id="dictionary-edit-label"
-                  value={editForm.dictLabel}
-                  onChange={(event) =>
-                    setEditForm((previous) => ({
-                      ...previous,
-                      dictLabel: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dictionary-edit-value">{t("dictionaryFieldValue")}</Label>
-                <Input
-                  id="dictionary-edit-value"
-                  value={editForm.dictValue}
-                  onChange={(event) =>
-                    setEditForm((previous) => ({
-                      ...previous,
-                      dictValue: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="dictionary-edit-sort">{t("dictionaryFieldSortOrder")}</Label>
-                <Input
-                  id="dictionary-edit-sort"
-                  value={editForm.sortOrder}
-                  onChange={(event) =>
-                    setEditForm((previous) => ({
-                      ...previous,
-                      sortOrder: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>{t("dictionaryFieldEnabled")}</Label>
-                <div className="flex h-10 items-center justify-between rounded-md border px-3">
-                  <span className="text-sm">
-                    {editForm.enabled ? t("dictionaryStatusEnabled") : t("dictionaryStatusDisabled")}
-                  </span>
-                  <Switch
-                    checked={editForm.enabled}
-                    onCheckedChange={(checked) =>
-                      setEditForm((previous) => ({
-                        ...previous,
-                        enabled: checked,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dictionary-edit-description">{t("dictionaryFieldDescription")}</Label>
-              <Textarea
-                id="dictionary-edit-description"
-                value={editForm.description}
-                onChange={(event) =>
-                  setEditForm((previous) => ({
-                    ...previous,
-                    description: event.target.value,
-                  }))
-                }
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dictionary-edit-extra-json">{t("dictionaryFieldExtraJson")}</Label>
-              <Textarea
-                id="dictionary-edit-extra-json"
-                value={editForm.extraJson}
-                onChange={(event) =>
-                  setEditForm((previous) => ({
-                    ...previous,
-                    extraJson: event.target.value,
-                  }))
-                }
-                rows={3}
-              />
-              <p className="text-xs text-muted-foreground">{t("dictionaryFieldExtraJsonHint")}</p>
-            </div>
+            <DictionaryEntryFormFields
+              form={editForm}
+              setForm={setEditForm}
+              idPrefix="dictionary-edit"
+              labels={{
+                label: t("dictionaryFieldLabel"),
+                value: t("dictionaryFieldValue"),
+                sortOrder: t("dictionaryFieldSortOrder"),
+                enabled: t("dictionaryFieldEnabled"),
+                statusEnabled: t("dictionaryStatusEnabled"),
+                statusDisabled: t("dictionaryStatusDisabled"),
+                description: t("dictionaryFieldDescription"),
+                extraJson: t("dictionaryFieldExtraJson"),
+                extraJsonHint: t("dictionaryFieldExtraJsonHint"),
+              }}
+            />
 
             <DialogFooter>
               <Button

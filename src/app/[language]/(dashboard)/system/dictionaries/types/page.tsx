@@ -351,15 +351,18 @@ export default function SystemDictionaryTypesPage() {
 
       <Card>
         <CardContent className="space-y-3 pt-6">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-center">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={typeKeyword}
-                onChange={(event) => setTypeKeyword(event.target.value)}
-                placeholder={t("dictionaryTypeSearchPlaceholder")}
-                className="pl-9"
-              />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-2">
+              <Label>{t("dictionaryTypeSearchPlaceholder")}</Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={typeKeyword}
+                  onChange={(event) => setTypeKeyword(event.target.value)}
+                  placeholder={t("dictionaryTypeSearchPlaceholder")}
+                  className="h-10 pl-9"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -368,7 +371,7 @@ export default function SystemDictionaryTypesPage() {
                 value={typeSortMode}
                 onValueChange={(value) => setTypeSortMode(value as DictionaryTypeSortMode)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 w-full bg-background">
                   <SelectValue placeholder={t("dictionaryTypeSortLabel")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -380,12 +383,17 @@ export default function SystemDictionaryTypesPage() {
               </Select>
             </div>
 
-            <p className="text-sm text-muted-foreground lg:justify-self-end">
-              {t("dictionaryTypeTableStats", {
-                visible: filteredTypeSummaries.length,
-                total: typeSummaries.length,
-              })}
-            </p>
+            <div className="space-y-2">
+              <Label className="invisible">{t("dictionaryTypeTableStats", { visible: 0, total: 0 })}</Label>
+              <div className="flex h-10 w-full items-center rounded-md border bg-background px-3">
+                <p className="text-sm text-muted-foreground">
+                  {t("dictionaryTypeTableStats", {
+                    visible: filteredTypeSummaries.length,
+                    total: typeSummaries.length,
+                  })}
+                </p>
+              </div>
+            </div>
           </div>
 
           <Table>
