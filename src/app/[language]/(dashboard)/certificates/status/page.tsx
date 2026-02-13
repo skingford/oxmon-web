@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner"
 
 const PAGE_LIMIT = 20
+type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
 function formatDateTime(value: string | null, locale: "zh" | "en") {
   if (!value) {
@@ -53,7 +54,7 @@ function formatDateTime(value: string | null, locale: "zh" | "en") {
 
 function getStatusMeta(
   status: CertCheckResult,
-  t: (path: any, values?: Record<string, string | number>) => string
+  t: TranslateFn
 ) {
   if (status.is_valid && status.chain_valid) {
     return {

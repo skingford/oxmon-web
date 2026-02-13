@@ -3,20 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { AlertEventResponse } from "@/types/api"
-import { useAppTranslations } from "@/hooks/use-app-translations"
+import {
+  useAppTranslations,
+  type AppNamespaceTranslator,
+} from "@/hooks/use-app-translations"
+import { AlertHistoryFiltersCard } from "@/components/alerts/AlertHistoryFiltersCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -33,11 +27,18 @@ import {
   Loader2,
   Info,
   XCircle,
-  Filter,
-  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
+
+type AlertHistoryParams = {
+  limit: number
+  offset: number
+  agent_id__eq?: string
+  severity__eq?: string
+  timestamp__gte?: string
+  timestamp__lte?: string
+}
 
 function TableRowSkeleton() {
   return (
@@ -103,7 +104,25 @@ function getSeverityIcon(severity: string) {
   return AlertCircle
 }
 
-function getStatusBadge(alert: AlertEventResponse, t: any) {
+function getSeverityText(severity: string, t: AppNamespaceTranslator<"alerts">) {
+  const normalized = severity.toLowerCase()
+
+  if (normalized === "critical") {
+    return t("severity.critical")
+  }
+
+  if (normalized === "warning") {
+    return t("severity.warning")
+  }
+
+  if (normalized === "info") {
+    return t("severity.info")
+  }
+
+  return severity
+}
+
+function getStatusBadge(alert: AlertEventResponse, t: AppNamespaceTranslator<"alerts">) {
   // 状态: 1=未处理, 2=已确认, 3=已处理
   switch (alert.status) {
     case 3:
@@ -164,7 +183,7 @@ export default function AlertHistoryPage() {
     setLoading(true)
 
     try {
-      const params: any = { limit, offset }
+      const params: AlertHistoryParams = { limit, offset }
 
       if (filterAgentId.trim()) {
         params.agent_id__eq = filterAgentId.trim()
@@ -235,162 +254,21 @@ export default function AlertHistoryPage() {
         <p className="text-sm text-muted-foreground">{t("history.description")}</p>
       </div>
 
-      <Card className="glass-card">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                {t("history.filtersTitle")}
-              </CardTitle>
-              <CardDescription>{t("history.filtersDescription")}</CardDescription>
-            </div>
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={handleResetFilters}>
-                <X className="mr-2 h-4 w-4" />
-                {t("history.clearAllFilters")}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <FilterToolbar
-            className="gap-4 md:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5"
-            search={{
-              value: filterAgentId,
-              onValueChange: setFilterAgentId,
-              placeholder: t("history.filterAgentPlaceholder"),
-              label: t("history.filterAgent"),
-              inputClassName: "h-10",
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="filter-severity">{t("history.filterSeverity")}</Label>
-              <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                <SelectTrigger id="filter-severity" className="h-10 w-full bg-background">
-                  <SelectValue placeholder={t("history.filterSelectAllPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("history.statusAll")}</SelectItem>
-                  <SelectItem value="critical">{t("severity.critical")}</SelectItem>
-                  <SelectItem value="warning">{t("severity.warning")}</SelectItem>
-                  <SelectItem value="info">{t("severity.info")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filter-status">{t("history.filterStatus")}</Label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger id="filter-status" className="h-10 w-full bg-background">
-                  <SelectValue placeholder={t("history.filterSelectAllPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("history.statusAll")}</SelectItem>
-                  <SelectItem value="resolved">{t("history.statusResolved")}</SelectItem>
-                  <SelectItem value="acknowledged">{t("history.statusAcknowledged")}</SelectItem>
-                  <SelectItem value="open">{t("history.statusOpen")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filter-from">{t("history.filterTimeFrom")}</Label>
-              <Input
-                id="filter-from"
-                type="datetime-local"
-                value={filterTimeFrom}
-                onChange={(e) => setFilterTimeFrom(e.target.value)}
-                className="h-10"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filter-to">{t("history.filterTimeTo")}</Label>
-              <Input
-                id="filter-to"
-                type="datetime-local"
-                value={filterTimeTo}
-                onChange={(e) => setFilterTimeTo(e.target.value)}
-                className="h-10"
-              />
-            </div>
-          </FilterToolbar>
-
-          <div className="mt-4 flex items-center gap-2">
-            <Button onClick={handleApplyFilters}>
-              <Filter className="mr-2 h-4 w-4" />
-              {t("history.filterApply")}
-            </Button>
-            <Button variant="outline" onClick={handleResetFilters}>
-              {t("history.filterReset")}
-            </Button>
-          </div>
-
-          {hasActiveFilters && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">{t("history.activeFiltersLabel")}</span>
-              {filterAgentId && (
-                <Badge variant="secondary" className="gap-1">
-                  {t("history.activeFilterAgent", { value: filterAgentId })}
-                  <button
-                    onClick={() => setFilterAgentId("")}
-                    className="ml-1 hover:text-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {filterSeverity && filterSeverity !== "all" && (
-                <Badge variant="secondary" className="gap-1">
-                  {t("history.activeFilterSeverity", { value: t(`severity.${filterSeverity}` as any) })}
-                  <button
-                    onClick={() => setFilterSeverity("")}
-                    className="ml-1 hover:text-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {filterStatus && filterStatus !== "all" && (
-                <Badge variant="secondary" className="gap-1">
-                  {t("history.activeFilterStatus", {
-                    value: t(`history.status${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)}` as any),
-                  })}
-                  <button
-                    onClick={() => setFilterStatus("")}
-                    className="ml-1 hover:text-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {filterTimeFrom && (
-                <Badge variant="secondary" className="gap-1">
-                  {t("history.activeFilterStart", { value: new Date(filterTimeFrom).toLocaleDateString() })}
-                  <button
-                    onClick={() => setFilterTimeFrom("")}
-                    className="ml-1 hover:text-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {filterTimeTo && (
-                <Badge variant="secondary" className="gap-1">
-                  {t("history.activeFilterEnd", { value: new Date(filterTimeTo).toLocaleDateString() })}
-                  <button
-                    onClick={() => setFilterTimeTo("")}
-                    className="ml-1 hover:text-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <AlertHistoryFiltersCard
+        filterAgentId={filterAgentId}
+        filterSeverity={filterSeverity}
+        filterStatus={filterStatus}
+        filterTimeFrom={filterTimeFrom}
+        filterTimeTo={filterTimeTo}
+        hasActiveFilters={Boolean(hasActiveFilters)}
+        onFilterAgentIdChange={setFilterAgentId}
+        onFilterSeverityChange={setFilterSeverity}
+        onFilterStatusChange={setFilterStatus}
+        onFilterTimeFromChange={setFilterTimeFrom}
+        onFilterTimeToChange={setFilterTimeTo}
+        onApplyFilters={handleApplyFilters}
+        onResetFilters={handleResetFilters}
+      />
 
       <Card className="glass-card">
         <CardHeader>
@@ -454,7 +332,7 @@ export default function AlertHistoryPage() {
                         <TableCell>
                           <Badge className={getSeverityBadgeClass(alert.severity)}>
                             <SeverityIcon className="mr-1 h-3 w-3" />
-                            {t(`severity.${alert.severity.toLowerCase()}` as any)}
+                            {getSeverityText(alert.severity, t)}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-mono text-xs">{alert.agent_id}</TableCell>

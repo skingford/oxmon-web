@@ -1,6 +1,7 @@
 "use client"
 
 import { Dispatch, SetStateAction } from "react"
+import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -23,7 +24,7 @@ type SystemConfigFormFieldsProps = {
   idPrefix: string
   isEditing: boolean
   providerReadOnly: boolean
-  t: (path: string, values?: Record<string, string | number>) => string
+  t: AppNamespaceTranslator<"system">
 }
 
 export function SystemConfigFormFields({

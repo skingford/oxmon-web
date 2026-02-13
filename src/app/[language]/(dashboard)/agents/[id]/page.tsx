@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
 import { LatestMetric } from "@/types/api"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -118,8 +118,8 @@ export default function AgentDetailPage() {
           onSuccess: () => {
             setNotFound(false)
           },
-          onError: (error: any) => {
-            if (error?.status === 404) {
+          onError: (error: unknown) => {
+            if (error instanceof ApiRequestError && error.status === 404) {
               setNotFound(true)
               setMetrics([])
               return

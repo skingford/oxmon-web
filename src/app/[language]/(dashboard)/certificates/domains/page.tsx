@@ -58,6 +58,7 @@ import { toast } from "sonner"
 
 const PAGE_LIMIT = 20
 const AUTO_CREATE_ADVANCED_STORAGE_KEY = "certificates:auto-create-advanced:v1"
+type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
 function formatDateTime(value: string | null, locale: "zh" | "en") {
   if (!value) {
@@ -96,7 +97,7 @@ function parseOptionalNonNegativeInt(value: string) {
 
 function getDomainStatusMeta(
   enabled: boolean,
-  t: (path: any, values?: Record<string, string | number>) => string
+  t: TranslateFn
 ) {
   if (enabled) {
     return {

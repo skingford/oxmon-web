@@ -54,6 +54,7 @@ type TokenDialogState = {
   title: string
   description: string
 }
+type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
 function formatTimestamp(timestamp: string | null, locale: "zh" | "en") {
   if (!timestamp) {
@@ -78,7 +79,7 @@ function formatTimestamp(timestamp: string | null, locale: "zh" | "en") {
 
 function getStatusMeta(
   status: string,
-  t: (path: any, values?: Record<string, string | number>) => string
+  t: TranslateFn
 ) {
   const normalized = status.toLowerCase()
 

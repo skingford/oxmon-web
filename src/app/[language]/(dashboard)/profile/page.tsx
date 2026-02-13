@@ -14,13 +14,20 @@ import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 
+type JwtPayload = {
+  sub?: string
+  username?: string
+  iat?: number
+  exp?: number
+}
+
 export default function ProfilePage() {
   const { t } = useAppTranslations("profile")
   const locale = useAppLocale()
   const [token, setToken] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [showToken, setShowToken] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<JwtPayload | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -32,7 +39,7 @@ export default function ProfilePage() {
         const payloadPart = t.split(".")[1]
         if (payloadPart) {
           const base64 = payloadPart.replace(/-/g, "+").replace(/_/g, "/")
-          const decoded = JSON.parse(window.atob(base64))
+          const decoded = JSON.parse(window.atob(base64)) as JwtPayload
           setUser(decoded)
         }
       } catch (e) {

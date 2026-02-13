@@ -3,7 +3,10 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
 import { CreateSilenceWindowRequest, SilenceWindow } from "@/types/api"
-import { useAppTranslations } from "@/hooks/use-app-translations"
+import {
+  useAppTranslations,
+  type AppNamespaceTranslator,
+} from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -67,7 +70,6 @@ type WindowOriginMeta = {
   mode: WindowOriginMode
   createdAt: number
 }
-
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 const WINDOW_ORIGIN_TTL_OPTIONS = [1, 7, 30] as const
 const WINDOW_ORIGIN_TTL_DEFAULT_DAYS = 7
@@ -385,7 +387,7 @@ function formatDuration(milliseconds: number, locale: "zh" | "en") {
 
 function getStatusMeta(
   status: SilenceStatus,
-  t: (path: any, values?: Record<string, string | number>) => string
+  t: AppNamespaceTranslator<"pages">
 ) {
   if (status === "active") {
     return {

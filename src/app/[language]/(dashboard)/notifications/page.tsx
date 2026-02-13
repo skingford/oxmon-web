@@ -9,7 +9,10 @@ import {
   SystemConfigResponse,
   UpdateChannelConfigRequest,
 } from "@/types/api"
-import { useAppTranslations } from "@/hooks/use-app-translations"
+import {
+  useAppTranslations,
+  type AppNamespaceTranslator,
+} from "@/hooks/use-app-translations"
 import {
   NotificationChannelFormFields,
   NotificationChannelFormState,
@@ -69,7 +72,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-const PAGE_LIMIT = 100
 const CHANNEL_SEVERITY_OPTIONS = ["info", "warning", "critical"] as const
 
 type NotificationsQueryState = {
@@ -79,7 +81,6 @@ type NotificationsQueryState = {
 }
 
 type NotificationStatusFilter = "all" | "enabled" | "disabled"
-
 
 function formatDateTime(value: string | null, locale: "zh" | "en") {
   if (!value) {
@@ -161,7 +162,7 @@ function createConfigMap(rows: ChannelConfig[] | unknown[]): Record<string, stri
 
 function getChannelTypeLabel(
   type: string,
-  t: (path: any, values?: Record<string, string | number>) => string
+  t: AppNamespaceTranslator<"pages">
 ) {
   const normalized = type.toLowerCase()
 
@@ -186,7 +187,7 @@ function getChannelTypeLabel(
 
 function getSeverityLabel(
   severity: string,
-  t: (path: any, values?: Record<string, string | number>) => string
+  t: AppNamespaceTranslator<"pages">
 ) {
   const normalized = severity.toLowerCase()
 
@@ -294,11 +295,11 @@ export default function NotificationsPage() {
       await execute(
         async () => {
           const [channelRows, configRows] = await Promise.all([
-            api.listChannels({ limit: PAGE_LIMIT, offset: 0 }),
-            api.listChannelConfigs({ limit: PAGE_LIMIT, offset: 0 }).catch(() => []),
+            api.listChannels(),
+            api.listChannelConfigs().catch(() => []),
           ])
           const systemConfigRows = await api
-            .listSystemConfigs({ limit: PAGE_LIMIT, offset: 0 })
+            .listSystemConfigs()
             .catch(() => [])
 
           return {

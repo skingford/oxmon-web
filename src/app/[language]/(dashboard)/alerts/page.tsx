@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { AlertEventResponse, AlertSummary } from "@/types/api"
-import { useAppTranslations } from "@/hooks/use-app-translations"
+import {
+  useAppTranslations,
+  type AppNamespaceTranslator,
+} from "@/hooks/use-app-translations"
+import { ActiveAlertsListHeader, ActiveAlertsTopControls } from "@/components/alerts/ActiveAlertsHeader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -16,10 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -33,10 +34,8 @@ import {
   CheckCircle,
   CheckCheck,
   Loader2,
-  RefreshCw,
   AlertTriangle,
   Info,
-  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
@@ -127,7 +126,7 @@ function getSeverityIcon(severity: string) {
 function formatTimestamp(
   timestamp: string,
   locale: "zh" | "en",
-  t: (path: string, values?: Record<string, string | number>) => string
+  t: AppNamespaceTranslator<"alerts">
 ) {
   try {
     const date = new Date(timestamp)
@@ -153,6 +152,27 @@ function formatTimestamp(
   } catch {
     return timestamp
   }
+}
+
+function getSeverityLabel(
+  severity: string,
+  t: AppNamespaceTranslator<"alerts">
+) {
+  const normalized = severity.toLowerCase()
+
+  if (normalized === "critical") {
+    return t("severity.critical")
+  }
+
+  if (normalized === "warning") {
+    return t("severity.warning")
+  }
+
+  if (normalized === "info") {
+    return t("severity.info")
+  }
+
+  return severity
 }
 
 function formatFullTimestamp(timestamp: string, locale: "zh" | "en") {
@@ -402,39 +422,13 @@ export default function ActiveAlertsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">{t("active.title")}</h2>
-          <p className="text-sm text-muted-foreground">{t("active.description")}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Switch
-              id="auto-refresh"
-              checked={autoRefresh}
-              onCheckedChange={setAutoRefresh}
-            />
-            <Label htmlFor="auto-refresh" className="text-sm cursor-pointer">
-              {t("active.autoRefresh")}
-            </Label>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => fetchData(true)}
-            disabled={loading || refreshing}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {t("active.btnRefresh")}
-          </Button>
-        </div>
-      </div>
-
-      {autoRefresh && (
-        <div className="text-xs text-muted-foreground flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          {t("active.autoRefreshEnabled")}
-        </div>
-      )}
+      <ActiveAlertsTopControls
+        autoRefresh={autoRefresh}
+        loading={loading}
+        refreshing={refreshing}
+        onAutoRefreshChange={setAutoRefresh}
+        onRefresh={() => fetchData(true)}
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         {loading ? (
@@ -582,34 +576,7 @@ export default function ActiveAlertsPage() {
       )}
 
       <Card className="glass-card">
-        <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>{t("active.title")}</CardTitle>
-              <CardDescription>{t("active.description")}</CardDescription>
-            </div>
-            <div className="w-full md:w-80">
-              <FilterToolbar
-                className="md:grid-cols-1 xl:grid-cols-1"
-                search={{
-                  value: searchQuery,
-                  onValueChange: setSearchQuery,
-                  placeholder: t("active.searchPlaceholder"),
-                  inputClassName: "h-10",
-                  trailing: searchQuery ? (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  ) : null,
-                }}
-              />
-            </div>
-          </div>
-        </CardHeader>
+        <ActiveAlertsListHeader searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
         <CardContent>
           {selectedAlerts.size > 0 && (
             <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
@@ -717,7 +684,7 @@ export default function ActiveAlertsPage() {
                           <TableCell>
                             <Badge className={getSeverityBadgeClass(alert.severity)}>
                               <SeverityIcon className="mr-1 h-3 w-3" />
-                              {t(`severity.${alert.severity.toLowerCase()}` as any)}
+                              {getSeverityLabel(alert.severity, t)}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-mono text-xs">{alert.agent_id}</TableCell>
@@ -825,7 +792,7 @@ export default function ActiveAlertsPage() {
                       {t("active.colSeverity")}
                     </p>
                     <Badge className={getSeverityBadgeClass(selectedAlert.severity)}>
-                      {t(`severity.${selectedAlert.severity.toLowerCase()}` as any)}
+                      {getSeverityLabel(selectedAlert.severity, t)}
                     </Badge>
                   </div>
                   <div className="space-y-1 text-right">

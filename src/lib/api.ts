@@ -8,9 +8,11 @@ import {
   ChannelOverview,
   ChannelConfig,
   CreateAlertRuleRequest,
+  UpdateAlertRuleRequest,
   DashboardOverview,
   LoginRequest,
   LoginResponse,
+  HealthResponse,
   PaginationParams,
   RuntimeConfig,
   SystemConfigResponse,
@@ -58,6 +60,12 @@ interface RequestConfig {
   body?: unknown
   token?: string
   requiresAuth?: boolean
+  allowEmptyResponse?: boolean
+}
+
+type PaginationFetchConfig = {
+  limit?: number
+  offset?: number
 }
 
 export class ApiRequestError extends Error {
@@ -100,6 +108,190 @@ function getApiErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+async function requestAllPages<T>(
+  fetchPage: (params: Required<PaginationFetchConfig>) => Promise<T[]>,
+  options: PaginationFetchConfig = {}
+) {
+  const limit = Math.max(1, options.limit ?? 200)
+  let offset = Math.max(0, options.offset ?? 0)
+  const merged: T[] = []
+
+  while (true) {
+    const page = await fetchPage({ limit, offset })
+    merged.push(...page)
+
+    if (page.length < limit) {
+      break
+    }
+
+    offset += limit
+  }
+
+  return merged
+}
+
+function toObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null
+  }
+
+  return value as Record<string, unknown>
+}
+
+function toStringValue(value: unknown, fallback = "") {
+  return typeof value === "string" ? value : fallback
+}
+
+function toNullableStringValue(value: unknown) {
+  if (typeof value === "string") {
+    return value
+  }
+
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  return String(value)
+}
+
+function toNumberValue(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value)
+
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+
+  return fallback
+}
+
+function normalizeAlertEvent(value: unknown): AlertEventResponse | null {
+  const record = toObject(value)
+
+  if (!record) {
+    return null
+  }
+
+  const id = toStringValue(record.id)
+  const ruleId = toStringValue(record.rule_id)
+  const agentId = toStringValue(record.agent_id)
+  const metricName = toStringValue(record.metric_name)
+  const severity = toStringValue(record.severity)
+  const message = toStringValue(record.message)
+  const timestamp = toStringValue(record.timestamp)
+
+  if (!id || !ruleId || !agentId || !metricName || !severity || !message || !timestamp) {
+    return null
+  }
+
+  let status = Math.trunc(toNumberValue(record.status, 1))
+
+  if (![1, 2, 3].includes(status)) {
+    if (toNullableStringValue(record.resolved_at)) {
+      status = 3
+    } else if (toNullableStringValue(record.acknowledged_at)) {
+      status = 2
+    } else {
+      status = 1
+    }
+  }
+
+  return {
+    id,
+    rule_id: ruleId,
+    agent_id: agentId,
+    metric_name: metricName,
+    severity,
+    message,
+    value: toNumberValue(record.value, 0),
+    threshold: toNumberValue(record.threshold, 0),
+    timestamp,
+    acknowledged_at: toNullableStringValue(record.acknowledged_at),
+    resolved_at: toNullableStringValue(record.resolved_at),
+    status,
+  }
+}
+
+function normalizeSilenceWindow(value: unknown): SilenceWindow | null {
+  const record = toObject(value)
+
+  if (!record) {
+    return null
+  }
+
+  const id = toStringValue(record.id)
+  const startTime = toStringValue(record.start_time)
+  const endTime = toStringValue(record.end_time)
+
+  if (!id || !startTime || !endTime) {
+    return null
+  }
+
+  return {
+    id,
+    start_time: startTime,
+    end_time: endTime,
+    recurrence: toNullableStringValue(record.recurrence),
+    created_at: toNullableStringValue(record.created_at) || undefined,
+    updated_at: toNullableStringValue(record.updated_at) || undefined,
+    name: toNullableStringValue(record.name) || undefined,
+    agent_pattern: toNullableStringValue(record.agent_pattern) || undefined,
+    metric_pattern: toNullableStringValue(record.metric_pattern) || undefined,
+  }
+}
+
+function normalizeAlertRuleDetail(value: unknown): AlertRuleDetailResponse | null {
+  const record = toObject(value)
+
+  if (!record) {
+    return null
+  }
+
+  const id = toStringValue(record.id)
+  const name = toStringValue(record.name)
+  const ruleType = toStringValue(record.rule_type)
+  const metric = toStringValue(record.metric)
+  const agentPattern = toStringValue(record.agent_pattern)
+  const severity = toStringValue(record.severity)
+  const source = toStringValue(record.source)
+  const createdAt = toStringValue(record.created_at)
+  const updatedAt = toStringValue(record.updated_at)
+
+  if (
+    !id ||
+    !name ||
+    !ruleType ||
+    !metric ||
+    !agentPattern ||
+    !severity ||
+    !source ||
+    !createdAt ||
+    !updatedAt
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    name,
+    rule_type: ruleType,
+    metric,
+    agent_pattern: agentPattern,
+    severity,
+    enabled: Boolean(record.enabled),
+    config_json: toStringValue(record.config_json),
+    silence_secs: Math.max(0, Math.trunc(toNumberValue(record.silence_secs, 0))),
+    source,
+    created_at: createdAt,
+    updated_at: updatedAt,
+  }
+}
+
 function resolveEnvelopeData<T>(payload: unknown, status: number): T {
   if (!payload || typeof payload !== "object") {
     throw new ApiRequestError("Invalid API response format", { status })
@@ -123,7 +315,7 @@ function resolveEnvelopeData<T>(payload: unknown, status: number): T {
 }
 
 async function request<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
-  const { method = "GET", body, token, requiresAuth = true } = config
+  const { method = "GET", body, token, requiresAuth = true, allowEmptyResponse = false } = config
   const headers: Record<string, string> = {}
 
   if (body !== undefined) {
@@ -188,6 +380,14 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
     })
   }
 
+  if (payload === null) {
+    if (allowEmptyResponse) {
+      return {} as T
+    }
+
+    throw new ApiRequestError("Invalid API response format", { status: response.status })
+  }
+
   return resolveEnvelopeData<T>(payload, response.status)
 }
 
@@ -207,30 +407,63 @@ export const api = {
   ...agentApi,
 
   getActiveAlerts: (params: PaginationParams) =>
-    request<AlertEventResponse[]>(`/v1/alerts/active${buildQueryString(params)}`),
+    request<unknown[]>(`/v1/alerts/active${buildQueryString(params)}`).then((items) =>
+      items
+        .map((item) => normalizeAlertEvent(item))
+        .filter((item): item is AlertEventResponse => Boolean(item))
+    ),
 
-  getAlertHistory: (params: PaginationParams & { agent_id__eq?: string; severity__eq?: string; status__eq?: number }) =>
-    request<AlertEventResponse[]>(`/v1/alerts/history${buildQueryString(params)}`),
+  getAlertHistory: (params: PaginationParams & { agent_id__eq?: string; severity__eq?: string }) =>
+    request<unknown[]>(`/v1/alerts/history${buildQueryString(params)}`).then((items) =>
+      items
+        .map((item) => normalizeAlertEvent(item))
+        .filter((item): item is AlertEventResponse => Boolean(item))
+    ),
 
   acknowledgeAlert: (id: string, token?: string) =>
     request(`/v1/alerts/history/${id}/acknowledge`, {
       method: "POST",
       token,
+      allowEmptyResponse: true,
     }),
 
   resolveAlert: (id: string, token?: string) =>
     request(`/v1/alerts/history/${id}/resolve`, {
       method: "POST",
       token,
+      allowEmptyResponse: true,
     }),
 
-  getAlertRules: (params: PaginationParams) =>
-    request<AlertRuleDetailResponse[]>(`/v1/alerts/rules${buildQueryString(params)}`),
+  getAlertRules: (params?: PaginationParams) => {
+    if (params) {
+      return request<unknown[]>(`/v1/alerts/rules${buildQueryString(params)}`).then((items) =>
+        items
+          .map((item) => normalizeAlertRuleDetail(item))
+          .filter((item): item is AlertRuleDetailResponse => Boolean(item))
+      )
+    }
+
+    return requestAllPages<unknown>((page) =>
+      request<unknown[]>(`/v1/alerts/rules${buildQueryString(page)}`)
+    ).then((items) =>
+      items
+        .map((item) => normalizeAlertRuleDetail(item))
+        .filter((item): item is AlertRuleDetailResponse => Boolean(item))
+    )
+  },
 
   createAlertRule: (data: CreateAlertRuleRequest) =>
-    request<AlertRuleDetailResponse>("/v1/alerts/rules", {
+    request<unknown>("/v1/alerts/rules", {
       method: "POST",
       body: data,
+    }).then((result) => {
+      const normalized = normalizeAlertRuleDetail(result)
+
+      if (!normalized) {
+        throw new ApiRequestError("Invalid alert rule response format", { status: 200 })
+      }
+
+      return normalized
     }),
 
 
@@ -246,8 +479,15 @@ export const api = {
     request<CertificateDetails>(`/v1/certificates/${id}`),
 
   // Notifications
-  listChannels: (params: PaginationParams) =>
-    request<ChannelOverview[]>(`/v1/notifications/channels${buildQueryString(params)}`),
+  listChannels: (params?: PaginationParams) => {
+    if (params) {
+      return request<ChannelOverview[]>(`/v1/notifications/channels${buildQueryString(params)}`)
+    }
+
+    return requestAllPages<ChannelOverview>((page) =>
+      request<ChannelOverview[]>(`/v1/notifications/channels${buildQueryString(page)}`)
+    )
+  },
 
   // System
   getSystemConfig: () =>
@@ -257,10 +497,17 @@ export const api = {
     request<StorageInfo>("/v1/system/storage"),
 
   triggerCleanup: () =>
-    request("/v1/system/storage/cleanup", { method: "POST" }),
+    request("/v1/system/storage/cleanup", { method: "POST", allowEmptyResponse: true }),
 
-  listSystemConfigs: (params: PaginationParams) =>
-    request<SystemConfigResponse[]>(`/v1/system/configs${buildQueryString(params)}`),
+  listSystemConfigs: (params?: PaginationParams) => {
+    if (params) {
+      return request<SystemConfigResponse[]>(`/v1/system/configs${buildQueryString(params)}`)
+    }
+
+    return requestAllPages<SystemConfigResponse>((page) =>
+      request<SystemConfigResponse[]>(`/v1/system/configs${buildQueryString(page)}`)
+    )
+  },
 
   getSystemConfigById: (id: string) =>
     request<SystemConfigResponse>(`/v1/system/configs/${id}`),
@@ -272,11 +519,18 @@ export const api = {
     request<SystemConfigResponse>(`/v1/system/configs/${id}`, { method: "PUT", body: data }),
 
   deleteSystemConfig: (id: string) =>
-    request(`/v1/system/configs/${id}`, { method: "DELETE" }),
+    request(`/v1/system/configs/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
   // Dictionaries
-  listDictionaryTypes: () =>
-    request<DictionaryTypeSummary[]>("/v1/dictionaries/types"),
+  listDictionaryTypes: (params?: PaginationParams) => {
+    if (params) {
+      return request<DictionaryTypeSummary[]>(`/v1/dictionaries/types${buildQueryString(params)}`)
+    }
+
+    return requestAllPages<DictionaryTypeSummary>((page) =>
+      request<DictionaryTypeSummary[]>(`/v1/dictionaries/types${buildQueryString(page)}`)
+    )
+  },
 
   createDictionaryType: (data: CreateDictionaryTypeRequest) =>
     request<DictionaryType>("/v1/dictionaries/types", { method: "POST", body: data }),
@@ -285,20 +539,40 @@ export const api = {
     request<DictionaryType>(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "PUT", body: data }),
 
   deleteDictionaryType: (dictType: string) =>
-    request(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "DELETE" }),
+    request(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "DELETE", allowEmptyResponse: true }),
 
-  listDictionariesByType: async (dictType: string, enabledOnly = false) => {
+  listDictionariesByType: async (
+    dictType: string,
+    enabledOnly = false,
+    params?: PaginationParams
+  ) => {
     const encodedType = encodeURIComponent(dictType)
 
-    try {
-      return await request<DictionaryItem[]>(`/v1/dictionaries/type/${encodedType}${buildQueryString({ enabled_only: enabledOnly })}`)
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 404) {
-        return request<DictionaryItem[]>(`/v1/dictionaries/type/${encodedType}/${enabledOnly}`)
-      }
+    const requestDictionaryPage = async (page: Required<PaginationFetchConfig>) => {
+      const query = buildQueryString({
+        enabled_only: enabledOnly,
+        ...page,
+      })
 
-      throw error
+      try {
+        return await request<DictionaryItem[]>(`/v1/dictionaries/type/${encodedType}${query}`)
+      } catch (error) {
+        if (error instanceof ApiRequestError && error.status === 404) {
+          return request<DictionaryItem[]>(`/v1/dictionaries/type/${encodedType}/${enabledOnly}${buildQueryString(page)}`)
+        }
+
+        throw error
+      }
     }
+
+    if (params) {
+      return requestDictionaryPage({
+        limit: Math.max(1, params.limit ?? 200),
+        offset: Math.max(0, params.offset ?? 0),
+      })
+    }
+
+    return requestAllPages<DictionaryItem>(requestDictionaryPage)
   },
 
   createDictionary: (data: CreateDictionaryRequest) =>
@@ -311,7 +585,7 @@ export const api = {
     request<DictionaryItem>(`/v1/dictionaries/${id}`, { method: "PUT", body: data }),
 
   deleteDictionary: (id: string) =>
-    request(`/v1/dictionaries/${id}`, { method: "DELETE" }),
+    request(`/v1/dictionaries/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
   // Auth - Security
   changePassword: (data: ChangePasswordRequest) =>
@@ -340,7 +614,7 @@ export const api = {
     request<CertDomain>(`/v1/certs/domains/${id}`, { method: "PUT", body: data }),
 
   deleteDomain: (id: string) =>
-    request(`/v1/certs/domains/${id}`, { method: "DELETE" }),
+    request(`/v1/certs/domains/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
   checkSingleDomain: (id: string) =>
     request<CertCheckResult>(`/v1/certs/domains/${id}/check`, { method: "POST" }),
@@ -371,8 +645,15 @@ export const api = {
     request<MetricSummaryResponse>(`/v1/metrics/summary${buildQueryString(params)}`),
 
   // Notifications - Advanced
-  listChannelConfigs: (params: PaginationParams) =>
-    request<ChannelConfig[]>(`/v1/notifications/channels/config${buildQueryString(params)}`),
+  listChannelConfigs: (params?: PaginationParams) => {
+    if (params) {
+      return request<ChannelConfig[]>(`/v1/notifications/channels/config${buildQueryString(params)}`)
+    }
+
+    return requestAllPages<ChannelConfig>((page) =>
+      request<ChannelConfig[]>(`/v1/notifications/channels/config${buildQueryString(page)}`)
+    )
+  },
 
   createChannelConfig: (data: CreateChannelRequest) =>
     request<ChannelConfig>("/v1/notifications/channels/config", { method: "POST", body: data }),
@@ -381,7 +662,7 @@ export const api = {
     request<ChannelConfig>(`/v1/notifications/channels/config/${id}`, { method: "PUT", body: data }),
 
   deleteChannelConfig: (id: string) =>
-    request(`/v1/notifications/channels/config/${id}`, { method: "DELETE" }),
+    request(`/v1/notifications/channels/config/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
   getRecipients: (id: string) =>
     request<string[]>(`/v1/notifications/channels/${id}/recipients`),
@@ -390,34 +671,69 @@ export const api = {
     request<string[]>(`/v1/notifications/channels/${id}/recipients`, { method: "PUT", body: data }),
 
   testChannel: (id: string) =>
-    request(`/v1/notifications/channels/${id}/test`, { method: "POST" }),
+    request(`/v1/notifications/channels/${id}/test`, { method: "POST", allowEmptyResponse: true }),
 
   listSilenceWindows: (params: PaginationParams) =>
-    request<SilenceWindow[]>(`/v1/notifications/silence-windows${buildQueryString(params)}`),
+    request<unknown[]>(`/v1/notifications/silence-windows${buildQueryString(params)}`).then((items) =>
+      items
+        .map((item) => normalizeSilenceWindow(item))
+        .filter((item): item is SilenceWindow => Boolean(item))
+    ),
 
   createSilenceWindow: (data: CreateSilenceWindowRequest) =>
-    request<Partial<SilenceWindow>>("/v1/notifications/silence-windows", { method: "POST", body: data }),
+    request<unknown>("/v1/notifications/silence-windows", {
+      method: "POST",
+      body: data,
+      allowEmptyResponse: true,
+    }).then((result) => {
+      const normalized = normalizeSilenceWindow(result)
+      return (normalized || {}) as Partial<SilenceWindow>
+    }),
 
   deleteSilenceWindow: (id: string) =>
-    request(`/v1/notifications/silence-windows/${id}`, { method: "DELETE" }),
+    request(`/v1/notifications/silence-windows/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
   setAlertRuleEnabled: (id: string, data: EnableRequest) =>
-    request<AlertRuleDetailResponse>(`/v1/alerts/rules/${id}/enable`, { method: "PUT", body: data }),
+    request<unknown>(`/v1/alerts/rules/${id}/enable`, { method: "PUT", body: data }).then((result) => {
+      const normalized = normalizeAlertRuleDetail(result)
+
+      if (!normalized) {
+        throw new ApiRequestError("Invalid alert rule response format", { status: 200 })
+      }
+
+      return normalized
+    }),
 
   getAlertRule: (id: string) =>
-    request<AlertRuleDetailResponse>(`/v1/alerts/rules/${id}`),
+    request<unknown>(`/v1/alerts/rules/${id}`).then((result) => {
+      const normalized = normalizeAlertRuleDetail(result)
 
-  updateAlertRule: (id: string, data: any) =>
-    request<AlertRuleDetailResponse>(`/v1/alerts/rules/${id}`, { method: "PUT", body: data }),
+      if (!normalized) {
+        throw new ApiRequestError("Invalid alert rule response format", { status: 200 })
+      }
+
+      return normalized
+    }),
+
+  updateAlertRule: (id: string, data: UpdateAlertRuleRequest) =>
+    request<unknown>(`/v1/alerts/rules/${id}`, { method: "PUT", body: data }).then((result) => {
+      const normalized = normalizeAlertRuleDetail(result)
+
+      if (!normalized) {
+        throw new ApiRequestError("Invalid alert rule response format", { status: 200 })
+      }
+
+      return normalized
+    }),
 
   deleteAlertRule: (id: string) =>
-    request(`/v1/alerts/rules/${id}`, { method: "DELETE" }),
+    request(`/v1/alerts/rules/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
   getAlertSummary: () =>
     request<AlertSummary>("/v1/alerts/summary"),
 
   getHealth: () =>
-    request<any>("/v1/health", { requiresAuth: false }),
+    request<HealthResponse>("/v1/health", { requiresAuth: false }),
 }
 
 export { getApiErrorMessage }

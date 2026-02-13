@@ -45,6 +45,7 @@ type CertificatesQueryState = {
   certs: CertificateDetails[]
   summary: CertSummary | null
 }
+type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
 function formatDateTime(value: string | null, locale: "zh" | "en") {
   if (!value) {
@@ -97,7 +98,7 @@ function getDaysUntilExpiry(notAfter: string) {
 
 function getCertificateStatusMeta(
   certificate: CertificateDetails,
-  t: (path: any, values?: Record<string, string | number>) => string
+  t: TranslateFn
 ) {
   const daysUntilExpiry = getDaysUntilExpiry(certificate.not_after)
 

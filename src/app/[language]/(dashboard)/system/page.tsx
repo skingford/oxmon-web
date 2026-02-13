@@ -65,8 +65,6 @@ import { SystemConfigFormFields, SystemConfigFormState } from "@/components/syst
 import { withLocalePrefix } from "@/components/app-locale"
 import { motion } from "framer-motion"
 
-const SYSTEM_CONFIG_PAGE_LIMIT = 200
-
 type SystemConfigStatusFilter = "all" | "enabled" | "disabled"
 
 function getInitialSystemConfigForm(): SystemConfigFormState {
@@ -117,7 +115,7 @@ export default function SystemPage() {
   const [systemConfigSearchKeyword, setSystemConfigSearchKeyword] = useState("")
   const [systemConfigTypeFilter, setSystemConfigTypeFilter] = useState("all")
   const [systemConfigStatusFilter, setSystemConfigStatusFilter] = useState<SystemConfigStatusFilter>("all")
-  const [passwordForm, setPasswordForm] = useState({ old_password: "", new_password: "" })
+  const [passwordForm, setPasswordForm] = useState({ current_password: "", new_password: "" })
   const [changing, setChanging] = useState(false)
 
   const fetchData = async (silent = false) => {
@@ -131,8 +129,8 @@ export default function SystemPage() {
       const [configData, storageData, systemConfigRows, channelRows] = await Promise.all([
         api.getSystemConfig(),
         api.getStorageInfo(),
-        api.listSystemConfigs({ limit: SYSTEM_CONFIG_PAGE_LIMIT, offset: 0 }),
-        api.listChannels({ limit: SYSTEM_CONFIG_PAGE_LIMIT, offset: 0 }).catch(() => []),
+        api.listSystemConfigs(),
+        api.listChannels().catch(() => []),
       ])
       setConfig(configData)
       setStorage(storageData)
@@ -166,7 +164,7 @@ export default function SystemPage() {
   }
 
   const handleChangePassword = async () => {
-    if (!passwordForm.old_password || !passwordForm.new_password) {
+    if (!passwordForm.current_password || !passwordForm.new_password) {
       toast.error(t("toastPasswordRequired"))
       return
     }
@@ -175,7 +173,7 @@ export default function SystemPage() {
       await api.changePassword(passwordForm)
       toast.success(t("toastPasswordSuccess"))
       setIsPasswordDialogOpen(false)
-      setPasswordForm({ old_password: "", new_password: "" })
+      setPasswordForm({ current_password: "", new_password: "" })
     } catch (error) {
       toast.error(getApiErrorMessage(error, t("toastPasswordError")))
     } finally {
@@ -510,16 +508,100 @@ export default function SystemPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">{t("fieldLogLevel")}</Label>
-                <Input readOnly value={config?.log_level} className="bg-muted font-mono" />
+                <Label className="text-sm font-medium">{t("fieldDataDir")}</Label>
+                <Input readOnly value={config?.data_dir || "N/A"} className="bg-muted font-mono" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("fieldRetentionDays")}</Label>
+                  <Input
+                    readOnly
+                    value={config?.retention_days ?? "N/A"}
+                    className="bg-muted font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("fieldAgentAuth")}</Label>
+                  <Input
+                    readOnly
+                    value={
+                      config?.require_agent_auth
+                        ? t("systemConfigFilterStatusEnabled")
+                        : t("systemConfigFilterStatusDisabled")
+                    }
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("fieldCertCheckEnabled")}</Label>
+                  <Input
+                    readOnly
+                    value={
+                      config?.cert_check_enabled
+                        ? t("systemConfigFilterStatusEnabled")
+                        : t("systemConfigFilterStatusDisabled")
+                    }
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("fieldCertCheckDefaultInterval")}</Label>
+                  <Input
+                    readOnly
+                    value={config?.cert_check_default_interval_secs ?? "N/A"}
+                    className="bg-muted font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("fieldCertCheckTickSecs")}</Label>
+                  <Input
+                    readOnly
+                    value={config?.cert_check_tick_secs ?? "N/A"}
+                    className="bg-muted font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("fieldCertCheckMaxConcurrent")}</Label>
+                  <Input
+                    readOnly
+                    value={config?.cert_check_max_concurrent ?? "N/A"}
+                    className="bg-muted font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("fieldNotifyAggregationWindow")}</Label>
+                  <Input
+                    readOnly
+                    value={config?.notification_aggregation_window_secs ?? "N/A"}
+                    className="bg-muted font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("fieldAlertRulesCount")}</Label>
+                  <Input
+                    readOnly
+                    value={config?.alert_rules_count ?? 0}
+                    className="bg-muted font-mono"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">{t("fieldUptime")}</Label>
+                <Label className="text-sm font-medium">{t("fieldNotificationChannelsCount")}</Label>
                 <Input
                   readOnly
-                  value={config?.uptime_secs ? formatUptime(config.uptime_secs) : "N/A"}
-                  className="bg-muted"
+                  value={config?.notification_channels_count ?? 0}
+                  className="bg-muted font-mono"
                 />
               </div>
             </CardContent>
@@ -552,18 +634,18 @@ export default function SystemPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldAlertPartitions")}</Label>
+                  <Label className="text-sm font-medium">{t("fieldTotalPartitions")}</Label>
                   <Input
                     readOnly
-                    value={storage?.alert_events_partition_count || 0}
+                    value={storage?.total_partitions || 0}
                     className="bg-muted font-mono"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldMetricPartitions")}</Label>
+                  <Label className="text-sm font-medium">{t("fieldLatestPartitionDate")}</Label>
                   <Input
                     readOnly
-                    value={storage?.metrics_partition_count || 0}
+                    value={storage?.partitions?.[0]?.date || "-"}
                     className="bg-muted font-mono"
                   />
                 </div>
@@ -976,9 +1058,9 @@ export default function SystemPage() {
               <Input
                 id="old-password"
                 type="password"
-                value={passwordForm.old_password}
+                value={passwordForm.current_password}
                 onChange={(e) =>
-                  setPasswordForm({ ...passwordForm, old_password: e.target.value })
+                  setPasswordForm({ ...passwordForm, current_password: e.target.value })
                 }
                 className="bg-white border-gray-300 text-gray-900"
               />

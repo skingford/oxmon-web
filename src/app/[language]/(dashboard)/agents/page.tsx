@@ -33,7 +33,9 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-function formatLastSeen(lastSeen: string | null, t: (path: any, values?: Record<string, string | number>) => string) {
+type TranslateFn = (path: string, values?: Record<string, string | number>) => string
+
+function formatLastSeen(lastSeen: string | null, t: TranslateFn) {
   if (!lastSeen) {
     return t("agents.lastSeenNever")
   }
@@ -64,7 +66,7 @@ function formatLastSeen(lastSeen: string | null, t: (path: any, values?: Record<
   return t("agents.lastSeenDaysAgo", { count: Math.floor(diff / day) })
 }
 
-function getStatusMeta(status: string, t: (path: any, values?: Record<string, string | number>) => string) {
+function getStatusMeta(status: string, t: TranslateFn) {
   const normalized = status.toLowerCase()
 
   if (normalized === "active") {

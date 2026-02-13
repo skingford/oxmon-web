@@ -72,15 +72,15 @@ export interface AlertEventResponse {
 
 export interface AlertRuleResponse {
   id: string;
+  name: string;
+  rule_type: string;
   metric: string;
   agent_pattern: string;
   severity: string;
+  enabled: boolean;
 }
 
 export interface AlertRuleDetailResponse extends AlertRuleResponse {
-  name: string;
-  rule_type: string;
-  enabled: boolean;
   config_json: string;
   silence_secs: number;
   source: string;
@@ -94,6 +94,18 @@ export interface CreateAlertRuleRequest {
   metric: string;
   agent_pattern?: string;
   severity?: string;
+  enabled?: boolean;
+  config_json?: string;
+  silence_secs?: number;
+}
+
+export interface UpdateAlertRuleRequest {
+  name?: string;
+  rule_type?: string;
+  metric?: string;
+  agent_pattern?: string;
+  severity?: string;
+  enabled?: boolean;
   config_json?: string;
   silence_secs?: number;
 }
@@ -102,6 +114,13 @@ export interface ApiError {
   err_code: number;
   err_msg: string;
   trace_id?: string;
+}
+
+export interface HealthResponse {
+  version: string;
+  uptime_secs: number;
+  agent_count: number;
+  storage_status: string;
 }
 
 export interface LoginResponse {
@@ -211,12 +230,7 @@ export interface UpdateSystemConfigRequest {
 }
 
 export interface PartitionDetail {
-  partition_id: string;
-  agent_id: string;
-  metric_name: string;
-  start_time: string;
-  end_time: string;
-  points_count: number;
+  date: string;
   size_bytes: number;
 }
 
@@ -229,7 +243,7 @@ export interface StorageInfo {
 }
 
 export interface ChangePasswordRequest {
-  old_password: string;
+  current_password: string;
   new_password: string;
 }
 
