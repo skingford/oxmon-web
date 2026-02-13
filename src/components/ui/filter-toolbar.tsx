@@ -13,6 +13,8 @@ type FilterToolbarSearchProps = {
   label?: string
   fieldClassName?: string
   inputClassName?: string
+  trailing?: ReactNode
+  trailingWrapperClassName?: string
 }
 
 type FilterToolbarProps = {
@@ -34,8 +36,22 @@ export function FilterToolbar({ search, className, children }: FilterToolbarProp
             value={search.value}
             onChange={(event) => search.onValueChange(event.target.value)}
             placeholder={search.placeholder}
-            className={cn(hasLabel ? "h-10 pl-9" : "pl-9", search.inputClassName)}
+            className={cn(
+              hasLabel ? "h-10 pl-9" : "pl-9",
+              search.trailing ? "pr-9" : undefined,
+              search.inputClassName
+            )}
           />
+          {search.trailing ? (
+            <div
+              className={cn(
+                "absolute right-3 top-1/2 -translate-y-1/2",
+                search.trailingWrapperClassName
+              )}
+            >
+              {search.trailing}
+            </div>
+          ) : null}
         </div>
       </div>
 

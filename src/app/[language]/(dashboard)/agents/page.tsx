@@ -12,7 +12,7 @@ import { withLocalePrefix } from "@/components/app-locale"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import {
   Table,
   TableBody,
@@ -27,7 +27,6 @@ import {
   ListChecks,
   Loader2,
   RefreshCw,
-  Search,
   Server,
   Wifi,
   WifiOff,
@@ -270,13 +269,15 @@ export default function AgentsPage() {
               <CardTitle>{t("agents.currentPageTitle")}</CardTitle>
               <CardDescription>{t("agents.currentPageDescription", { limit })}</CardDescription>
             </div>
-            <div className="relative w-full md:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={t("agents.searchPlaceholder")}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="pl-9"
+            <div className="w-full md:w-72">
+              <FilterToolbar
+                className="md:grid-cols-1 xl:grid-cols-1"
+                search={{
+                  value: search,
+                  onValueChange: setSearch,
+                  placeholder: t("agents.searchPlaceholder"),
+                  inputClassName: "h-10",
+                }}
               />
             </div>
           </div>

@@ -7,6 +7,7 @@ import { useAppTranslations } from "@/hooks/use-app-translations"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -15,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -36,7 +36,6 @@ import {
   RefreshCw,
   AlertTriangle,
   Info,
-  Search,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -589,22 +588,25 @@ export default function ActiveAlertsPage() {
               <CardTitle>{t("active.title")}</CardTitle>
               <CardDescription>{t("active.description")}</CardDescription>
             </div>
-            <div className="relative w-full md:w-80">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={t("active.searchPlaceholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-9"
+            <div className="w-full md:w-80">
+              <FilterToolbar
+                className="md:grid-cols-1 xl:grid-cols-1"
+                search={{
+                  value: searchQuery,
+                  onValueChange: setSearchQuery,
+                  placeholder: t("active.searchPlaceholder"),
+                  inputClassName: "h-10",
+                  trailing: searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : null,
+                }}
               />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
             </div>
           </div>
         </CardHeader>

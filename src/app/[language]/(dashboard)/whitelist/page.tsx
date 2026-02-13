@@ -9,6 +9,7 @@ import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
   WifiOff,
   HelpCircle,
@@ -536,13 +536,15 @@ export default function WhitelistPage() {
               <CardTitle>{t("whitelist.listTitle")}</CardTitle>
               <CardDescription>{t("whitelist.listDescription", { limit: PAGE_LIMIT })}</CardDescription>
             </div>
-            <div className="relative w-full md:w-80">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => handleSearchChange(event.target.value)}
-                placeholder={t("whitelist.searchPlaceholder")}
-                className="pl-9"
+            <div className="w-full md:w-80">
+              <FilterToolbar
+                className="md:grid-cols-1 xl:grid-cols-1"
+                search={{
+                  value: search,
+                  onValueChange: handleSearchChange,
+                  placeholder: t("whitelist.searchPlaceholder"),
+                  inputClassName: "h-10",
+                }}
               />
             </div>
           </div>

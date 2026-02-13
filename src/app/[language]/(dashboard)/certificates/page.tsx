@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -32,7 +33,6 @@ import {
   ChevronRight as ArrowRight,
   Loader2,
   RefreshCw,
-  Search,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -406,37 +406,41 @@ export default function CertificatesPage() {
           <CardTitle>{t("certificates.overview.filtersTitle")}</CardTitle>
           <CardDescription>{t("certificates.overview.filtersDescription")}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <CardContent>
+          <FilterToolbar
+            className="gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"
+            search={{
+              value: domainKeyword,
+              onValueChange: handleDomainKeywordChange,
+              placeholder: t("certificates.overview.filterDomainPlaceholder"),
+              inputClassName: "h-10",
+            }}
+          >
             <Input
-              value={domainKeyword}
-              onChange={(event) => handleDomainKeywordChange(event.target.value)}
-              placeholder={t("certificates.overview.filterDomainPlaceholder")}
-              className="pl-9"
+              value={issuerKeyword}
+              onChange={(event) => handleIssuerKeywordChange(event.target.value)}
+              placeholder={t("certificates.overview.filterIssuerPlaceholder")}
+              className="h-10"
             />
-          </div>
-          <Input
-            value={issuerKeyword}
-            onChange={(event) => handleIssuerKeywordChange(event.target.value)}
-            placeholder={t("certificates.overview.filterIssuerPlaceholder")}
-          />
-          <Input
-            value={ipKeyword}
-            onChange={(event) => handleIpKeywordChange(event.target.value)}
-            placeholder={t("certificates.overview.filterIpPlaceholder")}
-          />
-          <div className="flex gap-2">
             <Input
-              value={expiryDays}
-              onChange={(event) => handleExpiryDaysChange(event.target.value)}
-              placeholder={t("certificates.overview.filterExpiryDaysPlaceholder")}
-              inputMode="numeric"
+              value={ipKeyword}
+              onChange={(event) => handleIpKeywordChange(event.target.value)}
+              placeholder={t("certificates.overview.filterIpPlaceholder")}
+              className="h-10"
             />
-            <Button type="button" variant="outline" onClick={handleClearFilters}>
-              {t("certificates.overview.clearFilters")}
-            </Button>
-          </div>
+            <div className="flex gap-2">
+              <Input
+                value={expiryDays}
+                onChange={(event) => handleExpiryDaysChange(event.target.value)}
+                placeholder={t("certificates.overview.filterExpiryDaysPlaceholder")}
+                inputMode="numeric"
+                className="h-10"
+              />
+              <Button type="button" variant="outline" onClick={handleClearFilters} className="h-10">
+                {t("certificates.overview.clearFilters")}
+              </Button>
+            </div>
+          </FilterToolbar>
         </CardContent>
       </Card>
 
