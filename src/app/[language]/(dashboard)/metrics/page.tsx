@@ -3,23 +3,21 @@
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Area, AreaChart, Brush, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { Activity, ArrowDown, ArrowUp, ArrowUpDown, Database, Download, FileJson2, Filter, Link2, Loader2, RefreshCw, RotateCcw, Server } from "lucide-react"
+import { Activity, ArrowDown, ArrowUp, ArrowUpDown, Filter, Loader2 } from "lucide-react"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { MetricDataPointResponse, MetricSummaryResponse } from "@/types/api"
 import { useRequestState } from "@/hooks/use-request-state"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
+import { MetricsQueryToolbar, MetricsTimeRange } from "@/components/metrics/MetricsQueryToolbar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 
-type TimeRange = "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "all" | "custom"
+type TimeRange = MetricsTimeRange
 type TablePageSize = "20" | "50" | "100"
 type SortField = "timestamp" | "value"
 type SortDirection = "asc" | "desc"
@@ -522,6 +520,36 @@ function MetricsPageContent() {
     }
   }, [tablePage, totalPages])
 
+  const queryToolbarTexts = useMemo(
+    () => ({
+      agentLabel: t("metrics.agentLabel"),
+      agentPlaceholder: t("metrics.agentPlaceholder"),
+      metricLabel: t("metrics.metricLabel"),
+      metricPlaceholder: t("metrics.metricPlaceholder"),
+      labelFilterLabel: t("metrics.labelFilterLabel"),
+      labelFilterPlaceholder: t("metrics.labelFilterPlaceholder"),
+      queryModeLabel: t("metrics.queryModeLabel"),
+      queryModeAuto: t("metrics.queryModeAuto"),
+      timeRangeLabel: t("metrics.timeRangeLabel"),
+      timeRange15m: t("metrics.timeRange15m"),
+      timeRange30m: t("metrics.timeRange30m"),
+      timeRange1h: t("metrics.timeRange1h"),
+      timeRange6h: t("metrics.timeRange6h"),
+      timeRange24h: t("metrics.timeRange24h"),
+      timeRange7d: t("metrics.timeRange7d"),
+      timeRangeAll: t("metrics.timeRangeAll"),
+      timeRangeCustom: t("metrics.timeRangeCustom"),
+      refreshDataButton: t("metrics.refreshDataButton"),
+      resetFiltersTitle: t("metrics.resetFiltersTitle"),
+      exportCsvTitle: t("metrics.exportCsvTitle"),
+      exportJsonTitle: t("metrics.exportJsonTitle"),
+      copyQueryLinkTitle: t("metrics.copyQueryLinkTitle"),
+      startTimeLabel: t("metrics.startTimeLabel"),
+      endTimeLabel: t("metrics.endTimeLabel"),
+    }),
+    [t]
+  )
+
   return (
     <div className="p-8 space-y-8">
       <div>
@@ -538,123 +566,34 @@ function MetricsPageContent() {
           <CardDescription>{t("metrics.queryConditionsDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground flex items-center gap-2">
-                <Server className="h-4 w-4" /> {t("metrics.agentLabel")}
-              </div>
-              <Select value={selectedAgent} onValueChange={setSelectedAgent} disabled={fetchingOptions}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("metrics.agentPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {agents.map((agentId) => (
-                    <SelectItem key={agentId} value={agentId}>
-                      {agentId}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground flex items-center gap-2">
-                <Database className="h-4 w-4" /> {t("metrics.metricLabel")}
-              </div>
-              <Select value={selectedMetric} onValueChange={setSelectedMetric} disabled={fetchingOptions}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("metrics.metricPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {metricNames.map((metricName) => (
-                    <SelectItem key={metricName} value={metricName}>
-                      {metricName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="md:col-span-2">
-              <FilterToolbar
-                className="md:grid-cols-1 xl:grid-cols-1"
-                search={{
-                  value: labelFilter,
-                  onValueChange: setLabelFilter,
-                  placeholder: t("metrics.labelFilterPlaceholder"),
-                  label: t("metrics.labelFilterLabel"),
-                  inputClassName: "h-10",
-                }}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground">{t("metrics.queryModeLabel")}</div>
-              <div className="flex h-9 items-center justify-between rounded-md border px-3">
-                <span className="text-sm">{t("metrics.queryModeAuto")}</span>
-                <Switch checked={autoQuery} onCheckedChange={setAutoQuery} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground">{t("metrics.timeRangeLabel")}</div>
-              <Select value={timeRange} onValueChange={(value) => setTimeRange(value as TimeRange)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15m">{t("metrics.timeRange15m")}</SelectItem>
-                  <SelectItem value="30m">{t("metrics.timeRange30m")}</SelectItem>
-                  <SelectItem value="1h">{t("metrics.timeRange1h")}</SelectItem>
-                  <SelectItem value="6h">{t("metrics.timeRange6h")}</SelectItem>
-                  <SelectItem value="24h">{t("metrics.timeRange24h")}</SelectItem>
-                  <SelectItem value="7d">{t("metrics.timeRange7d")}</SelectItem>
-                  <SelectItem value="all">{t("metrics.timeRangeAll")}</SelectItem>
-                  <SelectItem value="custom">{t("metrics.timeRangeCustom")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-end gap-2">
-              <Button className="flex-1" onClick={() => queryMetrics(true)} disabled={!hasQueryCondition || querying}>
-                {querying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                {t("metrics.refreshDataButton")}
-              </Button>
-              <Button type="button" variant="outline" size="icon" onClick={handleResetFilters} title={t("metrics.resetFiltersTitle")}>
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-              <Button type="button" variant="outline" size="icon" onClick={handleExportCsv} disabled={filteredDataPoints.length === 0} title={t("metrics.exportCsvTitle")}>
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button type="button" variant="outline" size="icon" onClick={handleExportJson} disabled={filteredDataPoints.length === 0} title={t("metrics.exportJsonTitle")}>
-                <FileJson2 className="h-4 w-4" />
-              </Button>
-              <Button type="button" variant="outline" size="icon" onClick={handleCopyQueryLink} title={t("metrics.copyQueryLinkTitle")}>
-                <Link2 className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {timeRange === "custom" && (
-              <>
-                <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm text-muted-foreground">{t("metrics.startTimeLabel")}</div>
-                  <Input
-                    type="datetime-local"
-                    value={customFrom}
-                    onChange={(event) => setCustomFrom(event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <div className="text-sm text-muted-foreground">{t("metrics.endTimeLabel")}</div>
-                  <Input
-                    type="datetime-local"
-                    value={customTo}
-                    onChange={(event) => setCustomTo(event.target.value)}
-                  />
-                </div>
-              </>
-            )}
-          </div>
+          <MetricsQueryToolbar
+            texts={queryToolbarTexts}
+            agents={agents}
+            metricNames={metricNames}
+            selectedAgent={selectedAgent}
+            selectedMetric={selectedMetric}
+            labelFilter={labelFilter}
+            autoQuery={autoQuery}
+            timeRange={timeRange}
+            customFrom={customFrom}
+            customTo={customTo}
+            fetchingOptions={fetchingOptions}
+            querying={querying}
+            hasQueryCondition={hasQueryCondition}
+            canExport={filteredDataPoints.length > 0}
+            onSelectedAgentChange={setSelectedAgent}
+            onSelectedMetricChange={setSelectedMetric}
+            onLabelFilterChange={setLabelFilter}
+            onAutoQueryChange={setAutoQuery}
+            onTimeRangeChange={setTimeRange}
+            onCustomFromChange={setCustomFrom}
+            onCustomToChange={setCustomTo}
+            onRefresh={() => queryMetrics(true)}
+            onResetFilters={handleResetFilters}
+            onExportCsv={handleExportCsv}
+            onExportJson={handleExportJson}
+            onCopyQueryLink={handleCopyQueryLink}
+          />
         </CardContent>
       </Card>
 

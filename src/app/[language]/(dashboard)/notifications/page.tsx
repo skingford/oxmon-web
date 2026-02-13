@@ -19,7 +19,7 @@ import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
+import { NotificationsFiltersCard } from "@/components/notifications/NotificationsFiltersCard"
 import {
   Dialog,
   DialogContent,
@@ -54,7 +54,6 @@ import {
   Bell,
   CheckCircle2,
   CircleOff,
-  FilterX,
   Loader2,
   Mail,
   Pencil,

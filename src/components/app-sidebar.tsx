@@ -74,6 +74,10 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
   }, [pathname, sidebarMenuGroups])
 
   const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>(activeParentMap)
+  const activeMenuButtonClass =
+    "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-xs hover:bg-primary/15 hover:text-primary"
+  const activeSubMenuButtonClass =
+    "bg-primary/10 text-primary ring-1 ring-primary/20 hover:bg-primary/15 hover:text-primary"
 
   useEffect(() => {
     setExpandedParents((previous) => {
@@ -102,10 +106,11 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
                 {group.items.map((item) => {
                   const children = item.children ?? []
                   const hasChildren = children.length > 0
+                  const itemSelfActive = isRouteActive(pathname, item.url, item.exact)
                   const childActive = hasChildren
                     ? children.some((child) => isRouteActive(pathname, child.url, child.exact))
                     : false
-                  const itemActive = isRouteActive(pathname, item.url, item.exact) || childActive
+                  const itemActive = itemSelfActive || childActive
                   const isOpen = hasChildren ? (expandedParents[item.url] ?? childActive) : false
 
                   return (
@@ -121,7 +126,11 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
                           }
                         >
                           <CollapsibleTrigger asChild>
-                            <SidebarMenuButton isActive={itemActive} tooltip={item.title}>
+                            <SidebarMenuButton
+                              isActive={false}
+                              tooltip={item.title}
+                              className={undefined}
+                            >
                               <item.icon />
                               <span>{item.title}</span>
                               <ChevronRight
@@ -140,7 +149,11 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
 
                                 return (
                                   <SidebarMenuSubItem key={child.url}>
-                                    <SidebarMenuSubButton asChild isActive={subActive}>
+                                    <SidebarMenuSubButton
+                                      asChild
+                                      isActive={subActive}
+                                      className={subActive ? activeSubMenuButtonClass : undefined}
+                                    >
                                       <Link href={withLocalePrefix(child.url, locale)}>
                                         <span>{child.title}</span>
                                       </Link>
@@ -152,7 +165,12 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
                           </CollapsibleContent>
                         </Collapsible>
                       ) : (
-                        <SidebarMenuButton asChild isActive={itemActive} tooltip={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={itemActive}
+                          tooltip={item.title}
+                          className={itemActive ? activeMenuButtonClass : undefined}
+                        >
                           <Link href={withLocalePrefix(item.url, locale)}>
                             <item.icon />
                             <span>{item.title}</span>
@@ -175,7 +193,12 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
 
             return (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive}
+                  tooltip={item.title}
+                  className={isActive ? activeMenuButtonClass : undefined}
+                >
                   <Link href={withLocalePrefix(item.url, locale)}>
                     <item.icon />
                     <span>{item.title}</span>

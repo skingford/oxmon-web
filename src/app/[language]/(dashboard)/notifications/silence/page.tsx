@@ -8,7 +8,7 @@ import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
+import { SilenceFiltersCard } from "@/components/notifications/SilenceFiltersCard"
 import {
   Dialog,
   DialogContent,
@@ -40,14 +40,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  Download,
-  FilterX,
   Loader2,
   Pencil,
   Plus,
   RefreshCw,
   ShieldOff,
-  Upload,
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -1028,152 +1025,29 @@ export default function SilenceWindowsPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>{t("notifications.silenceFiltersTitle")}</CardTitle>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={hasWindowOrigins ? "secondary" : "outline"}>
-                {t("notifications.silenceOriginMarksCount", { count: originMarksCount })}
-              </Badge>
-              <Badge variant={originModeCounts.replaced > 0 ? "secondary" : "outline"}>
-                {t("notifications.silenceOriginReplacedCount", { count: originModeCounts.replaced })}
-              </Badge>
-              <Badge variant={originModeCounts.cloned > 0 ? "secondary" : "outline"}>
-                {t("notifications.silenceOriginClonedCount", { count: originModeCounts.cloned })}
-              </Badge>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <Input
-              ref={importOriginsInputRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={handleImportWindowOrigins}
-            />
-
-            <div className="rounded-lg border bg-muted/20 p-3 sm:p-4">
-              <FilterToolbar
-                className="gap-3 sm:grid-cols-2 xl:grid-cols-12"
-                search={{
-                  value: searchKeyword,
-                  onValueChange: setSearchKeyword,
-                  placeholder: t("notifications.silenceSearchPlaceholder"),
-                  fieldClassName: "sm:col-span-2 xl:col-span-6",
-                  inputClassName: "h-10",
-                }}
-              >
-                <div className="xl:col-span-2">
-                  <Select
-                    value={statusFilter}
-                    onValueChange={(value) => setStatusFilter(value as SilenceStatusFilter)}
-                  >
-                    <SelectTrigger className="h-10 w-full bg-background">
-                      <SelectValue placeholder={t("notifications.silenceFilterStatusLabel")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("notifications.silenceFilterStatusAll")}</SelectItem>
-                      <SelectItem value="active">{t("notifications.silenceFilterStatusActive")}</SelectItem>
-                      <SelectItem value="scheduled">{t("notifications.silenceFilterStatusScheduled")}</SelectItem>
-                      <SelectItem value="expired">{t("notifications.silenceFilterStatusExpired")}</SelectItem>
-                      <SelectItem value="unknown">{t("notifications.silenceFilterStatusUnknown")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="xl:col-span-2">
-                  <Select
-                    value={originModeFilter}
-                    onValueChange={(value) => setOriginModeFilter(value as WindowOriginModeFilter)}
-                  >
-                    <SelectTrigger className="h-10 w-full bg-background">
-                      <SelectValue placeholder={t("notifications.silenceFilterOriginModeLabel")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("notifications.silenceFilterOriginModeAll")}</SelectItem>
-                      <SelectItem value="replaced">{t("notifications.silenceFilterOriginModeReplaced")}</SelectItem>
-                      <SelectItem value="cloned">{t("notifications.silenceFilterOriginModeCloned")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="xl:col-span-2">
-                  <Select
-                    value={String(windowOriginTtlDays)}
-                    onValueChange={handleWindowOriginTtlDaysChange}
-                  >
-                    <SelectTrigger className="h-10 w-full bg-background">
-                      <SelectValue placeholder={t("notifications.silenceOriginTtlLabel")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">{t("notifications.silenceOriginTtlOneDay")}</SelectItem>
-                      <SelectItem value="7">{t("notifications.silenceOriginTtlSevenDays")}</SelectItem>
-                      <SelectItem value="30">{t("notifications.silenceOriginTtlThirtyDays")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </FilterToolbar>
-            </div>
-
-            <div className="rounded-lg border p-3 sm:p-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <div className="flex h-10 items-center justify-between rounded-md border bg-background px-3">
-                  <p className="truncate text-sm">{t("notifications.silenceFilterOriginOnlyLabel")}</p>
-                  <Switch checked={onlyOriginMarked} onCheckedChange={setOnlyOriginMarked} />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={resetFilters}
-                  disabled={!hasActiveFilters}
-                  title={t("notifications.silenceClearFilters")}
-                  aria-label={t("notifications.silenceClearFilters")}
-                  className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
-                >
-                  <FilterX className="h-4 w-4 shrink-0" />
-                  {t("notifications.silenceClearFiltersShort")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={clearWindowOrigins}
-                  disabled={!hasWindowOrigins}
-                  title={t("notifications.silenceClearOriginsButton")}
-                  aria-label={t("notifications.silenceClearOriginsButton")}
-                  className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
-                >
-                  {t("notifications.silenceClearOriginsShort")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={triggerImportWindowOrigins}
-                  disabled={importingOrigins}
-                  title={t("notifications.silenceImportOriginsButton")}
-                  aria-label={t("notifications.silenceImportOriginsButton")}
-                  className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
-                >
-                  {importingOrigins ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Upload className="h-4 w-4 shrink-0" />}
-                  {t("notifications.silenceImportOriginsShort")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={exportWindowOrigins}
-                  disabled={!hasWindowOrigins}
-                  title={t("notifications.silenceExportOriginsButton")}
-                  aria-label={t("notifications.silenceExportOriginsButton")}
-                  className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
-                >
-                  <Download className="h-4 w-4 shrink-0" />
-                  {t("notifications.silenceExportOriginsShort")}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      <SilenceFiltersCard
+        searchKeyword={searchKeyword}
+        statusFilter={statusFilter}
+        originModeFilter={originModeFilter}
+        windowOriginTtlDays={windowOriginTtlDays}
+        onlyOriginMarked={onlyOriginMarked}
+        hasActiveFilters={hasActiveFilters}
+        hasWindowOrigins={hasWindowOrigins}
+        importingOrigins={importingOrigins}
+        originMarksCount={originMarksCount}
+        originModeCounts={originModeCounts}
+        importOriginsInputRef={importOriginsInputRef}
+        onSearchKeywordChange={setSearchKeyword}
+        onStatusFilterChange={(value) => setStatusFilter(value as SilenceStatusFilter)}
+        onOriginModeFilterChange={(value) => setOriginModeFilter(value as WindowOriginModeFilter)}
+        onWindowOriginTtlDaysChange={handleWindowOriginTtlDaysChange}
+        onOnlyOriginMarkedChange={setOnlyOriginMarked}
+        onImportWindowOrigins={handleImportWindowOrigins}
+        onResetFilters={resetFilters}
+        onClearWindowOrigins={clearWindowOrigins}
+        onTriggerImportOrigins={triggerImportWindowOrigins}
+        onExportWindowOrigins={exportWindowOrigins}
+      />
 
       <Card>
         <CardHeader>
