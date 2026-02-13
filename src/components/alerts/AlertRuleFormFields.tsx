@@ -1,6 +1,10 @@
 "use client"
 
 import { CreateAlertRuleRequest } from "@/types/api"
+import {
+  ALERT_RULE_TYPE_OPTIONS,
+  isSupportedAlertRuleType,
+} from "@/lib/alerts/rule-form"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,13 +25,6 @@ type AlertRuleFormFieldsProps = {
   onRuleFormChange: (next: CreateAlertRuleRequest) => void
 }
 
-const SUPPORTED_RULE_TYPES = [
-  "threshold",
-  "rate_of_change",
-  "trend_prediction",
-  "cert_expiration",
-] as const
-
 export function AlertRuleFormFields({
   ruleForm,
   metricNames,
@@ -37,7 +34,7 @@ export function AlertRuleFormFields({
 }: AlertRuleFormFieldsProps) {
   const { t } = useAppTranslations("alerts")
   const hasLegacyRuleType =
-    Boolean(ruleForm.rule_type) && !SUPPORTED_RULE_TYPES.includes(ruleForm.rule_type as (typeof SUPPORTED_RULE_TYPES)[number])
+    Boolean(ruleForm.rule_type) && !isSupportedAlertRuleType(ruleForm.rule_type)
 
   const updateRuleForm = (patch: Partial<CreateAlertRuleRequest>) => {
     onRuleFormChange({
@@ -66,22 +63,23 @@ export function AlertRuleFormFields({
           <Label htmlFor="rule-type" className="font-medium text-gray-900">
             {t("rules.fieldType")}
           </Label>
-            <Select value={ruleForm.rule_type} onValueChange={(value) => updateRuleForm({ rule_type: value })}>
-              <SelectTrigger id="rule-type" className="bg-white border-gray-300 text-gray-900">
-                <SelectValue placeholder={t("rules.placeholderType")} />
-              </SelectTrigger>
-              <SelectContent className="bg-white">
-                <SelectItem value="threshold">{t("rules.ruleTypes.threshold")}</SelectItem>
-                <SelectItem value="rate_of_change">{t("rules.ruleTypes.rateOfChange")}</SelectItem>
-                <SelectItem value="trend_prediction">{t("rules.ruleTypes.trendPrediction")}</SelectItem>
-                <SelectItem value="cert_expiration">{t("rules.ruleTypes.certExpiration")}</SelectItem>
-                {hasLegacyRuleType ? (
-                  <SelectItem value={ruleForm.rule_type}>
-                    {t("rules.ruleTypes.legacy", { value: ruleForm.rule_type })}
-                  </SelectItem>
-                ) : null}
-              </SelectContent>
-            </Select>
+          <Select value={ruleForm.rule_type} onValueChange={(value) => updateRuleForm({ rule_type: value })}>
+            <SelectTrigger id="rule-type" className="bg-white border-gray-300 text-gray-900">
+              <SelectValue placeholder={t("rules.placeholderType")} />
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              {ALERT_RULE_TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {t(option.labelKey)}
+                </SelectItem>
+              ))}
+              {hasLegacyRuleType ? (
+                <SelectItem value={ruleForm.rule_type}>
+                  {t("rules.ruleTypes.legacy", { value: ruleForm.rule_type })}
+                </SelectItem>
+              ) : null}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid gap-2">

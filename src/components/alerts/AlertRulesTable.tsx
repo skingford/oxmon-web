@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import { AlertCircle, AlertTriangle, Edit2, Info, Loader2, Trash2 } from "lucide-react"
 import { AlertRuleDetailResponse } from "@/types/api"
+import { getAlertRuleTypeLabelInfo } from "@/lib/alerts/rule-form"
 import {
   useAppTranslations,
   type AppNamespaceTranslator,
@@ -76,27 +77,8 @@ function getSeverityText(severity: string, t: AppNamespaceTranslator<"alerts">) 
 }
 
 function getRuleTypeText(ruleType: string, t: AppNamespaceTranslator<"alerts">) {
-  if (ruleType === "threshold") {
-    return t("rules.ruleTypes.threshold")
-  }
-
-  if (ruleType === "rate_of_change") {
-    return t("rules.ruleTypes.rateOfChange")
-  }
-
-  if (ruleType === "trend_prediction") {
-    return t("rules.ruleTypes.trendPrediction")
-  }
-
-  if (ruleType === "cert_expiration") {
-    return t("rules.ruleTypes.certExpiration")
-  }
-
-  if (ruleType === "heartbeat_absent") {
-    return t("rules.ruleTypes.legacy", { value: ruleType })
-  }
-
-  return ruleType
+  const labelInfo = getAlertRuleTypeLabelInfo(ruleType)
+  return t(labelInfo.key, labelInfo.values)
 }
 
 type AlertRulesTableProps = {

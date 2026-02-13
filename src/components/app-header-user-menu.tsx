@@ -31,7 +31,10 @@ export function AppHeaderUserMenu() {
       try {
         const payloadPart = token.split(".")[1]
         if (payloadPart) {
-          const base64 = payloadPart.replace(/-/g, "+").replace(/_/g, "/")
+          const base64 = payloadPart
+            .replace(/-/g, "+")
+            .replace(/_/g, "/")
+            .padEnd(Math.ceil(payloadPart.length / 4) * 4, "=")
           const decoded = JSON.parse(window.atob(base64))
           setUser(decoded)
         }
@@ -60,8 +63,8 @@ export function AppHeaderUserMenu() {
     window.location.replace(withLocalePrefix("/login", locale))
   }
 
-  const username = user?.sub || user?.username || "Operator"
-  const initials = username.slice(0, 2).toUpperCase()
+  const username = (user?.username || user?.sub || "Operator").trim() || "Operator"
+  const avatarInitial = username.charAt(0).toUpperCase() || "O"
 
   return (
     <DropdownMenu>
@@ -69,7 +72,7 @@ export function AppHeaderUserMenu() {
         <Button variant="ghost" className="relative h-9 w-9 rounded-full">
           <Avatar className="h-9 w-9">
             <AvatarFallback className="bg-primary/10 text-xs font-medium">
-              {initials}
+              {avatarInitial}
             </AvatarFallback>
           </Avatar>
         </Button>

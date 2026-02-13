@@ -62,37 +62,14 @@ import {
 } from "@/components/ui/dialog"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { SystemConfigFormFields, SystemConfigFormState } from "@/components/system/SystemConfigFormFields"
+import {
+  getInitialSystemConfigForm,
+  getSystemConfigFormFromItem,
+} from "@/lib/system/system-config-form"
 import { withLocalePrefix } from "@/components/app-locale"
 import { motion } from "framer-motion"
 
 type SystemConfigStatusFilter = "all" | "enabled" | "disabled"
-
-function getInitialSystemConfigForm(): SystemConfigFormState {
-  return {
-    configKey: "",
-    configType: "email",
-    provider: "",
-    displayName: "",
-    description: "",
-    configJson: "{}",
-    enabled: true,
-  }
-}
-
-function getSystemConfigFormFromItem(item: SystemConfigResponse): SystemConfigFormState {
-  return {
-    configKey: item.config_key,
-    configType: item.config_type,
-    provider: item.provider || "",
-    displayName: item.display_name,
-    description: item.description || "",
-    configJson:
-      typeof item.config_json === "string"
-        ? item.config_json
-        : JSON.stringify(item.config_json ?? {}, null, 2),
-    enabled: item.enabled,
-  }
-}
 
 export default function SystemPage() {
   const { t, locale } = useAppTranslations("system")

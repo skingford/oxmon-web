@@ -270,8 +270,8 @@ export interface CertCheckResult {
   resolved_ips: string[] | null;
   error: string | null;
   checked_at: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
   certificate_id?: string | null;
 }
 

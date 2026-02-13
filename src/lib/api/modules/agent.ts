@@ -16,6 +16,7 @@ interface RequestConfig {
   body?: unknown
   token?: string
   requiresAuth?: boolean
+  allowEmptyResponse?: boolean
 }
 
 interface AgentApiModuleDeps {
@@ -59,6 +60,7 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     request<void>(`/v1/agents/whitelist/${id}`, {
       method: "DELETE",
       token,
+      allowEmptyResponse: true,
     })
 
   const regenerateToken = (id: string, token?: string) =>

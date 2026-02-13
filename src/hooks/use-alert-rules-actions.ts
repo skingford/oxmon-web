@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { normalizeAlertRulePayload } from "@/lib/alerts/rule-form"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { AlertRuleDetailResponse, CreateAlertRuleRequest } from "@/types/api"
 import { toast } from "sonner"
@@ -27,8 +28,10 @@ export function useAlertRulesActions({
   const [deleting, setDeleting] = useState(false)
 
   const handleSubmit = useCallback(async () => {
+    const normalizedPayload = normalizeAlertRulePayload(ruleForm)
+
     try {
-      JSON.parse(ruleForm.config_json || "{}")
+      JSON.parse(normalizedPayload.config_json || "{}")
     } catch {
       toast.error(t("rules.toastInvalidConfigJson"))
       return
@@ -38,10 +41,10 @@ export function useAlertRulesActions({
 
     try {
       if (editingRuleId) {
-        await api.updateAlertRule(editingRuleId, ruleForm)
+        await api.updateAlertRule(editingRuleId, normalizedPayload)
         toast.success(t("rules.toastUpdated"))
       } else {
-        await api.createAlertRule(ruleForm)
+        await api.createAlertRule(normalizedPayload)
         toast.success(t("rules.toastCreated"))
       }
 

@@ -2,12 +2,36 @@
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
-import { CreateSilenceWindowRequest, SilenceWindow } from "@/types/api"
-import {
-  useAppTranslations,
-  type AppNamespaceTranslator,
-} from "@/hooks/use-app-translations"
+import { SilenceWindow } from "@/types/api"
+import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
+import {
+  DAY_IN_MS,
+  WINDOW_ORIGIN_STORAGE_KEY,
+  WINDOW_ORIGIN_TTL_STORAGE_KEY,
+  filterActiveWindowOrigins,
+  formatDateTime,
+  formatDuration,
+  getInitialFormState,
+  getStatusMeta,
+  getWindowStatus,
+  isWindowOriginExpired,
+  mergeWindowOrigins,
+  normalizeWindowOriginTtlDays,
+  parseDate,
+  parseImportedWindowOrigins,
+  readWindowOriginTtlDaysFromStorage,
+  readWindowOriginsFromStorage,
+  resolveCreatedWindowId,
+  toLocalDatetimeInputValue,
+  toSilencePayload,
+  type SilenceFormState,
+  type SilenceStatusFilter,
+  type WindowOriginMeta,
+  type WindowOriginMode,
+  type WindowOriginModeFilter,
+  type WindowOriginTtlDays,
+} from "@/lib/notifications/silence-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -54,448 +78,6 @@ import { toast } from "sonner"
 
 const PAGE_LIMIT = 100
 
-type SilenceStatus = "active" | "scheduled" | "expired" | "unknown"
-type SilenceStatusFilter = "all" | SilenceStatus
-type WindowOriginMode = "replaced" | "cloned"
-type WindowOriginModeFilter = "all" | WindowOriginMode
-
-type SilenceFormState = {
-  startTime: string
-  endTime: string
-  recurrence: string
-}
-
-type WindowOriginMeta = {
-  sourceId: string
-  mode: WindowOriginMode
-  createdAt: number
-}
-const DAY_IN_MS = 24 * 60 * 60 * 1000
-const WINDOW_ORIGIN_TTL_OPTIONS = [1, 7, 30] as const
-const WINDOW_ORIGIN_TTL_DEFAULT_DAYS = 7
-const WINDOW_ORIGIN_STORAGE_KEY = "oxmon.notifications.silence.window-origins.v1"
-const WINDOW_ORIGIN_TTL_STORAGE_KEY = "oxmon.notifications.silence.window-origins.ttl-days.v1"
-
-function sanitizeWindowOrigins(value: unknown): Record<string, WindowOriginMeta> {
-  if (!value || typeof value !== "object") {
-    return {}
-  }
-
-  const next: Record<string, WindowOriginMeta> = {}
-
-  Object.entries(value as Record<string, unknown>).forEach(([windowId, meta]) => {
-    if (!windowId || typeof meta !== "object" || !meta) {
-      return
-    }
-
-    const sourceId = (meta as Record<string, unknown>).sourceId
-    const mode = (meta as Record<string, unknown>).mode
-    const createdAt = (meta as Record<string, unknown>).createdAt
-
-    if (typeof sourceId !== "string") {
-      return
-    }
-
-    if (mode !== "replaced" && mode !== "cloned") {
-      return
-    }
-
-    const normalizedCreatedAt =
-      typeof createdAt === "number" && Number.isFinite(createdAt) && createdAt > 0
-        ? createdAt
-        : Date.now()
-
-    next[windowId] = {
-      sourceId,
-      mode,
-      createdAt: normalizedCreatedAt,
-    }
-  })
-
-  return next
-}
-
-function normalizeWindowOriginTtlDays(value: unknown) {
-  const parsed = Number(value)
-
-  if (!Number.isFinite(parsed)) {
-    return WINDOW_ORIGIN_TTL_DEFAULT_DAYS
-  }
-
-  if (!WINDOW_ORIGIN_TTL_OPTIONS.includes(parsed as (typeof WINDOW_ORIGIN_TTL_OPTIONS)[number])) {
-    return WINDOW_ORIGIN_TTL_DEFAULT_DAYS
-  }
-
-  return parsed as (typeof WINDOW_ORIGIN_TTL_OPTIONS)[number]
-}
-
-function readWindowOriginTtlDaysFromStorage() {
-  if (typeof window === "undefined") {
-    return WINDOW_ORIGIN_TTL_DEFAULT_DAYS
-  }
-
-  try {
-    const rawValue = window.localStorage.getItem(WINDOW_ORIGIN_TTL_STORAGE_KEY)
-    return normalizeWindowOriginTtlDays(rawValue)
-  } catch {
-    return WINDOW_ORIGIN_TTL_DEFAULT_DAYS
-  }
-}
-
-function isWindowOriginExpired(originMeta: WindowOriginMeta, ttlMs: number, now = Date.now()) {
-  return now - originMeta.createdAt > ttlMs
-}
-
-function filterActiveWindowOrigins(
-  origins: Record<string, WindowOriginMeta>,
-  ttlMs: number,
-  now = Date.now()
-) {
-  const entries = Object.entries(origins).filter(([, meta]) => !isWindowOriginExpired(meta, ttlMs, now))
-
-  if (entries.length === Object.keys(origins).length) {
-    return origins
-  }
-
-  return Object.fromEntries(entries)
-}
-
-function readWindowOriginsFromStorage(ttlMs: number): Record<string, WindowOriginMeta> {
-  if (typeof window === "undefined") {
-    return {}
-  }
-
-  try {
-    const rawValue = window.localStorage.getItem(WINDOW_ORIGIN_STORAGE_KEY)
-
-    if (!rawValue) {
-      return {}
-    }
-
-    const parsed = sanitizeWindowOrigins(JSON.parse(rawValue))
-    return filterActiveWindowOrigins(parsed, ttlMs)
-  } catch {
-    return {}
-  }
-}
-
-function normalizeImportedWindowOriginEntry(
-  rawWindowId: unknown,
-  rawSourceId: unknown,
-  rawMode: unknown,
-  rawCreatedAt: unknown
-): { windowId: string; meta: WindowOriginMeta } | null {
-  if (typeof rawWindowId !== "string" || typeof rawSourceId !== "string") {
-    return null
-  }
-
-  if (rawMode !== "replaced" && rawMode !== "cloned") {
-    return null
-  }
-
-  let createdAt = Date.now()
-
-  if (typeof rawCreatedAt === "number" && Number.isFinite(rawCreatedAt) && rawCreatedAt > 0) {
-    createdAt = rawCreatedAt
-  }
-
-  if (typeof rawCreatedAt === "string") {
-    const parsedDate = Date.parse(rawCreatedAt)
-
-    if (Number.isFinite(parsedDate) && parsedDate > 0) {
-      createdAt = parsedDate
-    }
-  }
-
-  return {
-    windowId: rawWindowId,
-    meta: {
-      sourceId: rawSourceId,
-      mode: rawMode,
-      createdAt,
-    },
-  }
-}
-
-function parseImportedWindowOrigins(value: unknown): Record<string, WindowOriginMeta> {
-  if (!value || typeof value !== "object") {
-    return {}
-  }
-
-  const payload = value as Record<string, unknown>
-
-  if (Array.isArray(payload.entries)) {
-    const entries: Record<string, WindowOriginMeta> = {}
-
-    payload.entries.forEach((entry) => {
-      if (!entry || typeof entry !== "object") {
-        return
-      }
-
-      const normalized = normalizeImportedWindowOriginEntry(
-        (entry as Record<string, unknown>).window_id,
-        (entry as Record<string, unknown>).source_id,
-        (entry as Record<string, unknown>).mode,
-        (entry as Record<string, unknown>).created_at
-      )
-
-      if (!normalized) {
-        return
-      }
-
-      const previous = entries[normalized.windowId]
-
-      if (!previous || normalized.meta.createdAt >= previous.createdAt) {
-        entries[normalized.windowId] = normalized.meta
-      }
-    })
-
-    return entries
-  }
-
-  return sanitizeWindowOrigins(payload)
-}
-
-function mergeWindowOrigins(
-  currentOrigins: Record<string, WindowOriginMeta>,
-  importedOrigins: Record<string, WindowOriginMeta>
-) {
-  const next = { ...currentOrigins }
-
-  Object.entries(importedOrigins).forEach(([windowId, importedMeta]) => {
-    const previous = next[windowId]
-
-    if (!previous || importedMeta.createdAt >= previous.createdAt) {
-      next[windowId] = importedMeta
-    }
-  })
-
-  return next
-}
-
-function getInitialFormState(): SilenceFormState {
-  return {
-    startTime: "",
-    endTime: "",
-    recurrence: "",
-  }
-}
-
-function parseDate(value: string | null | undefined) {
-  if (!value) {
-    return null
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return null
-  }
-
-  return date
-}
-
-function normalizeRecurrence(value: string | null | undefined) {
-  return (value || "").trim()
-}
-
-function toLocalDatetimeInputValue(value: string | null | undefined) {
-  const date = parseDate(value)
-
-  if (!date) {
-    return ""
-  }
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  const hours = String(date.getHours()).padStart(2, "0")
-  const minutes = String(date.getMinutes()).padStart(2, "0")
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
-
-function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  const date = parseDate(value)
-
-  if (!date) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
-function getWindowStatus(window: SilenceWindow, currentTime = Date.now()): SilenceStatus {
-  const startTime = parseDate(window.start_time)?.getTime()
-  const endTime = parseDate(window.end_time)?.getTime()
-
-  if (!startTime || !endTime) {
-    return "unknown"
-  }
-
-  if (currentTime < startTime) {
-    return "scheduled"
-  }
-
-  if (currentTime > endTime) {
-    return "expired"
-  }
-
-  return "active"
-}
-
-function formatDuration(milliseconds: number, locale: "zh" | "en") {
-  const totalMinutes = Math.floor(milliseconds / 60000)
-
-  if (totalMinutes < 0) {
-    return "-"
-  }
-
-  const days = Math.floor(totalMinutes / (24 * 60))
-  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
-  const minutes = totalMinutes % 60
-
-  if (locale === "zh") {
-    if (days > 0) {
-      return `${days} 天 ${hours} 小时`
-    }
-
-    if (hours > 0) {
-      return `${hours} 小时 ${minutes} 分钟`
-    }
-
-    return `${minutes} 分钟`
-  }
-
-  if (days > 0) {
-    return `${days}d ${hours}h`
-  }
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`
-  }
-
-  return `${minutes}m`
-}
-
-function getStatusMeta(
-  status: SilenceStatus,
-  t: AppNamespaceTranslator<"pages">
-) {
-  if (status === "active") {
-    return {
-      label: t("notifications.silenceStatusActive"),
-      className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
-    }
-  }
-
-  if (status === "scheduled") {
-    return {
-      label: t("notifications.silenceStatusScheduled"),
-      className: "border-amber-500/30 bg-amber-500/10 text-amber-600",
-    }
-  }
-
-  if (status === "expired") {
-    return {
-      label: t("notifications.silenceStatusExpired"),
-      className: "border-muted bg-muted text-muted-foreground",
-    }
-  }
-
-  return {
-    label: t("notifications.silenceStatusUnknown"),
-    className: "border-red-500/30 bg-red-500/10 text-red-600",
-  }
-}
-
-function toSilencePayload(form: SilenceFormState): CreateSilenceWindowRequest | null {
-  if (!form.startTime || !form.endTime) {
-    return null
-  }
-
-  const startDate = parseDate(form.startTime)
-  const endDate = parseDate(form.endTime)
-
-  if (!startDate || !endDate) {
-    return null
-  }
-
-  if (endDate.getTime() <= startDate.getTime()) {
-    return null
-  }
-
-  const payload: CreateSilenceWindowRequest = {
-    start_time: startDate.toISOString(),
-    end_time: endDate.toISOString(),
-  }
-
-  const recurrenceValue = normalizeRecurrence(form.recurrence)
-
-  if (recurrenceValue) {
-    payload.recurrence = recurrenceValue
-  }
-
-  return payload
-}
-
-function isWindowMatchingPayload(window: SilenceWindow, payload: CreateSilenceWindowRequest) {
-  const windowStart = parseDate(window.start_time)?.getTime()
-  const windowEnd = parseDate(window.end_time)?.getTime()
-  const payloadStart = parseDate(payload.start_time)?.getTime()
-  const payloadEnd = parseDate(payload.end_time)?.getTime()
-
-  if (!windowStart || !windowEnd || !payloadStart || !payloadEnd) {
-    return false
-  }
-
-  if (windowStart !== payloadStart || windowEnd !== payloadEnd) {
-    return false
-  }
-
-  return normalizeRecurrence(window.recurrence) === normalizeRecurrence(payload.recurrence)
-}
-
-function resolveCreatedWindowId(
-  windows: SilenceWindow[],
-  payload: CreateSilenceWindowRequest,
-  excludedId?: string
-) {
-  const matched = windows
-    .filter((window) => window.id !== excludedId)
-    .filter((window) => isWindowMatchingPayload(window, payload))
-    .sort((left, right) => {
-      const rightCreated = parseDate(right.created_at)?.getTime() || 0
-      const leftCreated = parseDate(left.created_at)?.getTime() || 0
-
-      if (rightCreated !== leftCreated) {
-        return rightCreated - leftCreated
-      }
-
-      const rightUpdated = parseDate(right.updated_at)?.getTime() || 0
-      const leftUpdated = parseDate(left.updated_at)?.getTime() || 0
-
-      if (rightUpdated !== leftUpdated) {
-        return rightUpdated - leftUpdated
-      }
-
-      return right.id.localeCompare(left.id)
-    })
-
-  if (matched.length === 0) {
-    return null
-  }
-
-  return matched[0].id
-}
-
 export default function SilenceWindowsPage() {
   const { t, locale } = useAppTranslations("pages")
   const {
@@ -520,7 +102,7 @@ export default function SilenceWindowsPage() {
   const [editForm, setEditForm] = useState<SilenceFormState>(getInitialFormState)
   const [replaceOriginalAfterEdit, setReplaceOriginalAfterEdit] = useState(true)
 
-  const [windowOriginTtlDays, setWindowOriginTtlDays] = useState<(typeof WINDOW_ORIGIN_TTL_OPTIONS)[number]>(
+  const [windowOriginTtlDays, setWindowOriginTtlDays] = useState<WindowOriginTtlDays>(
     () => readWindowOriginTtlDaysFromStorage()
   )
   const windowOriginTtlMs = useMemo(() => windowOriginTtlDays * DAY_IN_MS, [windowOriginTtlDays])

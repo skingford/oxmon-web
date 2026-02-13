@@ -258,7 +258,7 @@ function normalizeAlertRuleDetail(value: unknown): AlertRuleDetailResponse | nul
   const metric = toStringValue(record.metric)
   const agentPattern = toStringValue(record.agent_pattern)
   const severity = toStringValue(record.severity)
-  const source = toStringValue(record.source)
+  const source = toStringValue(record.source, "manual")
   const createdAt = toStringValue(record.created_at)
   const updatedAt = toStringValue(record.updated_at)
 
@@ -268,10 +268,7 @@ function normalizeAlertRuleDetail(value: unknown): AlertRuleDetailResponse | nul
     !ruleType ||
     !metric ||
     !agentPattern ||
-    !severity ||
-    !source ||
-    !createdAt ||
-    !updatedAt
+    !severity
   ) {
     return null
   }
@@ -284,11 +281,11 @@ function normalizeAlertRuleDetail(value: unknown): AlertRuleDetailResponse | nul
     agent_pattern: agentPattern,
     severity,
     enabled: Boolean(record.enabled),
-    config_json: toStringValue(record.config_json),
+    config_json: toStringValue(record.config_json, "{}"),
     silence_secs: Math.max(0, Math.trunc(toNumberValue(record.silence_secs, 0))),
     source,
-    created_at: createdAt,
-    updated_at: updatedAt,
+    created_at: createdAt || "",
+    updated_at: updatedAt || "",
   }
 }
 
@@ -406,14 +403,19 @@ export const api = {
 
   ...agentApi,
 
-  getActiveAlerts: (params: PaginationParams) =>
+  getActiveAlerts: (params: PaginationParams = {}) =>
     request<unknown[]>(`/v1/alerts/active${buildQueryString(params)}`).then((items) =>
       items
         .map((item) => normalizeAlertEvent(item))
         .filter((item): item is AlertEventResponse => Boolean(item))
     ),
 
-  getAlertHistory: (params: PaginationParams & { agent_id__eq?: string; severity__eq?: string }) =>
+  getAlertHistory: (params: PaginationParams & {
+    agent_id__eq?: string
+    severity__eq?: string
+    timestamp__gte?: string
+    timestamp__lte?: string
+  } = {}) =>
     request<unknown[]>(`/v1/alerts/history${buildQueryString(params)}`).then((items) =>
       items
         .map((item) => normalizeAlertEvent(item))
@@ -472,7 +474,11 @@ export const api = {
     request<DashboardOverview>("/v1/dashboard/overview"),
 
   // Certificates
-  getCertificates: (params: PaginationParams & { not_after__lte?: number; ip_address__contains?: string; issuer__contains?: string }) =>
+  getCertificates: (params: PaginationParams & {
+    not_after__lte?: number
+    ip_address__contains?: string
+    issuer__contains?: string
+  } = {}) =>
     request<CertificateDetails[]>(`/v1/certificates${buildQueryString(params)}`),
 
   getCertificate: (id: string) =>
@@ -598,7 +604,7 @@ export const api = {
   checkAllDomains: () =>
     request<CertCheckResult[]>("/v1/certs/check", { method: "POST" }),
 
-  listDomains: (params: PaginationParams & { enabled__eq?: boolean; domain__contains?: string }) =>
+  listDomains: (params: PaginationParams & { enabled__eq?: boolean; domain__contains?: string } = {}) =>
     request<CertDomain[]>(`/v1/certs/domains${buildQueryString(params)}`),
 
   createDomain: (data: CreateDomainRequest) =>
@@ -619,20 +625,25 @@ export const api = {
   checkSingleDomain: (id: string) =>
     request<CertCheckResult>(`/v1/certs/domains/${id}/check`, { method: "POST" }),
 
-  getCertCheckHistory: (id: string, params: PaginationParams) =>
+  getCertCheckHistory: (id: string, params: PaginationParams = {}) =>
     request<CertCheckResult[]>(`/v1/certs/domains/${id}/history${buildQueryString(params)}`),
 
-  getCertStatusAll: (params: PaginationParams) =>
+  getCertStatusAll: (params: PaginationParams = {}) =>
     request<CertCheckResult[]>(`/v1/certs/status${buildQueryString(params)}`),
 
   getCertStatusByDomain: (domain: string) =>
-    request<CertCheckResult>(`/v1/certs/status/${domain}`),
+    request<CertCheckResult>(`/v1/certs/status/${encodeURIComponent(domain)}`),
 
   getCertSummary: () =>
     request<CertSummary>("/v1/certs/summary"),
 
   // Metrics - Explorer
-  queryAllMetrics: (params: PaginationParams & { agent_id__eq?: string; metric_name__eq?: string; timestamp__gte?: string; timestamp__lte?: string }) =>
+  queryAllMetrics: (params: PaginationParams & {
+    agent_id__eq?: string
+    metric_name__eq?: string
+    timestamp__gte?: string
+    timestamp__lte?: string
+  } = {}) =>
     request<MetricDataPointResponse[]>(`/v1/metrics${buildQueryString(params)}`),
 
   getMetricAgents: (params?: { timestamp__gte?: string; timestamp__lte?: string }) =>
@@ -664,8 +675,15 @@ export const api = {
   deleteChannelConfig: (id: string) =>
     request(`/v1/notifications/channels/config/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
-  getRecipients: (id: string) =>
-    request<string[]>(`/v1/notifications/channels/${id}/recipients`),
+  getRecipients: (id: string, params?: PaginationParams) => {
+    if (params) {
+      return request<string[]>(`/v1/notifications/channels/${id}/recipients${buildQueryString(params)}`)
+    }
+
+    return requestAllPages<string>((page) =>
+      request<string[]>(`/v1/notifications/channels/${id}/recipients${buildQueryString(page)}`)
+    )
+  },
 
   setRecipients: (id: string, data: SetRecipientsRequest) =>
     request<string[]>(`/v1/notifications/channels/${id}/recipients`, { method: "PUT", body: data }),
@@ -673,7 +691,7 @@ export const api = {
   testChannel: (id: string) =>
     request(`/v1/notifications/channels/${id}/test`, { method: "POST", allowEmptyResponse: true }),
 
-  listSilenceWindows: (params: PaginationParams) =>
+  listSilenceWindows: (params: PaginationParams = {}) =>
     request<unknown[]>(`/v1/notifications/silence-windows${buildQueryString(params)}`).then((items) =>
       items
         .map((item) => normalizeSilenceWindow(item))
@@ -729,8 +747,8 @@ export const api = {
   deleteAlertRule: (id: string) =>
     request(`/v1/alerts/rules/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
-  getAlertSummary: () =>
-    request<AlertSummary>("/v1/alerts/summary"),
+  getAlertSummary: (params?: { hours?: number }) =>
+    request<AlertSummary>(`/v1/alerts/summary${buildQueryString(params || {})}`),
 
   getHealth: () =>
     request<HealthResponse>("/v1/health", { requiresAuth: false }),
