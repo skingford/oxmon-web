@@ -6,13 +6,20 @@ import {
   ChannelConfig,
   ChannelOverview,
   CreateChannelRequest,
+  SystemConfigResponse,
   UpdateChannelConfigRequest,
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import {
+  NotificationChannelFormFields,
+  NotificationChannelFormState,
+  NotificationSystemConfigOption,
+} from "@/components/notifications/NotificationChannelFormFields"
 import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import {
   Dialog,
   DialogContent,
@@ -21,7 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -54,7 +60,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Send,
   Share2,
   Smartphone,
@@ -66,23 +71,16 @@ import {
 import { toast } from "sonner"
 
 const PAGE_LIMIT = 100
+const CHANNEL_SEVERITY_OPTIONS = ["info", "warning", "critical"] as const
 
 type NotificationsQueryState = {
   channels: ChannelOverview[]
   configMap: Record<string, string>
+  systemConfigs: SystemConfigResponse[]
 }
 
 type NotificationStatusFilter = "all" | "enabled" | "disabled"
 
-type ChannelFormState = {
-  name: string
-  channelType: string
-  description: string
-  minSeverity: string
-  enabled: boolean
-  recipientsInput: string
-  configJson: string
-}
 
 function formatDateTime(value: string | null, locale: "zh" | "en") {
   if (!value) {
@@ -116,10 +114,11 @@ function normalizeRecipientsInput(value: string) {
   )
 }
 
-function getInitialFormState(): ChannelFormState {
+function getInitialFormState(): NotificationChannelFormState {
   return {
     name: "",
     channelType: "email",
+    systemConfigId: "",
     description: "",
     minSeverity: "info",
     enabled: true,
@@ -247,6 +246,11 @@ function getChannelIcon(channelType: string) {
   return <Bell className="h-4 w-4" />
 }
 
+function shouldRequireSystemConfig(channelType: string) {
+  const normalized = channelType.trim().toLowerCase()
+  return normalized === "email" || normalized === "sms"
+}
+
 export default function NotificationsPage() {
   const { t, locale } = useAppTranslations("pages")
   const {
@@ -257,20 +261,23 @@ export default function NotificationsPage() {
   } = useRequestState<NotificationsQueryState>({
     channels: [],
     configMap: {},
+    systemConfigs: [],
   })
 
   const channels = data.channels
   const configMap = data.configMap
+  const systemConfigs = data.systemConfigs
 
   const [searchKeyword, setSearchKeyword] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [severityFilter, setSeverityFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<NotificationStatusFilter>("all")
+  const [systemConfigFilter, setSystemConfigFilter] = useState("all")
 
   const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false)
   const [editingChannel, setEditingChannel] = useState<ChannelOverview | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
-  const [channelForm, setChannelForm] = useState<ChannelFormState>(getInitialFormState)
+  const [channelForm, setChannelForm] = useState<NotificationChannelFormState>(getInitialFormState)
 
   const [isRecipientsDialogOpen, setIsRecipientsDialogOpen] = useState(false)
   const [recipientsDialogChannel, setRecipientsDialogChannel] = useState<ChannelOverview | null>(null)
@@ -291,10 +298,14 @@ export default function NotificationsPage() {
             api.listChannels({ limit: PAGE_LIMIT, offset: 0 }),
             api.listChannelConfigs({ limit: PAGE_LIMIT, offset: 0 }).catch(() => []),
           ])
+          const systemConfigRows = await api
+            .listSystemConfigs({ limit: PAGE_LIMIT, offset: 0 })
+            .catch(() => [])
 
           return {
             channels: channelRows,
             configMap: createConfigMap(configRows),
+            systemConfigs: systemConfigRows,
           }
         },
         {
@@ -326,6 +337,14 @@ export default function NotificationsPage() {
     }
   }, [channels])
 
+  const systemConfigMap = useMemo(() => {
+    const map = new Map<string, SystemConfigResponse>()
+    systemConfigs.forEach((item) => {
+      map.set(item.id, item)
+    })
+    return map
+  }, [systemConfigs])
+
   const availableTypes = useMemo(() => {
     const typeSet = new Set<string>()
 
@@ -337,6 +356,14 @@ export default function NotificationsPage() {
 
     return Array.from(typeSet).sort((left, right) => left.localeCompare(right))
   }, [channels])
+
+  const availableSystemConfigs = useMemo(() => {
+    return systemConfigs.slice().sort((left, right) => {
+      const leftLabel = `${left.display_name} ${left.config_key}`
+      const rightLabel = `${right.display_name} ${right.config_key}`
+      return leftLabel.localeCompare(rightLabel)
+    })
+  }, [systemConfigs])
 
   const filteredChannels = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
@@ -356,6 +383,18 @@ export default function NotificationsPage() {
         }
 
         if (typeFilter !== "all" && channel.channel_type.toLowerCase() !== typeFilter.toLowerCase()) {
+          return false
+        }
+
+        if (systemConfigFilter === "unbound" && channel.system_config_id) {
+          return false
+        }
+
+        if (
+          systemConfigFilter !== "all" &&
+          systemConfigFilter !== "unbound" &&
+          channel.system_config_id !== systemConfigFilter
+        ) {
           return false
         }
 
@@ -380,15 +419,39 @@ export default function NotificationsPage() {
         const rightTime = new Date(right.updated_at).getTime()
         return rightTime - leftTime
       })
-  }, [channels, searchKeyword, severityFilter, statusFilter, typeFilter])
+  }, [channels, searchKeyword, severityFilter, statusFilter, systemConfigFilter, typeFilter])
 
-  const hasActiveFilters = Boolean(searchKeyword.trim()) || typeFilter !== "all" || severityFilter !== "all" || statusFilter !== "all"
+  const hasActiveFilters =
+    Boolean(searchKeyword.trim()) ||
+    typeFilter !== "all" ||
+    severityFilter !== "all" ||
+    statusFilter !== "all" ||
+    systemConfigFilter !== "all"
+  const currentChannelTypeNormalized = channelForm.channelType.trim().toLowerCase()
+  const channelSystemConfigOptions = useMemo<NotificationSystemConfigOption[]>(
+    () =>
+      systemConfigs
+        .filter((item) => item.config_type.toLowerCase() === currentChannelTypeNormalized)
+        .map((item) => ({
+          id: item.id,
+          displayName: item.display_name,
+          configKey: item.config_key,
+          enabled: item.enabled,
+        })),
+    [currentChannelTypeNormalized, systemConfigs]
+  )
+
+  const getSeverityLabelForForm = useCallback(
+    (severity: string) => getSeverityLabel(severity, t),
+    [t]
+  )
 
   const resetFilters = () => {
     setSearchKeyword("")
     setTypeFilter("all")
     setSeverityFilter("all")
     setStatusFilter("all")
+    setSystemConfigFilter("all")
   }
 
   const getStatusAwareMessage = (
@@ -414,6 +477,7 @@ export default function NotificationsPage() {
     setChannelForm({
       name: channel.name,
       channelType: channel.channel_type,
+      systemConfigId: channel.system_config_id || "",
       description: channel.description || "",
       minSeverity: channel.min_severity || "info",
       enabled: channel.enabled,
@@ -428,6 +492,8 @@ export default function NotificationsPage() {
 
     const name = channelForm.name.trim()
     const channelType = channelForm.channelType.trim()
+    const normalizedChannelType = channelType.toLowerCase()
+    const systemConfigId = channelForm.systemConfigId.trim()
     const recipients = normalizeRecipientsInput(channelForm.recipientsInput)
 
     if (!name) {
@@ -437,6 +503,11 @@ export default function NotificationsPage() {
 
     if (!channelType) {
       toast.error(t("notifications.toastTypeRequired"))
+      return
+    }
+
+    if (shouldRequireSystemConfig(channelType) && !systemConfigId) {
+      toast.error(t("notifications.toastSystemConfigRequired"))
       return
     }
 
@@ -462,6 +533,9 @@ export default function NotificationsPage() {
         min_severity: channelForm.minSeverity,
         recipients,
         config_json: normalizedConfig,
+      }
+      if (shouldRequireSystemConfig(channelType)) {
+        basePayload.system_config_id = systemConfigId
       }
 
       if (editingChannel) {
@@ -592,7 +666,7 @@ export default function NotificationsPage() {
     }
   }
 
-  const severityOptions = ["info", "warning", "critical"]
+  const severityOptions = CHANNEL_SEVERITY_OPTIONS
 
   return (
     <div className="space-y-6">
@@ -650,19 +724,16 @@ export default function NotificationsPage() {
           <div>
             <CardTitle>{t("notifications.filtersTitle")}</CardTitle>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchKeyword}
-                onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder={t("notifications.searchPlaceholder")}
-                className="pl-9"
-              />
-            </div>
-
+          <FilterToolbar
+            className="xl:grid-cols-5"
+            search={{
+              value: searchKeyword,
+              onValueChange: setSearchKeyword,
+              placeholder: t("notifications.searchPlaceholder"),
+            }}
+          >
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10 w-full bg-background">
                 <SelectValue placeholder={t("notifications.filterTypeLabel")} />
               </SelectTrigger>
               <SelectContent>
@@ -676,7 +747,7 @@ export default function NotificationsPage() {
             </Select>
 
             <Select value={severityFilter} onValueChange={setSeverityFilter}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10 w-full bg-background">
                 <SelectValue placeholder={t("notifications.filterSeverityLabel")} />
               </SelectTrigger>
               <SelectContent>
@@ -689,9 +760,24 @@ export default function NotificationsPage() {
               </SelectContent>
             </Select>
 
+            <Select value={systemConfigFilter} onValueChange={setSystemConfigFilter}>
+              <SelectTrigger className="h-10 w-full bg-background">
+                <SelectValue placeholder={t("notifications.filterSystemConfigLabel")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("notifications.filterSystemConfigAll")}</SelectItem>
+                <SelectItem value="unbound">{t("notifications.filterSystemConfigUnbound")}</SelectItem>
+                {availableSystemConfigs.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.display_name} ({item.config_key})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <div className="flex items-center gap-2">
               <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as NotificationStatusFilter)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10 w-full bg-background">
                   <SelectValue placeholder={t("notifications.filterStatusLabel")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -711,7 +797,7 @@ export default function NotificationsPage() {
                 <FilterX className="h-4 w-4" />
               </Button>
             </div>
-          </div>
+          </FilterToolbar>
         </CardHeader>
       </Card>
 
@@ -726,6 +812,7 @@ export default function NotificationsPage() {
               <TableRow>
                 <TableHead>{t("notifications.tableColName")}</TableHead>
                 <TableHead>{t("notifications.tableColType")}</TableHead>
+                <TableHead>{t("notifications.tableColSystemConfig")}</TableHead>
                 <TableHead>{t("notifications.tableColSeverity")}</TableHead>
                 <TableHead>{t("notifications.tableColRecipients")}</TableHead>
                 <TableHead>{t("notifications.tableColStatus")}</TableHead>
@@ -737,14 +824,14 @@ export default function NotificationsPage() {
               {loading ? (
                 Array.from({ length: 4 }).map((_, index) => (
                   <TableRow key={index}>
-                    <TableCell colSpan={7} className="h-16 text-muted-foreground">
+                    <TableCell colSpan={8} className="h-16 text-muted-foreground">
                       {t("notifications.tableLoading")}
                     </TableCell>
                   </TableRow>
                 ))
               ) : filteredChannels.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-40 text-center text-muted-foreground">
                     <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
                       <TriangleAlert className="h-5 w-5" />
                       <p>{hasActiveFilters ? t("notifications.tableEmptyFiltered") : t("notifications.tableEmpty")}</p>
@@ -757,6 +844,9 @@ export default function NotificationsPage() {
               ) : (
                 filteredChannels.map((channel) => {
                   const recipients = channel.recipients || []
+                  const boundSystemConfig = channel.system_config_id
+                    ? systemConfigMap.get(channel.system_config_id)
+                    : null
                   const statusKey = channel.enabled ? "notifications.statusEnabled" : "notifications.statusDisabled"
                   const recipientCountKey = recipients.length === 1
                     ? "notifications.recipientCountOne"
@@ -777,6 +867,20 @@ export default function NotificationsPage() {
                           <span className="text-primary">{getChannelIcon(channel.channel_type)}</span>
                           <span className="text-sm">{getChannelTypeLabel(channel.channel_type, t)}</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {boundSystemConfig ? (
+                          <div className="space-y-1">
+                            <p className="text-sm">{boundSystemConfig.display_name}</p>
+                            <p className="font-mono text-xs text-muted-foreground">
+                              {boundSystemConfig.config_key}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {t("notifications.systemConfigNone")}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={getSeverityClassName(channel.min_severity)}>
@@ -908,130 +1012,17 @@ export default function NotificationsPage() {
           </DialogHeader>
 
           <form className="min-w-0 space-y-4" onSubmit={handleSubmitChannel}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor="channel-name">{t("notifications.fieldName")}</Label>
-                <Input
-                  id="channel-name"
-                  value={channelForm.name}
-                  onChange={(event) =>
-                    setChannelForm((previous) => ({
-                      ...previous,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder={t("notifications.fieldNamePlaceholder")}
-                />
-              </div>
-
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor="channel-type">{t("notifications.fieldType")}</Label>
-                <Input
-                  id="channel-type"
-                  value={channelForm.channelType}
-                  onChange={(event) =>
-                    setChannelForm((previous) => ({
-                      ...previous,
-                      channelType: event.target.value,
-                    }))
-                  }
-                  placeholder={t("notifications.fieldTypePlaceholder")}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="min-w-0 space-y-2">
-                <Label>{t("notifications.fieldSeverity")}</Label>
-                <Select
-                  value={channelForm.minSeverity}
-                  onValueChange={(value) =>
-                    setChannelForm((previous) => ({
-                      ...previous,
-                      minSeverity: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {severityOptions.map((severity) => (
-                      <SelectItem key={severity} value={severity}>
-                        {getSeverityLabel(severity, t)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {editingChannel ? (
-                <div className="min-w-0 space-y-2">
-                  <Label>{t("notifications.fieldEnabled")}</Label>
-                  <div className="flex h-10 items-center rounded-md border px-3">
-                    <Switch
-                      checked={channelForm.enabled}
-                      onCheckedChange={(checked) =>
-                        setChannelForm((previous) => ({
-                          ...previous,
-                          enabled: checked,
-                        }))
-                      }
-                    />
-                    <span className="ml-3 text-sm text-muted-foreground">
-                      {channelForm.enabled ? t("notifications.statusEnabled") : t("notifications.statusDisabled")}
-                    </span>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="channel-description">{t("notifications.fieldDescription")}</Label>
-              <Input
-                id="channel-description"
-                value={channelForm.description}
-                onChange={(event) =>
-                  setChannelForm((previous) => ({
-                    ...previous,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder={t("notifications.fieldDescriptionPlaceholder")}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="channel-recipients">{t("notifications.fieldRecipients")}</Label>
-              <Textarea
-                id="channel-recipients"
-                value={channelForm.recipientsInput}
-                onChange={(event) =>
-                  setChannelForm((previous) => ({
-                    ...previous,
-                    recipientsInput: event.target.value,
-                  }))
-                }
-                placeholder={t("notifications.fieldRecipientsPlaceholder")}
-                className="min-h-[96px]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="channel-config">{t("notifications.fieldConfigJson")}</Label>
-              <Textarea
-                id="channel-config"
-                value={channelForm.configJson}
-                onChange={(event) =>
-                  setChannelForm((previous) => ({
-                    ...previous,
-                    configJson: event.target.value,
-                  }))
-                }
-                placeholder={t("notifications.fieldConfigPlaceholder")}
-                className="min-h-[160px] font-mono text-xs"
-              />
-            </div>
+            <NotificationChannelFormFields
+              form={channelForm}
+              setForm={setChannelForm}
+              idPrefix="channel"
+              isEditing={Boolean(editingChannel)}
+              severityOptions={severityOptions}
+              systemConfigOptions={channelSystemConfigOptions}
+              shouldRequireSystemConfig={shouldRequireSystemConfig}
+              getSeverityLabel={getSeverityLabelForForm}
+              t={t}
+            />
 
             <DialogFooter>
               <Button

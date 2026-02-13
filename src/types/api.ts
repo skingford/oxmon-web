@@ -158,6 +158,7 @@ export interface ChannelOverview {
   min_severity: string;
   enabled: boolean;
   recipient_type: string | null;
+  system_config_id?: string | null;
   recipients: string[];
   created_at: string;
   updated_at: string;
@@ -178,6 +179,35 @@ export interface RuntimeConfig {
   notification_aggregation_window_secs: number;
   alert_rules_count: number;
   notification_channels_count: number;
+}
+
+export interface SystemConfigResponse {
+  id: string;
+  config_key: string;
+  config_type: string;
+  provider?: string | null;
+  display_name: string;
+  description?: string | null;
+  config_json: unknown;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSystemConfigRequest {
+  config_key: string;
+  config_type: string;
+  provider?: string | null;
+  display_name: string;
+  description?: string | null;
+  config_json: string;
+}
+
+export interface UpdateSystemConfigRequest {
+  display_name?: string | null;
+  description?: string | null;
+  config_json?: string | null;
+  enabled?: boolean | null;
 }
 
 export interface PartitionDetail {
@@ -286,6 +316,7 @@ export interface CreateChannelRequest {
   description?: string | null;
   min_severity?: string;
   config_json?: string;
+  system_config_id?: string | null;
   recipients?: string[];
 }
 
@@ -296,6 +327,7 @@ export interface UpdateChannelConfigRequest {
   min_severity?: string;
   enabled?: boolean;
   config_json?: string;
+  system_config_id?: string | null;
   recipients?: string[];
 }
 
@@ -307,6 +339,7 @@ export interface ChannelConfig {
   min_severity?: string;
   enabled?: boolean;
   recipient_type?: string | null;
+  system_config_id?: string | null;
   recipients?: string[];
   created_at?: string;
   updated_at?: string;

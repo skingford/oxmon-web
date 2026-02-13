@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import {
   createScopedTranslator,
   type AppMessageNamespace,
@@ -10,7 +10,7 @@ import {
 import { useAppLocale } from "@/hooks/use-app-locale"
 
 type NamespaceTranslator<Namespace extends AppMessageNamespace> = (
-  path: AppMessageNamespacePath<Namespace>,
+  path: AppMessageNamespacePath<Namespace> | string,
   values?: MessageValues
 ) => string
 
@@ -21,7 +21,12 @@ export function useAppTranslations<Namespace extends AppMessageNamespace>(
   t: NamespaceTranslator<Namespace>
 } {
   const locale = useAppLocale()
-  const t = useMemo(() => createScopedTranslator(locale, namespace), [locale, namespace])
+  const scopedTranslator = useMemo(() => createScopedTranslator(locale, namespace), [locale, namespace])
+
+  const t = useCallback<NamespaceTranslator<Namespace>>(
+    (path, values) => scopedTranslator(path as AppMessageNamespacePath<Namespace>, values),
+    [scopedTranslator]
+  )
 
   return {
     locale,

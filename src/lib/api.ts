@@ -13,6 +13,9 @@ import {
   LoginResponse,
   PaginationParams,
   RuntimeConfig,
+  SystemConfigResponse,
+  CreateSystemConfigRequest,
+  UpdateSystemConfigRequest,
   StorageInfo,
   ChangePasswordRequest,
   CertificateChainInfo,
@@ -255,6 +258,21 @@ export const api = {
 
   triggerCleanup: () =>
     request("/v1/system/storage/cleanup", { method: "POST" }),
+
+  listSystemConfigs: (params: PaginationParams) =>
+    request<SystemConfigResponse[]>(`/v1/system/configs${buildQueryString(params)}`),
+
+  getSystemConfigById: (id: string) =>
+    request<SystemConfigResponse>(`/v1/system/configs/${id}`),
+
+  createSystemConfig: (data: CreateSystemConfigRequest) =>
+    request<SystemConfigResponse>("/v1/system/configs", { method: "POST", body: data }),
+
+  updateSystemConfig: (id: string, data: UpdateSystemConfigRequest) =>
+    request<SystemConfigResponse>(`/v1/system/configs/${id}`, { method: "PUT", body: data }),
+
+  deleteSystemConfig: (id: string) =>
+    request(`/v1/system/configs/${id}`, { method: "DELETE" }),
 
   // Dictionaries
   listDictionaryTypes: () =>

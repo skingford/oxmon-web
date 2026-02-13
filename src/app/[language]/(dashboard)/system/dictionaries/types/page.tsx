@@ -18,6 +18,7 @@ import { normalizeNullableText, parseOptionalSortOrder } from "@/lib/dictionary-
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import {
   Dialog,
   DialogContent,
@@ -47,7 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react"
+import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 type DictionaryTypeSortMode =
@@ -351,20 +352,16 @@ export default function SystemDictionaryTypesPage() {
 
       <Card>
         <CardContent className="space-y-3 pt-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-2">
-              <Label>{t("dictionaryTypeSearchPlaceholder")}</Label>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={typeKeyword}
-                  onChange={(event) => setTypeKeyword(event.target.value)}
-                  placeholder={t("dictionaryTypeSearchPlaceholder")}
-                  className="h-10 pl-9"
-                />
-              </div>
-            </div>
-
+          <FilterToolbar
+            className="gap-4 xl:grid-cols-3"
+            search={{
+              value: typeKeyword,
+              onValueChange: setTypeKeyword,
+              placeholder: t("dictionaryTypeSearchPlaceholder"),
+              label: t("dictionaryTypeSearchPlaceholder"),
+              inputClassName: "h-10",
+            }}
+          >
             <div className="space-y-2">
               <Label>{t("dictionaryTypeSortLabel")}</Label>
               <Select
@@ -394,7 +391,7 @@ export default function SystemDictionaryTypesPage() {
                 </p>
               </div>
             </div>
-          </div>
+          </FilterToolbar>
 
           <Table>
             <TableHeader>

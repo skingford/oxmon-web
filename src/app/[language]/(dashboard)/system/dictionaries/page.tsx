@@ -11,6 +11,7 @@ import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useDictionaryTypes } from "@/hooks/use-dictionary-types"
 import {
   DictionaryEntryFormFields,
+  DictionaryEntryFormLabels,
   DictionaryEntryFormState,
 } from "@/components/system/DictionaryEntryFormFields"
 import { getStatusAwareMessage } from "@/lib/api-error-utils"
@@ -18,6 +19,7 @@ import { formatDateTime, normalizeNullableText, parseOptionalSortOrder } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import {
   Dialog,
   DialogContent,
@@ -55,7 +57,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -183,6 +184,21 @@ export default function SystemDictionaryEntriesPage() {
   const currentTypeDisplay = selectedTypeSummary
     ? `${selectedTypeSummary.dict_type_label} (${selectedTypeSummary.dict_type})`
     : "-"
+
+  const dictionaryEntryFieldLabels: DictionaryEntryFormLabels = useMemo(
+    () => ({
+      label: t("dictionaryFieldLabel"),
+      value: t("dictionaryFieldValue"),
+      sortOrder: t("dictionaryFieldSortOrder"),
+      enabled: t("dictionaryFieldEnabled"),
+      statusEnabled: t("dictionaryStatusEnabled"),
+      statusDisabled: t("dictionaryStatusDisabled"),
+      description: t("dictionaryFieldDescription"),
+      extraJson: t("dictionaryFieldExtraJson"),
+      extraJsonHint: t("dictionaryFieldExtraJsonHint"),
+    }),
+    [t]
+  )
 
   const stats = useMemo(() => {
     const total = items.length
@@ -558,7 +574,16 @@ export default function SystemDictionaryEntriesPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <FilterToolbar
+            className="gap-4 xl:grid-cols-5"
+            search={{
+              value: searchKeyword,
+              onValueChange: setSearchKeyword,
+              placeholder: t("dictionarySearchPlaceholder"),
+              label: t("dictionarySearchPlaceholder"),
+              inputClassName: "h-10",
+            }}
+          >
             <div className="space-y-2">
               <Label>{t("dictionaryTypeLabel")}</Label>
               <Select
@@ -587,19 +612,6 @@ export default function SystemDictionaryEntriesPage() {
                   )}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t("dictionarySearchPlaceholder")}</Label>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchKeyword}
-                  onChange={(event) => setSearchKeyword(event.target.value)}
-                  placeholder={t("dictionarySearchPlaceholder")}
-                  className="h-10 pl-9"
-                />
-              </div>
             </div>
 
             <div className="space-y-2">
@@ -647,7 +659,7 @@ export default function SystemDictionaryEntriesPage() {
                 {t("dictionaryResetFilters")}
               </Button>
             </div>
-          </div>
+          </FilterToolbar>
 
           <p className="text-xs text-muted-foreground">
             {selectedTypeSummary
@@ -840,17 +852,7 @@ export default function SystemDictionaryEntriesPage() {
               form={createForm}
               setForm={setCreateForm}
               idPrefix="dictionary-create"
-              labels={{
-                label: t("dictionaryFieldLabel"),
-                value: t("dictionaryFieldValue"),
-                sortOrder: t("dictionaryFieldSortOrder"),
-                enabled: t("dictionaryFieldEnabled"),
-                statusEnabled: t("dictionaryStatusEnabled"),
-                statusDisabled: t("dictionaryStatusDisabled"),
-                description: t("dictionaryFieldDescription"),
-                extraJson: t("dictionaryFieldExtraJson"),
-                extraJsonHint: t("dictionaryFieldExtraJsonHint"),
-              }}
+              labels={dictionaryEntryFieldLabels}
               sortPlaceholder="0"
               extraJsonPlaceholder='{"key":"value"}'
             />
@@ -907,17 +909,7 @@ export default function SystemDictionaryEntriesPage() {
               form={editForm}
               setForm={setEditForm}
               idPrefix="dictionary-edit"
-              labels={{
-                label: t("dictionaryFieldLabel"),
-                value: t("dictionaryFieldValue"),
-                sortOrder: t("dictionaryFieldSortOrder"),
-                enabled: t("dictionaryFieldEnabled"),
-                statusEnabled: t("dictionaryStatusEnabled"),
-                statusDisabled: t("dictionaryStatusDisabled"),
-                description: t("dictionaryFieldDescription"),
-                extraJson: t("dictionaryFieldExtraJson"),
-                extraJsonHint: t("dictionaryFieldExtraJsonHint"),
-              }}
+              labels={dictionaryEntryFieldLabels}
             />
 
             <DialogFooter>

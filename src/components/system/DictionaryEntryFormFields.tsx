@@ -17,7 +17,7 @@ export type DictionaryEntryFormState = {
   extraJson: string
 }
 
-type DictionaryEntryFormLabels = {
+export type DictionaryEntryFormLabels = {
   label: string
   value: string
   sortOrder: string
