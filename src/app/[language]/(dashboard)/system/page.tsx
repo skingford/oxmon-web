@@ -124,7 +124,7 @@ export default function SystemPage() {
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 px-8 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">{t("title")}</h2>

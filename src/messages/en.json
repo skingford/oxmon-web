@@ -988,6 +988,16 @@
     "dictionaryToastDeleteError": "Failed to delete dictionary entry",
     "dictionaryToastDeleteForbidden": "Built-in dictionary entries cannot be deleted",
     "dictionaryToastDeleteNotFound": "Dictionary entry not found or already removed",
-    "dictionaryToastSystemItemUndeletable": "Built-in dictionary entries cannot be deleted"
+    "dictionaryToastSystemItemUndeletable": "Built-in dictionary entries cannot be deleted",
+    "dictionarySortLabel": "Sort By",
+    "dictionarySortPlaceholder": "Select sorting",
+    "dictionarySortOrderAsc": "Sort Order (Asc)",
+    "dictionarySortOrderDesc": "Sort Order (Desc)",
+    "dictionarySortUpdatedDesc": "Updated Time (Newest)",
+    "dictionarySortUpdatedAsc": "Updated Time (Oldest)",
+    "dictionarySortKeyAsc": "Dictionary Key (A-Z)",
+    "dictionarySortKeyDesc": "Dictionary Key (Z-A)",
+    "dictionaryResetFilters": "Reset Filters",
+    "dictionaryEnabledOnlyShort": "Enabled"
   }
 }

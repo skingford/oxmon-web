@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   BookText,
+  FilterX,
   Loader2,
   Pencil,
   Plus,
@@ -64,6 +65,16 @@ type DictionaryFormState = {
   description: string
   extraJson: string
 }
+
+type DictionarySortMode =
+  | "sort_order_asc"
+  | "sort_order_desc"
+  | "updated_at_desc"
+  | "updated_at_asc"
+  | "dict_key_asc"
+  | "dict_key_desc"
+
+const DEFAULT_DICTIONARY_SORT_MODE: DictionarySortMode = "sort_order_asc"
 
 function getInitialDictionaryForm(dictType: string): DictionaryFormState {
   return {
@@ -142,6 +153,7 @@ export default function SystemDictionariesPage() {
 
   const [enabledOnly, setEnabledOnly] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState("")
+  const [sortMode, setSortMode] = useState<DictionarySortMode>(DEFAULT_DICTIONARY_SORT_MODE)
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
@@ -154,6 +166,7 @@ export default function SystemDictionariesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<DictionaryItem | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [togglingEnabledId, setTogglingEnabledId] = useState<string | null>(null)
 
   const getStatusAwareMessage = (
     error: unknown,
@@ -216,18 +229,8 @@ export default function SystemDictionariesPage() {
 
       try {
         const data = await api.listDictionariesByType(dictType, enabledOnly)
-        const sortedItems = data
-          .slice()
-          .sort((left, right) => {
-            if (left.sort_order !== right.sort_order) {
-              return left.sort_order - right.sort_order
-            }
-
-            return left.dict_key.localeCompare(right.dict_key)
-          })
-
-        setItems(sortedItems)
-        return sortedItems
+        setItems(data)
+        return data
       } catch (error) {
         toast.error(getApiErrorMessage(error, t("dictionaryToastFetchItemsError")))
         setItems([])
@@ -274,23 +277,78 @@ export default function SystemDictionariesPage() {
   const filteredItems = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
 
-    if (!keyword) {
-      return items
-    }
+    const matchedItems = keyword
+      ? items.filter((item) => {
+          const searchable = [
+            item.dict_key,
+            item.dict_label,
+            item.dict_value || "",
+            item.description || "",
+          ]
+            .join(" ")
+            .toLowerCase()
 
-    return items.filter((item) => {
-      const searchable = [
-        item.dict_key,
-        item.dict_label,
-        item.dict_value || "",
-        item.description || "",
-      ]
-        .join(" ")
-        .toLowerCase()
+          return searchable.includes(keyword)
+        })
+      : items
 
-      return searchable.includes(keyword)
+    return matchedItems.slice().sort((left, right) => {
+      if (sortMode === "sort_order_asc") {
+        if (left.sort_order !== right.sort_order) {
+          return left.sort_order - right.sort_order
+        }
+
+        return left.dict_key.localeCompare(right.dict_key)
+      }
+
+      if (sortMode === "sort_order_desc") {
+        if (left.sort_order !== right.sort_order) {
+          return right.sort_order - left.sort_order
+        }
+
+        return right.dict_key.localeCompare(left.dict_key)
+      }
+
+      if (sortMode === "updated_at_desc") {
+        const leftTime = new Date(left.updated_at).getTime() || 0
+        const rightTime = new Date(right.updated_at).getTime() || 0
+
+        if (leftTime !== rightTime) {
+          return rightTime - leftTime
+        }
+
+        return left.dict_key.localeCompare(right.dict_key)
+      }
+
+      if (sortMode === "updated_at_asc") {
+        const leftTime = new Date(left.updated_at).getTime() || 0
+        const rightTime = new Date(right.updated_at).getTime() || 0
+
+        if (leftTime !== rightTime) {
+          return leftTime - rightTime
+        }
+
+        return left.dict_key.localeCompare(right.dict_key)
+      }
+
+      if (sortMode === "dict_key_desc") {
+        return right.dict_key.localeCompare(left.dict_key)
+      }
+
+      return left.dict_key.localeCompare(right.dict_key)
     })
-  }, [items, searchKeyword])
+  }, [items, searchKeyword, sortMode])
+
+  const hasActiveFilters =
+    Boolean(searchKeyword.trim()) ||
+    enabledOnly ||
+    sortMode !== DEFAULT_DICTIONARY_SORT_MODE
+
+  const handleResetFilters = () => {
+    setSearchKeyword("")
+    setEnabledOnly(false)
+    setSortMode(DEFAULT_DICTIONARY_SORT_MODE)
+  }
 
   const openCreateDialog = () => {
     setCreateForm(getInitialDictionaryForm(selectedType))
@@ -471,6 +529,34 @@ export default function SystemDictionariesPage() {
     }
   }
 
+  const handleToggleItemEnabled = async (item: DictionaryItem, enabled: boolean) => {
+    if (item.enabled === enabled) {
+      return
+    }
+
+    setTogglingEnabledId(item.id)
+
+    try {
+      const updatedItem = await api.updateDictionary(item.id, { enabled })
+
+      setItems((previous) =>
+        previous.map((previousItem) =>
+          previousItem.id === item.id ? { ...previousItem, ...updatedItem } : previousItem
+        )
+      )
+
+      toast.success(t("dictionaryToastUpdateSuccess"))
+    } catch (error) {
+      toast.error(
+        getStatusAwareMessage(error, t("dictionaryToastUpdateError"), {
+          404: t("dictionaryToastUpdateNotFound"),
+        })
+      )
+    } finally {
+      setTogglingEnabledId(null)
+    }
+  }
+
   const handleDeleteDictionary = async () => {
     if (!deleteTarget) {
       return
@@ -507,7 +593,7 @@ export default function SystemDictionariesPage() {
   const isInitialLoading = loadingTypes && !selectedType
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 px-8 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">{t("dictionaryTitle")}</h2>
@@ -540,7 +626,7 @@ export default function SystemDictionariesPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <div className="space-y-2">
               <Label>{t("dictionaryTypeLabel")}</Label>
               <Select
@@ -585,14 +671,43 @@ export default function SystemDictionariesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>{t("dictionaryEnabledOnlyLabel")}</Label>
-              <div className="flex h-10 items-center justify-between rounded-md border px-3">
-                <div className="space-y-0.5">
-                  <p className="text-sm">{t("dictionaryEnabledOnlyLabel")}</p>
-                  <p className="text-xs text-muted-foreground">{t("dictionaryEnabledOnlyHint")}</p>
-                </div>
+              <Label>{t("dictionarySortLabel")}</Label>
+              <Select
+                value={sortMode}
+                onValueChange={(value) => setSortMode(value as DictionarySortMode)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("dictionarySortPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sort_order_asc">{t("dictionarySortOrderAsc")}</SelectItem>
+                  <SelectItem value="sort_order_desc">{t("dictionarySortOrderDesc")}</SelectItem>
+                  <SelectItem value="updated_at_desc">{t("dictionarySortUpdatedDesc")}</SelectItem>
+                  <SelectItem value="updated_at_asc">{t("dictionarySortUpdatedAsc")}</SelectItem>
+                  <SelectItem value="dict_key_asc">{t("dictionarySortKeyAsc")}</SelectItem>
+                  <SelectItem value="dict_key_desc">{t("dictionarySortKeyDesc")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex h-full items-end">
+              <div className="flex h-10 w-full items-center justify-between rounded-md border px-3">
+                <p className="text-sm">{t("dictionaryEnabledOnlyShort")}</p>
                 <Switch checked={enabledOnly} onCheckedChange={setEnabledOnly} />
               </div>
+            </div>
+
+            <div className="flex h-full items-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetFilters}
+                disabled={!hasActiveFilters}
+                className="h-10 w-full"
+              >
+                <FilterX className="mr-2 h-4 w-4" />
+                {t("dictionaryResetFilters")}
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -653,9 +768,19 @@ export default function SystemDictionariesPage() {
                     <TableCell className="max-w-[240px] truncate">{item.dict_value || "-"}</TableCell>
                     <TableCell>{item.sort_order}</TableCell>
                     <TableCell>
-                      <Badge variant={item.enabled ? "secondary" : "outline"}>
-                        {item.enabled ? t("dictionaryStatusEnabled") : t("dictionaryStatusDisabled")}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={item.enabled}
+                          onCheckedChange={(checked) => handleToggleItemEnabled(item, checked)}
+                          disabled={togglingEnabledId === item.id}
+                        />
+                        <Badge variant={item.enabled ? "secondary" : "outline"}>
+                          {togglingEnabledId === item.id ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : null}
+                          {item.enabled ? t("dictionaryStatusEnabled") : t("dictionaryStatusDisabled")}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={item.is_system ? "secondary" : "outline"}>

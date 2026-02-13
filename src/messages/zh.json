@@ -988,6 +988,16 @@
     "dictionaryToastDeleteError": "删除字典条目失败",
     "dictionaryToastDeleteForbidden": "系统内置条目不允许删除",
     "dictionaryToastDeleteNotFound": "字典条目不存在或已删除",
-    "dictionaryToastSystemItemUndeletable": "系统内置条目不支持删除"
+    "dictionaryToastSystemItemUndeletable": "系统内置条目不支持删除",
+    "dictionarySortLabel": "排序方式",
+    "dictionarySortPlaceholder": "选择排序",
+    "dictionarySortOrderAsc": "按排序号（升序）",
+    "dictionarySortOrderDesc": "按排序号（降序）",
+    "dictionarySortUpdatedDesc": "按更新时间（最新）",
+    "dictionarySortUpdatedAsc": "按更新时间（最早）",
+    "dictionarySortKeyAsc": "按字典键（A-Z）",
+    "dictionarySortKeyDesc": "按字典键（Z-A）",
+    "dictionaryResetFilters": "重置筛选",
+    "dictionaryEnabledOnlyShort": "仅启用"
   }
 }
