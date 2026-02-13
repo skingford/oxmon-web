@@ -7,6 +7,10 @@ import {
   CertificateDetails,
   ChannelOverview,
   ChannelConfig,
+  NotificationLogListResponse,
+  NotificationLogSummaryResponse,
+  NotificationLogQueryParams,
+  NotificationLogSummaryQueryParams,
   CreateAlertRuleRequest,
   UpdateAlertRuleRequest,
   DashboardOverview,
@@ -82,7 +86,12 @@ export class ApiRequestError extends Error {
   }
 }
 
-function buildQueryString(params: Record<string, unknown> | PaginationParams) {
+function buildQueryString(
+  params:
+    | Record<string, unknown>
+    | PaginationParams
+    | NotificationLogSummaryQueryParams
+) {
   const query = new URLSearchParams()
   const paramsRecord = params as Record<string, unknown>
 
@@ -697,6 +706,12 @@ export const api = {
         .map((item) => normalizeSilenceWindow(item))
         .filter((item): item is SilenceWindow => Boolean(item))
     ),
+
+  getNotificationLogs: (params: NotificationLogQueryParams = {}) =>
+    request<NotificationLogListResponse>(`/v1/notifications/logs${buildQueryString(params)}`),
+
+  getNotificationLogSummary: (params: NotificationLogSummaryQueryParams = {}) =>
+    request<NotificationLogSummaryResponse>(`/v1/notifications/logs/summary${buildQueryString(params)}`),
 
   createSilenceWindow: (data: CreateSilenceWindowRequest) =>
     request<unknown>("/v1/notifications/silence-windows", {

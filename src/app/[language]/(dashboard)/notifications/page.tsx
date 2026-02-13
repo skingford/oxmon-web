@@ -8,7 +8,6 @@ import {
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useNotificationChannelSubmit } from "@/hooks/use-notification-channel-submit"
-import { useNotificationChannelActions } from "@/hooks/use-notification-channel-actions"
 import { useNotificationChannelFilters, type NotificationStatusFilter } from "@/hooks/use-notification-channel-filters"
 import {
   NotificationChannelFormFields,
@@ -33,18 +32,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {
   Loader2,
   Plus,
@@ -86,6 +73,7 @@ export default function NotificationsPage() {
   const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false)
   const [editingChannel, setEditingChannel] = useState<ChannelOverview | null>(null)
   const [channelForm, setChannelForm] = useState<NotificationChannelFormState>(getInitialFormState)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
 
 
   const fetchChannels = useCallback(
@@ -123,7 +111,6 @@ export default function NotificationsPage() {
 
   const {
     stats,
-    systemConfigMap,
     filteredChannels,
     hasActiveFilters,
     filterTypeOptions,
@@ -176,29 +163,30 @@ export default function NotificationsPage() {
     setIsChannelDialogOpen,
   })
 
-  const {
-    isRecipientsDialogOpen,
-    recipientsDialogChannel,
-    recipientsLoading,
-    recipientsSaving,
-    recipientsInput,
-    setRecipientsInput,
-    handleRecipientsDialogOpenChange,
-    handleOpenRecipientsDialog,
-    handleUpdateRecipients,
-    testingId,
-    togglingId,
-    deleteDialogChannel,
-    deletingId,
-    openDeleteDialog,
-    handleDeleteDialogOpenChange,
-    handleToggleEnabled,
-    handleTestChannel,
-    handleDeleteChannel,
-  } = useNotificationChannelActions({
-    t,
-    fetchChannels,
-  })
+  const handleToggleEnabled = useCallback(
+    async (channel: ChannelOverview) => {
+      setTogglingId(channel.id)
+
+      try {
+        await api.updateChannelConfig(channel.id, {
+          enabled: !channel.enabled,
+        })
+
+        toast.success(
+          channel.enabled
+            ? t("notifications.toastToggleDisableSuccess")
+            : t("notifications.toastToggleEnableSuccess")
+        )
+
+        await fetchChannels(true)
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, t("notifications.toastToggleError")))
+      } finally {
+        setTogglingId(null)
+      }
+    },
+    [fetchChannels, t]
+  )
 
   return (
     <div className="space-y-6">
@@ -248,16 +236,10 @@ export default function NotificationsPage() {
         loading={loading}
         channels={filteredChannels}
         hasActiveFilters={hasActiveFilters}
-        systemConfigMap={systemConfigMap}
         togglingId={togglingId}
-        testingId={testingId}
         locale={locale}
         t={t}
-        onEdit={openEditDialog}
-        onOpenRecipients={handleOpenRecipientsDialog}
         onToggleEnabled={handleToggleEnabled}
-        onTestChannel={handleTestChannel}
-        onOpenDelete={openDeleteDialog}
       />
 
       <Dialog
@@ -306,90 +288,6 @@ export default function NotificationsPage() {
           </form>
         </DialogContent>
       </Dialog>
-
-      <Dialog
-        open={isRecipientsDialogOpen}
-        onOpenChange={handleRecipientsDialogOpenChange}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t("notifications.recipientsDialogTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("notifications.recipientsDialogDescription", {
-                name: recipientsDialogChannel?.name || "-",
-              })}
-            </DialogDescription>
-          </DialogHeader>
-
-          {recipientsLoading ? (
-            <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {t("notifications.recipientsDialogLoading")}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="recipients-input">{t("notifications.recipientsDialogField")}</Label>
-              <Textarea
-                id="recipients-input"
-                value={recipientsInput}
-                onChange={(event) => setRecipientsInput(event.target.value)}
-                className="min-h-[180px]"
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("notifications.recipientsDialogHint")}
-              </p>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleRecipientsDialogOpenChange(false)}
-              disabled={recipientsSaving}
-            >
-              {t("notifications.recipientsDialogCancel")}
-            </Button>
-            <Button
-              type="button"
-              onClick={handleUpdateRecipients}
-              disabled={recipientsLoading || recipientsSaving}
-            >
-              {recipientsSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t("notifications.recipientsDialogSubmit")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={Boolean(deleteDialogChannel)}
-        onOpenChange={handleDeleteDialogOpenChange}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("notifications.deleteDialogTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("notifications.deleteDialogDescription", {
-                name: deleteDialogChannel?.name || "-",
-              })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={Boolean(deletingId)}>
-              {t("notifications.dialogCancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={handleDeleteChannel}
-              disabled={Boolean(deletingId)}
-            >
-              {deletingId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t("notifications.deleteDialogConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

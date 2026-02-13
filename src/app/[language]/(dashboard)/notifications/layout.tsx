@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { withLocalePrefix, stripLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
-import { Inbox, ShieldOff } from "lucide-react"
+import { Inbox, ScrollText, ShieldOff } from "lucide-react"
 
 export default function NotificationsLayout({
   children,
@@ -33,20 +33,28 @@ export default function NotificationsLayout({
       </div>
 
       <Tabs value={normalizedPathname} className="space-y-6">
-        <TabsList className="glass h-12 bg-muted/50 p-1">
-          <Link href={withLocalePrefix("/notifications", locale)}>
-            <TabsTrigger value="/notifications" className="flex h-full items-center gap-2 px-6">
-              <Inbox className="h-4 w-4" />
-              {t("notifications.tabsChannels")}
-            </TabsTrigger>
-          </Link>
-          <Link href={withLocalePrefix("/notifications/silence", locale)}>
-            <TabsTrigger value="/notifications/silence" className="flex h-full items-center gap-2 px-6">
-              <ShieldOff className="h-4 w-4" />
-              {t("notifications.tabsSilence")}
-            </TabsTrigger>
-          </Link>
-        </TabsList>
+        <div className="w-full max-w-full overflow-x-auto">
+          <TabsList className="glass h-12 min-w-max bg-muted/50 p-1">
+            <Link href={withLocalePrefix("/notifications", locale)}>
+              <TabsTrigger value="/notifications" className="flex h-full items-center gap-2 px-6">
+                <Inbox className="h-4 w-4" />
+                {t("notifications.tabsChannels")}
+              </TabsTrigger>
+            </Link>
+            <Link href={withLocalePrefix("/notifications/silence", locale)}>
+              <TabsTrigger value="/notifications/silence" className="flex h-full items-center gap-2 px-6">
+                <ShieldOff className="h-4 w-4" />
+                {t("notifications.tabsSilence")}
+              </TabsTrigger>
+            </Link>
+            <Link href={withLocalePrefix("/notifications/logs", locale)}>
+              <TabsTrigger value="/notifications/logs" className="flex h-full items-center gap-2 px-6">
+                <ScrollText className="h-4 w-4" />
+                {t("notifications.tabsLogs")}
+              </TabsTrigger>
+            </Link>
+          </TabsList>
+        </div>
 
         <AnimatePresence mode="wait">
           <motion.div

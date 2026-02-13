@@ -16,6 +16,11 @@ export default function AlertsLayout({
   const pathname = usePathname()
   const { locale, t } = useAppTranslations("alerts")
   const normalizedPathname = stripLocalePrefix(pathname)
+  const currentTabValue = normalizedPathname.startsWith("/alerts/history")
+    ? "/alerts/history"
+    : normalizedPathname.startsWith("/alerts/rules")
+      ? "/alerts/rules"
+      : "/alerts"
 
   return (
     <motion.div
@@ -30,27 +35,29 @@ export default function AlertsLayout({
         <p className="text-muted-foreground text-sm">{t("layout.description")}</p>
       </div>
 
-      <Tabs value={normalizedPathname} className="space-y-6">
-        <TabsList className="bg-muted/50 p-1 glass h-12">
-          <Link href={withLocalePrefix("/alerts", locale)}>
-            <TabsTrigger value="/alerts" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
-              <Bell className="h-4 w-4" />
-              {t("layout.tabActive")}
-            </TabsTrigger>
-          </Link>
-          <Link href={withLocalePrefix("/alerts/history", locale)}>
-            <TabsTrigger value="/alerts/history" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
-              <History className="h-4 w-4" />
-              {t("layout.tabHistory")}
-            </TabsTrigger>
-          </Link>
-          <Link href={withLocalePrefix("/alerts/rules", locale)}>
-            <TabsTrigger value="/alerts/rules" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
-              <Settings2 className="h-4 w-4" />
-              {t("layout.tabRules")}
-            </TabsTrigger>
-          </Link>
-        </TabsList>
+      <Tabs value={currentTabValue} className="space-y-6">
+        <div className="w-full max-w-full overflow-x-auto">
+          <TabsList className="glass h-12 min-w-max bg-muted/50 p-1">
+            <Link href={withLocalePrefix("/alerts", locale)}>
+              <TabsTrigger value="/alerts" className="flex h-full items-center gap-2 px-6 transition-all data-[state=active]:glass">
+                <Bell className="h-4 w-4" />
+                {t("layout.tabActive")}
+              </TabsTrigger>
+            </Link>
+            <Link href={withLocalePrefix("/alerts/history", locale)}>
+              <TabsTrigger value="/alerts/history" className="flex h-full items-center gap-2 px-6 transition-all data-[state=active]:glass">
+                <History className="h-4 w-4" />
+                {t("layout.tabHistory")}
+              </TabsTrigger>
+            </Link>
+            <Link href={withLocalePrefix("/alerts/rules", locale)}>
+              <TabsTrigger value="/alerts/rules" className="flex h-full items-center gap-2 px-6 transition-all data-[state=active]:glass">
+                <Settings2 className="h-4 w-4" />
+                {t("layout.tabRules")}
+              </TabsTrigger>
+            </Link>
+          </TabsList>
+        </div>
 
         <AnimatePresence mode="wait">
           <motion.div

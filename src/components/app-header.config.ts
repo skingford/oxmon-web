@@ -68,6 +68,10 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "itemNotifications",
     descriptionKey: "notificationsDescription",
   },
+  "/notifications/logs": {
+    titleKey: "itemNotificationLogs",
+    descriptionKey: "notificationLogsDescription",
+  },
   "/notifications/silence": {
     titleKey: "itemSilenceWindows",
     descriptionKey: "silenceWindowsDescription",
@@ -90,6 +94,20 @@ const headerMetaByPrefix: Array<{
   prefix: string
   meta: AppHeaderMetaKeyConfig
 }> = [
+  {
+    prefix: "/alerts/",
+    meta: {
+      titleKey: "itemAlerts",
+      descriptionKey: "alertDetailDescription",
+    },
+  },
+  {
+    prefix: "/notifications/",
+    meta: {
+      titleKey: "itemNotificationChannels",
+      descriptionKey: "notificationChannelDetailDescription",
+    },
+  },
   {
     prefix: "/agents/",
     meta: {

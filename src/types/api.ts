@@ -361,6 +361,52 @@ export interface ChannelConfig {
   config?: Record<string, unknown> | null;
 }
 
+export interface NotificationLogItem {
+  id: string;
+  alert_event_id: string;
+  rule_id: string;
+  rule_name: string;
+  agent_id: string;
+  channel_id: string;
+  channel_name: string;
+  channel_type: string;
+  status: string;
+  error_message?: string | null;
+  duration_ms: number;
+  recipient_count: number;
+  severity: string;
+  created_at: string;
+}
+
+export interface NotificationLogListResponse {
+  items: NotificationLogItem[];
+  total: number;
+}
+
+export interface NotificationLogSummaryResponse {
+  total: number;
+  success: number;
+  failed: number;
+}
+
+export interface NotificationLogQueryParams extends PaginationParams {
+  channel_id?: string;
+  channel_type?: string;
+  status?: string;
+  alert_event_id?: string;
+  rule_id?: string;
+  agent_id?: string;
+  start_time?: number;
+  end_time?: number;
+}
+
+export interface NotificationLogSummaryQueryParams {
+  channel_id?: string;
+  channel_type?: string;
+  start_time?: number;
+  end_time?: number;
+}
+
 export interface SetRecipientsRequest {
   recipients: string[];
 }

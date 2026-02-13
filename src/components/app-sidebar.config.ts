@@ -138,6 +138,7 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/certificates/domains": ["/v1/certs/domains"],
   "/certificates/status": ["/v1/certs/status"],
   "/notifications": ["/v1/notifications/channels"],
+  "/notifications/logs": ["/v1/notifications/logs"],
   "/notifications/silence": ["/v1/notifications/silence-windows"],
   "/system": ["/v1/system/config"],
   "/system/dictionaries": ["/v1/dictionaries"],
@@ -232,6 +233,11 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
           {
             titleKey: "itemNotificationChannels",
             url: "/notifications",
+            exact: true,
+          },
+          {
+            titleKey: "itemNotificationLogs",
+            url: "/notifications/logs",
             exact: true,
           },
           {

@@ -1,8 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { AlertEventResponse, AlertSummary } from "@/types/api"
+import { withLocalePrefix } from "@/components/app-locale"
 import {
   useAppTranslations,
   type AppNamespaceTranslator,
@@ -13,13 +15,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -33,6 +33,8 @@ import {
   AlertCircle,
   CheckCircle,
   CheckCheck,
+  ExternalLink,
+  MoreHorizontal,
   Loader2,
   AlertTriangle,
   Info,
@@ -66,20 +68,15 @@ function TableRowSkeleton() {
         <Skeleton className="h-4 w-32" />
       </TableCell>
       <TableCell>
-        <Skeleton className="h-4 w-24" />
-      </TableCell>
-      <TableCell>
         <Skeleton className="h-4 w-48" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-16" />
       </TableCell>
       <TableCell>
         <Skeleton className="h-4 w-20" />
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-2">
-          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-16" />
+          <Skeleton className="h-8 w-20" />
           <Skeleton className="h-8 w-20" />
         </div>
       </TableCell>
@@ -175,23 +172,8 @@ function getSeverityLabel(
   return severity
 }
 
-function formatFullTimestamp(timestamp: string, locale: "zh" | "en") {
-  try {
-    const date = new Date(timestamp)
-    return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    })
-  } catch {
-    return timestamp
-  }
-}
-
 export default function ActiveAlertsPage() {
+  const router = useRouter()
   const { t, locale } = useAppTranslations("alerts")
   const [alerts, setAlerts] = useState<AlertEventResponse[]>([])
   const [summary, setSummary] = useState<AlertSummary | null>(null)
@@ -209,10 +191,6 @@ export default function ActiveAlertsPage() {
 
   // 批量操作
   const [selectedAlerts, setSelectedAlerts] = useState<Set<string>>(new Set())
-
-  // 详情对话框
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
-  const [selectedAlert, setSelectedAlert] = useState<AlertEventResponse | null>(null)
 
   const fetchData = useCallback(
     async (silent = false) => {
@@ -363,8 +341,7 @@ export default function ActiveAlertsPage() {
   }
 
   const handleViewDetails = (alert: AlertEventResponse) => {
-    setSelectedAlert(alert)
-    setDetailsDialogOpen(true)
+    router.push(withLocalePrefix(`/alerts/${alert.id}`, locale))
   }
 
   const canGoPrev = offset > 0
@@ -630,9 +607,7 @@ export default function ActiveAlertsPage() {
                   </TableHead>
                   <TableHead>{t("active.colSeverity")}</TableHead>
                   <TableHead>{t("active.colAgent")}</TableHead>
-                  <TableHead>{t("active.colMetric")}</TableHead>
                   <TableHead>{t("active.colMessage")}</TableHead>
-                  <TableHead>{t("active.colValue")}</TableHead>
                   <TableHead>{t("active.colTime")}</TableHead>
                   <TableHead className="text-right">{t("active.colActions")}</TableHead>
                 </TableRow>
@@ -646,7 +621,7 @@ export default function ActiveAlertsPage() {
                   </>
                 ) : filteredAlerts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-40 text-center">
+                    <TableCell colSpan={6} className="h-40 text-center">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <CheckCircle className="h-10 w-10 text-emerald-500" />
                         <p className="font-semibold">{t("active.emptyTitle")}</p>
@@ -688,51 +663,96 @@ export default function ActiveAlertsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-mono text-xs">{alert.agent_id}</TableCell>
-                          <TableCell>{alert.metric_name}</TableCell>
                           <TableCell className="max-w-xs truncate" title={alert.message}>
                             {alert.message}
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-semibold">{alert.value.toFixed(2)}</span>
-                            <span className="text-muted-foreground"> / {alert.threshold}</span>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {formatTimestamp(alert.timestamp, locale, t)}
                           </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="hidden items-center justify-end gap-1 sm:flex">
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
+                                onClick={() => handleViewDetails(alert)}
+                                className="h-8 w-8"
+                                title={t("active.viewDetails")}
+                                aria-label={t("active.viewDetails")}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => handleAcknowledge(alert.id)}
                                 disabled={isActionDisabled || alert.status >= 2}
-                                className="h-8"
+                                className="h-8 w-8"
+                                title={t("active.btnAcknowledge")}
+                                aria-label={t("active.btnAcknowledge")}
                               >
                                 {actionInProgress === alert.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                  <>
-                                    <CheckCircle className="mr-1 h-4 w-4" />
-                                    {t("active.btnAcknowledge")}
-                                  </>
+                                  <CheckCircle className="h-4 w-4" />
                                 )}
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
                                 onClick={() => handleResolve(alert.id)}
                                 disabled={isActionDisabled || alert.status === 3}
-                                className="h-8"
+                                className="h-8 w-8"
+                                title={t("active.btnResolve")}
+                                aria-label={t("active.btnResolve")}
                               >
                                 {actionInProgress === alert.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                  <>
-                                    <CheckCheck className="mr-1 h-4 w-4" />
-                                    {t("active.btnResolve")}
-                                  </>
+                                  <CheckCheck className="h-4 w-4" />
                                 )}
                               </Button>
+                            </div>
+                            <div className="flex justify-end sm:hidden">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    aria-label={t("active.moreActions")}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44">
+                                  <DropdownMenuItem onClick={() => handleViewDetails(alert)}>
+                                    <ExternalLink className="h-4 w-4" />
+                                    {t("active.viewDetails")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleAcknowledge(alert.id)}
+                                    disabled={isActionDisabled || alert.status >= 2}
+                                  >
+                                    {actionInProgress === alert.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <CheckCircle className="h-4 w-4" />
+                                    )}
+                                    {t("active.btnAcknowledge")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleResolve(alert.id)}
+                                    disabled={isActionDisabled || alert.status === 3}
+                                  >
+                                    {actionInProgress === alert.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <CheckCheck className="h-4 w-4" />
+                                    )}
+                                    {t("active.btnResolve")}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </TableCell>
                         </motion.tr>
@@ -772,107 +792,6 @@ export default function ActiveAlertsPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* 详情对话框 */}
-      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
-        <DialogContent className="glass-card !border-white/10 sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{t("active.alertDetails")}</DialogTitle>
-            <DialogDescription>
-              {t("active.detailDialogDescription")}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedAlert && (
-            <div className="space-y-4 py-4">
-              <div className="grid gap-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {t("active.colSeverity")}
-                    </p>
-                    <Badge className={getSeverityBadgeClass(selectedAlert.severity)}>
-                      {getSeverityLabel(selectedAlert.severity, t)}
-                    </Badge>
-                  </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-sm font-medium text-muted-foreground">{t("active.ruleIdLabel")}</p>
-                    <p className="font-mono text-sm">{selectedAlert.rule_id}</p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("active.colAgent")}
-                  </p>
-                  <p className="font-mono text-sm">{selectedAlert.agent_id}</p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("active.colMetric")}
-                  </p>
-                  <p className="text-sm">{selectedAlert.metric_name}</p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("active.colMessage")}
-                  </p>
-                  <p className="text-sm">{selectedAlert.message}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">{t("active.colValue")}</p>
-                    <p className="text-2xl font-bold">{selectedAlert.value.toFixed(2)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">{t("active.colThreshold")}</p>
-                    <p className="text-2xl font-bold text-muted-foreground">
-                      {selectedAlert.threshold}
-                    </p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">{t("active.timeline")}</p>
-                  <div className="space-y-2 pl-4 border-l-2 border-muted">
-                    <div className="pb-2">
-                      <p className="text-xs text-muted-foreground">{t("active.createdAt")}</p>
-                      <p className="text-sm font-medium">
-                        {formatFullTimestamp(selectedAlert.timestamp, locale)}
-                      </p>
-                    </div>
-                    {selectedAlert.acknowledged_at && (
-                      <div className="pb-2">
-                        <p className="text-xs text-muted-foreground">
-                          {t("active.acknowledgedAt")}
-                        </p>
-                        <p className="text-sm font-medium">
-                          {formatFullTimestamp(selectedAlert.acknowledged_at, locale)}
-                        </p>
-                      </div>
-                    )}
-                    {selectedAlert.resolved_at && (
-                      <div className="pb-2">
-                        <p className="text-xs text-muted-foreground">{t("active.resolvedAt")}</p>
-                        <p className="text-sm font-medium">
-                          {formatFullTimestamp(selectedAlert.resolved_at, locale)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
