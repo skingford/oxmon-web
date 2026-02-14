@@ -169,7 +169,7 @@ export default function CertificateDetailPage() {
   const daysUntilExpiry = getDaysUntilExpiry(certificate.not_after)
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="min-w-0 space-y-6 p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button

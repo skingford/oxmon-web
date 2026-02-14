@@ -6,8 +6,14 @@ import {
   getChannelTypeLabel,
   getSeverityLabel,
 } from "@/lib/notifications/channel-utils"
-import type { NotificationSystemConfigOption } from "@/components/notifications/NotificationChannelFormFields"
 import type { ChannelOverview, SystemConfigResponse } from "@/types/api"
+
+type NotificationSystemConfigOption = {
+  id: string
+  displayName: string
+  configKey: string
+  enabled: boolean
+}
 
 export type NotificationStatusFilter = "all" | "enabled" | "disabled"
 

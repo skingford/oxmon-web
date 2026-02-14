@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import localFont from "next/font/local"
+import Script from "next/script"
 import "./globals.css"
 import { DEFAULT_APP_LOCALE } from "@/components/app-locale"
 import { Toaster } from "@/components/ui/sonner"
@@ -149,7 +150,47 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+        <Script id="strip-eusoft-scrollable-attr" strategy="beforeInteractive">
+          {`
+            (() => {
+              const ATTR = "data-eusoft-scrollable-element"
+              const strip = (root) => {
+                if (!root || !root.querySelectorAll) return
+                root.querySelectorAll("[" + ATTR + "]").forEach((node) => node.removeAttribute(ATTR))
+              }
+
+              strip(document)
+
+              const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                  if (mutation.type === "attributes" && mutation.attributeName === ATTR && mutation.target instanceof Element) {
+                    mutation.target.removeAttribute(ATTR)
+                  }
+
+                  mutation.addedNodes.forEach((node) => {
+                    if (!(node instanceof Element)) return
+                    if (node.hasAttribute(ATTR)) {
+                      node.removeAttribute(ATTR)
+                    }
+                    strip(node)
+                  })
+                })
+              })
+
+              observer.observe(document.documentElement, {
+                subtree: true,
+                childList: true,
+                attributes: true,
+                attributeFilter: [ATTR],
+              })
+
+              window.addEventListener("load", () => {
+                setTimeout(() => observer.disconnect(), 3000)
+              })
+            })()
+          `}
+        </Script>
         {children}
         <Toaster />
       </body>

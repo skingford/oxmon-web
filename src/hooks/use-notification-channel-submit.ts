@@ -7,7 +7,6 @@ import {
   getInitialFormState,
   normalizeRecipientsInput,
   serializeChannelConfigJson,
-  shouldRequireSystemConfig,
 } from "@/lib/notifications/channel-utils"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import type { NotificationChannelFormState } from "@/components/notifications/NotificationChannelFormFields"
@@ -91,7 +90,6 @@ export function useNotificationChannelSubmit({
 
       const name = channelForm.name.trim()
       const channelType = channelForm.channelType.trim()
-      const systemConfigId = channelForm.systemConfigId.trim()
       const recipients = normalizeRecipientsInput(channelForm.recipientsInput)
 
       if (!name) {
@@ -101,11 +99,6 @@ export function useNotificationChannelSubmit({
 
       if (!channelType) {
         toast.error(t("notifications.toastTypeRequired"))
-        return
-      }
-
-      if (shouldRequireSystemConfig(channelType) && !systemConfigId) {
-        toast.error(t("notifications.toastSystemConfigRequired"))
         return
       }
 
@@ -153,10 +146,6 @@ export function useNotificationChannelSubmit({
           min_severity: channelForm.minSeverity,
           recipients,
           config_json: serializedConfigResult.configJson,
-        }
-
-        if (shouldRequireSystemConfig(channelType)) {
-          basePayload.system_config_id = systemConfigId
         }
 
         if (editingChannel) {

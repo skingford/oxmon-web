@@ -23,7 +23,7 @@ export default function NotificationsLayout({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8 p-8"
+      className="min-w-0 space-y-8 p-4 md:p-8"
     >
       <div className="flex flex-col gap-1">
         <h1 className="text-gradient flex items-center gap-3 text-4xl font-extrabold tracking-tight">
@@ -32,7 +32,7 @@ export default function NotificationsLayout({
         <p className="text-sm text-muted-foreground">{t("notifications.layoutDescription")}</p>
       </div>
 
-      <Tabs value={normalizedPathname} className="space-y-6">
+      <Tabs value={normalizedPathname} className="min-w-0 space-y-6">
         <div className="w-full max-w-full overflow-x-auto">
           <TabsList className="glass h-12 min-w-max bg-muted/50 p-1">
             <Link href={withLocalePrefix("/notifications", locale)}>

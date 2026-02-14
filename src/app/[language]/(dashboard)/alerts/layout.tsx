@@ -26,7 +26,7 @@ export default function AlertsLayout({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 space-y-8"
+      className="min-w-0 space-y-8 p-4 md:p-8"
     >
       <div className="flex flex-col gap-1">
         <h1 className="text-4xl font-extrabold tracking-tight text-gradient flex items-center gap-3">
@@ -35,7 +35,7 @@ export default function AlertsLayout({
         <p className="text-muted-foreground text-sm">{t("layout.description")}</p>
       </div>
 
-      <Tabs value={currentTabValue} className="space-y-6">
+      <Tabs value={currentTabValue} className="min-w-0 space-y-6">
         <div className="w-full max-w-full overflow-x-auto">
           <TabsList className="glass h-12 min-w-max bg-muted/50 p-1">
             <Link href={withLocalePrefix("/alerts", locale)}>

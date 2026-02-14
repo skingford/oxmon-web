@@ -28,21 +28,12 @@ export type NotificationChannelFormState = {
   configFormValues: ChannelConfigFormValues
 }
 
-export type NotificationSystemConfigOption = {
-  id: string
-  displayName: string
-  configKey: string
-  enabled: boolean
-}
-
 type NotificationChannelFormFieldsProps = {
   form: NotificationChannelFormState
   setForm: Dispatch<SetStateAction<NotificationChannelFormState>>
   idPrefix: string
   isEditing: boolean
   severityOptions: readonly string[]
-  systemConfigOptions: NotificationSystemConfigOption[]
-  shouldRequireSystemConfig: (channelType: string) => boolean
   getSeverityLabel: (severity: string) => string
   t: AppNamespaceTranslator<"pages">
 }
@@ -53,15 +44,9 @@ export function NotificationChannelFormFields({
   idPrefix,
   isEditing,
   severityOptions,
-  systemConfigOptions,
-  shouldRequireSystemConfig,
   getSeverityLabel,
   t,
 }: NotificationChannelFormFieldsProps) {
-  const requireSystemConfig = shouldRequireSystemConfig(form.channelType)
-  const selectedSystemConfig = form.systemConfigId
-    ? systemConfigOptions.find((item) => item.id === form.systemConfigId) || null
-    : null
   const normalizedType = form.channelType.trim().toLowerCase()
   const isBuiltInType = CHANNEL_TYPE_OPTIONS.includes(normalizedType as (typeof CHANNEL_TYPE_OPTIONS)[number])
   const typeSelectValue = isBuiltInType ? normalizedType : "__custom__"
@@ -108,9 +93,6 @@ export function NotificationChannelFormFields({
                   value === "__custom__"
                     ? previous.configFormValues
                     : getDefaultChannelConfigFormValues(value),
-                systemConfigId: shouldRequireSystemConfig(value)
-                  ? previous.systemConfigId
-                  : "",
               }))
             }>
             <SelectTrigger className="w-full">
@@ -138,50 +120,10 @@ export function NotificationChannelFormFields({
               setForm((previous) => ({
                 ...previous,
                 channelType: event.target.value,
-                systemConfigId: shouldRequireSystemConfig(event.target.value)
-                  ? previous.systemConfigId
-                  : "",
               }))
             }
             placeholder={t("notifications.fieldTypePlaceholder")}
           />
-        </div>
-      ) : null}
-
-      {requireSystemConfig ? (
-        <div className="space-y-2">
-          <Label>{t("notifications.fieldSystemConfig")}</Label>
-          <Select
-            value={form.systemConfigId}
-            onValueChange={(value) =>
-              setForm((previous) => ({
-                ...previous,
-                systemConfigId: value,
-              }))
-            }
-          >
-            <SelectTrigger className="h-10 w-full bg-background">
-              <SelectValue placeholder={t("notifications.fieldSystemConfigPlaceholder")} />
-            </SelectTrigger>
-            <SelectContent>
-              {systemConfigOptions.length === 0 ? (
-                <SelectItem value="__empty__" disabled>
-                  {t("notifications.fieldSystemConfigEmpty")}
-                </SelectItem>
-              ) : (
-                systemConfigOptions.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.displayName} ({item.configKey}){item.enabled ? "" : ` · ${t("notifications.systemConfigDisabledTag")}`}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
-          {selectedSystemConfig && !selectedSystemConfig.enabled ? (
-            <p className="text-xs text-amber-600">
-              {t("notifications.systemConfigDisabledWarning")}
-            </p>
-          ) : null}
         </div>
       ) : null}
 

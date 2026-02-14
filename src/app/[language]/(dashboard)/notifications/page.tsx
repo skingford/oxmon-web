@@ -18,7 +18,6 @@ import {
   createConfigMap,
   getInitialFormState,
   getSeverityLabel,
-  shouldRequireSystemConfig,
 } from "@/lib/notifications/channel-utils"
 import { Button } from "@/components/ui/button"
 import { NotificationsFiltersCard } from "@/components/notifications/NotificationsFiltersCard"
@@ -118,7 +117,6 @@ export default function NotificationsPage() {
     filterTypeOptions,
     filterSeverityOptions,
     filterSystemConfigOptions,
-    channelSystemConfigOptions,
   } = useNotificationChannelFilters({
     channels,
     systemConfigs,
@@ -275,14 +273,12 @@ export default function NotificationsPage() {
                 <NotificationChannelFormFields
                   form={channelForm}
                   setForm={setChannelForm}
-                  idPrefix="channel"
-                  isEditing={Boolean(editingChannel)}
-                  severityOptions={severityOptions}
-                  systemConfigOptions={channelSystemConfigOptions}
-                  shouldRequireSystemConfig={shouldRequireSystemConfig}
-                  getSeverityLabel={getSeverityLabelForForm}
-                  t={t}
-                />
+              idPrefix="channel"
+              isEditing={Boolean(editingChannel)}
+              severityOptions={severityOptions}
+              getSeverityLabel={getSeverityLabelForForm}
+              t={t}
+            />
               </div>
             </div>
 

@@ -19,7 +19,6 @@ import {
   getSeverityLabel,
   normalizeRecipientsInput,
   serializeChannelConfigJson,
-  shouldRequireSystemConfig,
 } from "@/lib/notifications/channel-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -169,20 +168,6 @@ export default function NotificationChannelDetailPage() {
     []
   )
 
-  const channelSystemConfigOptions = useMemo(() => {
-    return data.systemConfigs
-      .filter((item) => {
-        const provider = (item.provider || "").toLowerCase()
-        return provider === channelForm.channelType.toLowerCase()
-      })
-      .map((item) => ({
-        id: item.id,
-        displayName: item.display_name,
-        configKey: item.config_key,
-        enabled: item.enabled,
-      }))
-  }, [channelForm.channelType, data.systemConfigs])
-
   const getSeverityLabelForForm = useCallback(
     (severity: string) => getSeverityLabel(severity, t),
     [t]
@@ -287,7 +272,6 @@ export default function NotificationChannelDetailPage() {
         min_severity: channelForm.minSeverity,
         enabled: channelForm.enabled,
         recipients: normalizeRecipientsInput(channelForm.recipientsInput),
-        system_config_id: channelForm.systemConfigId || null,
         config_json: serializedConfigResult.configJson,
       })
       toast.success(t("notifications.toastUpdateSuccess"))
@@ -542,8 +526,6 @@ export default function NotificationChannelDetailPage() {
                 idPrefix="detail-channel"
                 isEditing
                 severityOptions={severityOptions}
-                systemConfigOptions={channelSystemConfigOptions}
-                shouldRequireSystemConfig={shouldRequireSystemConfig}
                 getSeverityLabel={getSeverityLabelForForm}
                 t={t}
               />

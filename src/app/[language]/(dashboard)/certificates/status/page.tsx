@@ -218,7 +218,7 @@ export default function CertificateStatusPage() {
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="min-w-0 space-y-6 p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">{t("certificates.status.title")}</h2>

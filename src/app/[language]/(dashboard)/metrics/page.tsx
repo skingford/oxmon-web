@@ -551,7 +551,7 @@ function MetricsPageContent() {
   )
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="min-w-0 space-y-8 p-4 md:p-8">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">{t("metrics.title")}</h2>
         <p className="text-muted-foreground">{t("metrics.description")}</p>

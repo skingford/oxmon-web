@@ -23,7 +23,7 @@ export default function CertificatesLayout({
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="p-8 space-y-8"
+      className="min-w-0 space-y-8 p-4 md:p-8"
     >
       <div className="flex items-center justify-between">
         <div>
@@ -34,8 +34,9 @@ export default function CertificatesLayout({
         </div>
       </div>
 
-      <Tabs value={normalizedPathname} className="space-y-6">
-        <TabsList className="bg-muted/50 p-1 glass h-12 mb-0">
+      <Tabs value={normalizedPathname} className="min-w-0 space-y-6">
+        <div className="w-full max-w-full overflow-x-auto">
+          <TabsList className="mb-0 h-12 min-w-max bg-muted/50 p-1 glass">
           <Link href={withLocalePrefix("/certificates", locale)}>
             <TabsTrigger value="/certificates" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
               <Shield className="h-4 w-4" />
@@ -54,7 +55,8 @@ export default function CertificatesLayout({
               Status
             </TabsTrigger>
           </Link>
-        </TabsList>
+          </TabsList>
+        </div>
 
         <AnimatePresence mode="wait">
           <motion.div

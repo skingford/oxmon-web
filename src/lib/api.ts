@@ -56,6 +56,7 @@ import { resolveAppLocale, stripLocalePrefix, withLocalePrefix } from "@/compone
 import { createAgentApiModule } from "@/lib/api/modules/agent"
 
 const BASE_URL = ""
+const inFlightGetRequests = new Map<string, Promise<unknown>>()
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE"
 
@@ -334,67 +335,98 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
     headers.Authorization = `Bearer ${authToken}`
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  const dedupeKey =
+    method === "GET"
+      ? JSON.stringify({
+          method,
+          endpoint,
+          authToken: authToken || "",
+          requiresAuth,
+          allowEmptyResponse,
+        })
+      : ""
 
-  if (response.status === 401) {
-    if (typeof window !== "undefined") {
-      clearAuthToken()
-
-      const currentPathname = window.location.pathname
-      const locale = resolveAppLocale(currentPathname)
-      const loginPath = withLocalePrefix("/login", locale)
-
-      if (stripLocalePrefix(currentPathname) !== "/login") {
-        window.location.replace(loginPath)
-      }
-    }
-
-    throw new ApiRequestError("认证已过期，请重新登录", { status: 401 })
-  }
-
-  if (response.status === 204) {
-    return {} as T
-  }
-
-  let payload: unknown
-
-  try {
-    payload = await response.json()
-  } catch {
-    payload = null
-  }
-
-  if (!response.ok) {
-    if (payload && typeof payload === "object") {
-      const envelope = payload as Partial<ApiResponseEnvelope<unknown>>
-      throw new ApiRequestError(
-        envelope.err_msg || `Request failed: ${response.status} ${response.statusText}`,
-        {
-          status: response.status,
-          errCode: envelope.err_code,
-          traceId: envelope.trace_id,
-        }
-      )
-    }
-
-    throw new ApiRequestError(`Request failed: ${response.status} ${response.statusText}`, {
-      status: response.status,
+  const executeRequest = async () => {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     })
-  }
 
-  if (payload === null) {
-    if (allowEmptyResponse) {
+    if (response.status === 401) {
+      if (typeof window !== "undefined") {
+        clearAuthToken()
+
+        const currentPathname = window.location.pathname
+        const locale = resolveAppLocale(currentPathname)
+        const loginPath = withLocalePrefix("/login", locale)
+
+        if (stripLocalePrefix(currentPathname) !== "/login") {
+          window.location.replace(loginPath)
+        }
+      }
+
+      throw new ApiRequestError("认证已过期，请重新登录", { status: 401 })
+    }
+
+    if (response.status === 204) {
       return {} as T
     }
 
-    throw new ApiRequestError("Invalid API response format", { status: response.status })
+    let payload: unknown
+
+    try {
+      payload = await response.json()
+    } catch {
+      payload = null
+    }
+
+    if (!response.ok) {
+      if (payload && typeof payload === "object") {
+        const envelope = payload as Partial<ApiResponseEnvelope<unknown>>
+        throw new ApiRequestError(
+          envelope.err_msg || `Request failed: ${response.status} ${response.statusText}`,
+          {
+            status: response.status,
+            errCode: envelope.err_code,
+            traceId: envelope.trace_id,
+          }
+        )
+      }
+
+      throw new ApiRequestError(`Request failed: ${response.status} ${response.statusText}`, {
+        status: response.status,
+      })
+    }
+
+    if (payload === null) {
+      if (allowEmptyResponse) {
+        return {} as T
+      }
+
+      throw new ApiRequestError("Invalid API response format", { status: response.status })
+    }
+
+    return resolveEnvelopeData<T>(payload, response.status)
   }
 
-  return resolveEnvelopeData<T>(payload, response.status)
+  if (!dedupeKey) {
+    return executeRequest()
+  }
+
+  const existingPromise = inFlightGetRequests.get(dedupeKey)
+
+  if (existingPromise) {
+    return existingPromise as Promise<T>
+  }
+
+  const requestPromise = executeRequest().finally(() => {
+    inFlightGetRequests.delete(dedupeKey)
+  }) as Promise<unknown>
+
+  inFlightGetRequests.set(dedupeKey, requestPromise)
+
+  return requestPromise as Promise<T>
 }
 
 const agentApi = createAgentApiModule({
