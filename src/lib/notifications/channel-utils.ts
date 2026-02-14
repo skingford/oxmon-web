@@ -1,6 +1,159 @@
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import type { ChannelConfig } from "@/types/api"
 
+export const CHANNEL_TYPE_OPTIONS = ["email", "dingtalk", "webhook", "slack", "sms"] as const
+
+export type ChannelConfigFieldType = "text" | "password" | "number" | "url" | "boolean" | "textarea"
+
+export type ChannelConfigFieldSchema = {
+  key: string
+  labelKey: string
+  placeholderKey: string
+  type: ChannelConfigFieldType
+  required?: boolean
+  defaultValue?: string | boolean
+}
+
+const CHANNEL_CONFIG_SCHEMA: Record<string, ChannelConfigFieldSchema[]> = {
+  email: [
+    {
+      key: "smtp_host",
+      labelKey: "notifications.configFieldEmailSmtpHost",
+      placeholderKey: "notifications.configFieldEmailSmtpHostPlaceholder",
+      type: "text",
+      required: true,
+      defaultValue: "",
+    },
+    {
+      key: "smtp_port",
+      labelKey: "notifications.configFieldEmailSmtpPort",
+      placeholderKey: "notifications.configFieldEmailSmtpPortPlaceholder",
+      type: "number",
+      required: true,
+      defaultValue: "587",
+    },
+    {
+      key: "username",
+      labelKey: "notifications.configFieldEmailUsername",
+      placeholderKey: "notifications.configFieldEmailUsernamePlaceholder",
+      type: "text",
+      defaultValue: "",
+    },
+    {
+      key: "password",
+      labelKey: "notifications.configFieldEmailPassword",
+      placeholderKey: "notifications.configFieldEmailPasswordPlaceholder",
+      type: "password",
+      defaultValue: "",
+    },
+    {
+      key: "from_address",
+      labelKey: "notifications.configFieldEmailFromAddress",
+      placeholderKey: "notifications.configFieldEmailFromAddressPlaceholder",
+      type: "text",
+      required: true,
+      defaultValue: "",
+    },
+    {
+      key: "use_tls",
+      labelKey: "notifications.configFieldEmailUseTls",
+      placeholderKey: "notifications.configFieldEmailUseTlsPlaceholder",
+      type: "boolean",
+      defaultValue: true,
+    },
+  ],
+  dingtalk: [
+    {
+      key: "webhook_url",
+      labelKey: "notifications.configFieldDingTalkWebhookUrl",
+      placeholderKey: "notifications.configFieldDingTalkWebhookUrlPlaceholder",
+      type: "url",
+      required: true,
+      defaultValue: "",
+    },
+    {
+      key: "secret",
+      labelKey: "notifications.configFieldDingTalkSecret",
+      placeholderKey: "notifications.configFieldDingTalkSecretPlaceholder",
+      type: "password",
+      defaultValue: "",
+    },
+    {
+      key: "at_all",
+      labelKey: "notifications.configFieldDingTalkAtAll",
+      placeholderKey: "notifications.configFieldDingTalkAtAllPlaceholder",
+      type: "boolean",
+      defaultValue: false,
+    },
+    {
+      key: "at_mobiles",
+      labelKey: "notifications.configFieldDingTalkAtMobiles",
+      placeholderKey: "notifications.configFieldDingTalkAtMobilesPlaceholder",
+      type: "textarea",
+      defaultValue: "",
+    },
+  ],
+  webhook: [
+    {
+      key: "url",
+      labelKey: "notifications.configFieldWebhookUrl",
+      placeholderKey: "notifications.configFieldWebhookUrlPlaceholder",
+      type: "url",
+      required: true,
+      defaultValue: "",
+    },
+    {
+      key: "method",
+      labelKey: "notifications.configFieldWebhookMethod",
+      placeholderKey: "notifications.configFieldWebhookMethodPlaceholder",
+      type: "text",
+      defaultValue: "POST",
+    },
+    {
+      key: "content_type",
+      labelKey: "notifications.configFieldWebhookContentType",
+      placeholderKey: "notifications.configFieldWebhookContentTypePlaceholder",
+      type: "text",
+      defaultValue: "application/json",
+    },
+  ],
+  slack: [
+    {
+      key: "webhook_url",
+      labelKey: "notifications.configFieldSlackWebhookUrl",
+      placeholderKey: "notifications.configFieldSlackWebhookUrlPlaceholder",
+      type: "url",
+      required: true,
+      defaultValue: "",
+    },
+    {
+      key: "channel",
+      labelKey: "notifications.configFieldSlackChannel",
+      placeholderKey: "notifications.configFieldSlackChannelPlaceholder",
+      type: "text",
+      defaultValue: "",
+    },
+  ],
+  sms: [
+    {
+      key: "template_id",
+      labelKey: "notifications.configFieldSmsTemplateId",
+      placeholderKey: "notifications.configFieldSmsTemplateIdPlaceholder",
+      type: "text",
+      defaultValue: "",
+    },
+    {
+      key: "sign_name",
+      labelKey: "notifications.configFieldSmsSignName",
+      placeholderKey: "notifications.configFieldSmsSignNamePlaceholder",
+      type: "text",
+      defaultValue: "",
+    },
+  ],
+}
+
+export type ChannelConfigFormValues = Record<string, string | boolean>
+
 export function formatDateTime(value: string | null, locale: "zh" | "en") {
   if (!value) {
     return "-"
@@ -43,6 +196,201 @@ export function getInitialFormState() {
     enabled: true,
     recipientsInput: "",
     configJson: "{}",
+    configFormValues: getDefaultChannelConfigFormValues("email"),
+  }
+}
+
+export function getChannelConfigSchema(channelType: string): ChannelConfigFieldSchema[] {
+  const normalized = channelType.trim().toLowerCase()
+  return CHANNEL_CONFIG_SCHEMA[normalized] || []
+}
+
+export function getDefaultChannelConfigFormValues(channelType: string): ChannelConfigFormValues {
+  const values: ChannelConfigFormValues = {}
+  const schema = getChannelConfigSchema(channelType)
+
+  schema.forEach((field) => {
+    if (field.defaultValue !== undefined) {
+      values[field.key] = field.defaultValue
+      return
+    }
+
+    values[field.key] = field.type === "boolean" ? false : ""
+  })
+
+  return values
+}
+
+function parseConfigJsonRecord(configJson: string): Record<string, unknown> {
+  const raw = configJson.trim()
+
+  if (!raw) {
+    return {}
+  }
+
+  const parsed = JSON.parse(raw)
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {}
+  }
+
+  return parsed as Record<string, unknown>
+}
+
+export function getConfigFormValuesFromConfigJson(
+  channelType: string,
+  configJson: string
+): ChannelConfigFormValues {
+  const schema = getChannelConfigSchema(channelType)
+  const defaults = getDefaultChannelConfigFormValues(channelType)
+
+  if (schema.length === 0) {
+    return defaults
+  }
+
+  let configRecord: Record<string, unknown> = {}
+
+  try {
+    configRecord = parseConfigJsonRecord(configJson)
+  } catch {
+    return defaults
+  }
+
+  const values = { ...defaults }
+
+  schema.forEach((field) => {
+    const rawValue = configRecord[field.key]
+
+    if (rawValue === undefined || rawValue === null) {
+      return
+    }
+
+    if (field.type === "boolean") {
+      values[field.key] = Boolean(rawValue)
+      return
+    }
+
+    if (Array.isArray(rawValue)) {
+      values[field.key] = rawValue.join(", ")
+      return
+    }
+
+    values[field.key] = String(rawValue)
+  })
+
+  return values
+}
+
+export type SerializeChannelConfigResult =
+  | {
+      ok: true
+      configJson: string
+    }
+  | {
+      ok: false
+      reason: "invalid_json" | "required" | "invalid_number"
+      fieldLabelKey?: string
+    }
+
+export function serializeChannelConfigJson({
+  channelType,
+  configJson,
+  configFormValues,
+}: {
+  channelType: string
+  configJson: string
+  configFormValues: ChannelConfigFormValues
+}): SerializeChannelConfigResult {
+  const schema = getChannelConfigSchema(channelType)
+
+  if (schema.length === 0) {
+    const input = configJson.trim()
+
+    if (!input) {
+      return { ok: true, configJson: "{}" }
+    }
+
+    try {
+      return {
+        ok: true,
+        configJson: JSON.stringify(JSON.parse(input)),
+      }
+    } catch {
+      return {
+        ok: false,
+        reason: "invalid_json",
+      }
+    }
+  }
+
+  let baseConfig: Record<string, unknown> = {}
+
+  try {
+    baseConfig = parseConfigJsonRecord(configJson)
+  } catch {
+    baseConfig = {}
+  }
+
+  const nextConfig: Record<string, unknown> = { ...baseConfig }
+
+  for (const field of schema) {
+    const rawValue = configFormValues[field.key]
+
+    if (field.type === "boolean") {
+      nextConfig[field.key] = Boolean(rawValue)
+      continue
+    }
+
+    const textValue = typeof rawValue === "string" ? rawValue.trim() : ""
+
+    if (field.required && !textValue) {
+      return {
+        ok: false,
+        reason: "required",
+        fieldLabelKey: field.labelKey,
+      }
+    }
+
+    if (!textValue) {
+      delete nextConfig[field.key]
+      continue
+    }
+
+    if (field.type === "number") {
+      const parsedNumber = Number(textValue)
+
+      if (!Number.isFinite(parsedNumber)) {
+        return {
+          ok: false,
+          reason: "invalid_number",
+          fieldLabelKey: field.labelKey,
+        }
+      }
+
+      nextConfig[field.key] = parsedNumber
+      continue
+    }
+
+    if (field.key === "at_mobiles") {
+      const mobileList = Array.from(
+        new Set(
+          textValue
+            .split(/[\n,]/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+        )
+      )
+
+      nextConfig[field.key] = mobileList
+      continue
+    }
+
+    nextConfig[field.key] = textValue
+  }
+
+  return {
+    ok: true,
+    configJson: JSON.stringify(nextConfig),
   }
 }
 
@@ -84,6 +432,10 @@ export function getChannelTypeLabel(type: string, t: AppNamespaceTranslator<"pag
 
   if (normalized === "email") {
     return t("notifications.typeEmail")
+  }
+
+  if (normalized === "dingtalk") {
+    return t("notifications.typeDingTalk")
   }
 
   if (normalized === "webhook") {

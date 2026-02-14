@@ -25,6 +25,7 @@ import { NotificationsFiltersCard } from "@/components/notifications/Notificatio
 import { NotificationsStatsCards } from "@/components/notifications/NotificationsStatsCards"
 import { NotificationsChannelsTable } from "@/components/notifications/NotificationsChannelsTable"
 import {
+  DialogClose,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -36,6 +37,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -246,32 +248,45 @@ export default function NotificationsPage() {
         open={isChannelDialogOpen}
         onOpenChange={handleChannelDialogOpenChange}
       >
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editingChannel ? t("notifications.dialogEditTitle") : t("notifications.dialogCreateTitle")}
-            </DialogTitle>
-            <DialogDescription>
-              {editingChannel
-                ? t("notifications.dialogEditDescription")
-                : t("notifications.dialogCreateDescription")}
-            </DialogDescription>
+        <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl" showCloseButton={false}>
+          <DialogHeader className="sticky top-0 z-10 border-b bg-background px-6 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1 pr-2">
+                <DialogTitle>
+                  {editingChannel ? t("notifications.dialogEditTitle") : t("notifications.dialogCreateTitle")}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingChannel
+                    ? t("notifications.dialogEditDescription")
+                    : t("notifications.dialogCreateDescription")}
+                </DialogDescription>
+              </div>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
           </DialogHeader>
 
-          <form className="min-w-0 space-y-4" onSubmit={handleSubmitChannel}>
-            <NotificationChannelFormFields
-              form={channelForm}
-              setForm={setChannelForm}
-              idPrefix="channel"
-              isEditing={Boolean(editingChannel)}
-              severityOptions={severityOptions}
-              systemConfigOptions={channelSystemConfigOptions}
-              shouldRequireSystemConfig={shouldRequireSystemConfig}
-              getSeverityLabel={getSeverityLabelForForm}
-              t={t}
-            />
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmitChannel}>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-4">
+                <NotificationChannelFormFields
+                  form={channelForm}
+                  setForm={setChannelForm}
+                  idPrefix="channel"
+                  isEditing={Boolean(editingChannel)}
+                  severityOptions={severityOptions}
+                  systemConfigOptions={channelSystemConfigOptions}
+                  shouldRequireSystemConfig={shouldRequireSystemConfig}
+                  getSeverityLabel={getSeverityLabelForForm}
+                  t={t}
+                />
+              </div>
+            </div>
 
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 z-10 border-t bg-background px-6 py-4">
               <Button
                 type="button"
                 variant="outline"

@@ -3,8 +3,10 @@
 import { Dispatch, FormEvent, SetStateAction, useCallback, useState } from "react"
 import { api, getApiErrorMessage } from "@/lib/api"
 import {
+  getConfigFormValuesFromConfigJson,
   getInitialFormState,
   normalizeRecipientsInput,
+  serializeChannelConfigJson,
   shouldRequireSystemConfig,
 } from "@/lib/notifications/channel-utils"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
@@ -57,6 +59,10 @@ export function useNotificationChannelSubmit({
         enabled: channel.enabled,
         recipientsInput: channel.recipients.join("\n"),
         configJson: configMap[channel.id] || "{}",
+        configFormValues: getConfigFormValuesFromConfigJson(
+          channel.channel_type,
+          configMap[channel.id] || "{}"
+        ),
       })
       setIsChannelDialogOpen(true)
     },
@@ -103,16 +109,38 @@ export function useNotificationChannelSubmit({
         return
       }
 
-      const configInput = channelForm.configJson.trim()
-      let normalizedConfig = "{}"
+      const serializedConfigResult = serializeChannelConfigJson({
+        channelType,
+        configJson: channelForm.configJson,
+        configFormValues: channelForm.configFormValues,
+      })
 
-      if (configInput) {
-        try {
-          normalizedConfig = JSON.stringify(JSON.parse(configInput))
-        } catch {
+      if (serializedConfigResult.ok === false) {
+        if (serializedConfigResult.reason === "invalid_json") {
           toast.error(t("notifications.toastConfigInvalid"))
           return
         }
+
+        if (serializedConfigResult.reason === "required" && serializedConfigResult.fieldLabelKey) {
+          toast.error(
+            t("notifications.toastConfigFieldRequired", {
+              field: t(serializedConfigResult.fieldLabelKey),
+            })
+          )
+          return
+        }
+
+        if (serializedConfigResult.reason === "invalid_number" && serializedConfigResult.fieldLabelKey) {
+          toast.error(
+            t("notifications.toastConfigFieldInvalidNumber", {
+              field: t(serializedConfigResult.fieldLabelKey),
+            })
+          )
+          return
+        }
+
+        toast.error(t("notifications.toastConfigInvalid"))
+        return
       }
 
       setFormSubmitting(true)
@@ -124,7 +152,7 @@ export function useNotificationChannelSubmit({
           description: channelForm.description.trim() || undefined,
           min_severity: channelForm.minSeverity,
           recipients,
-          config_json: normalizedConfig,
+          config_json: serializedConfigResult.configJson,
         }
 
         if (shouldRequireSystemConfig(channelType)) {

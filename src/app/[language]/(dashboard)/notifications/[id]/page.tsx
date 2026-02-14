@@ -12,11 +12,13 @@ import { useRequestState } from "@/hooks/use-request-state"
 import {
   createConfigMap,
   formatDateTime,
+  getConfigFormValuesFromConfigJson,
   getChannelTypeLabel,
   getInitialFormState,
   getSeverityClassName,
   getSeverityLabel,
   normalizeRecipientsInput,
+  serializeChannelConfigJson,
   shouldRequireSystemConfig,
 } from "@/lib/notifications/channel-utils"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  DialogClose,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -50,7 +53,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, ChevronDown, ChevronUp, Loader2, MoreHorizontal, Pencil, Send, Trash2, Users } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Loader2, MoreHorizontal, Pencil, Send, Trash2, Users, X } from "lucide-react"
 import { toast } from "sonner"
 
 type ChannelDetailState = {
@@ -218,6 +221,8 @@ export default function NotificationChannelDetailPage() {
   const channel = data.channel
 
   const openEditDialog = () => {
+    const currentConfigJson = data.configJson || "{}"
+
     setChannelForm({
       name: channel.name || "",
       channelType: channel.channel_type || "email",
@@ -226,7 +231,8 @@ export default function NotificationChannelDetailPage() {
       minSeverity: channel.min_severity || "info",
       enabled: channel.enabled,
       recipientsInput: (channel.recipients || []).join("\n"),
-      configJson: data.configJson || "{}",
+      configJson: currentConfigJson,
+      configFormValues: getConfigFormValuesFromConfigJson(channel.channel_type || "email", currentConfigJson),
     })
     setIsEditDialogOpen(true)
   }
@@ -237,6 +243,40 @@ export default function NotificationChannelDetailPage() {
   }
 
   const handleSaveChannel = async () => {
+    const serializedConfigResult = serializeChannelConfigJson({
+      channelType: channelForm.channelType.trim(),
+      configJson: channelForm.configJson,
+      configFormValues: channelForm.configFormValues,
+    })
+
+    if (serializedConfigResult.ok === false) {
+      if (serializedConfigResult.reason === "invalid_json") {
+        toast.error(t("notifications.toastConfigInvalid"))
+        return
+      }
+
+      if (serializedConfigResult.reason === "required" && serializedConfigResult.fieldLabelKey) {
+        toast.error(
+          t("notifications.toastConfigFieldRequired", {
+            field: t(serializedConfigResult.fieldLabelKey),
+          })
+        )
+        return
+      }
+
+      if (serializedConfigResult.reason === "invalid_number" && serializedConfigResult.fieldLabelKey) {
+        toast.error(
+          t("notifications.toastConfigFieldInvalidNumber", {
+            field: t(serializedConfigResult.fieldLabelKey),
+          })
+        )
+        return
+      }
+
+      toast.error(t("notifications.toastConfigInvalid"))
+      return
+    }
+
     setSavingChannel(true)
 
     try {
@@ -248,7 +288,7 @@ export default function NotificationChannelDetailPage() {
         enabled: channelForm.enabled,
         recipients: normalizeRecipientsInput(channelForm.recipientsInput),
         system_config_id: channelForm.systemConfigId || null,
-        config_json: channelForm.configJson,
+        config_json: serializedConfigResult.configJson,
       })
       toast.success(t("notifications.toastUpdateSuccess"))
       setIsEditDialogOpen(false)
@@ -479,27 +519,38 @@ export default function NotificationChannelDetailPage() {
       </Card>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t("notifications.dialogEditTitle")}</DialogTitle>
-            <DialogDescription>{t("notifications.dialogEditDescription")}</DialogDescription>
+        <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl" showCloseButton={false}>
+          <DialogHeader className="sticky top-0 z-10 border-b bg-background px-6 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1 pr-2">
+                <DialogTitle>{t("notifications.dialogEditTitle")}</DialogTitle>
+                <DialogDescription>{t("notifications.dialogEditDescription")}</DialogDescription>
+              </div>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <NotificationChannelFormFields
-              form={channelForm}
-              setForm={setChannelForm}
-              idPrefix="detail-channel"
-              isEditing
-              severityOptions={severityOptions}
-              systemConfigOptions={channelSystemConfigOptions}
-              shouldRequireSystemConfig={shouldRequireSystemConfig}
-              getSeverityLabel={getSeverityLabelForForm}
-              t={t}
-            />
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-4">
+              <NotificationChannelFormFields
+                form={channelForm}
+                setForm={setChannelForm}
+                idPrefix="detail-channel"
+                isEditing
+                severityOptions={severityOptions}
+                systemConfigOptions={channelSystemConfigOptions}
+                shouldRequireSystemConfig={shouldRequireSystemConfig}
+                getSeverityLabel={getSeverityLabelForForm}
+                t={t}
+              />
+            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 z-10 border-t bg-background px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={savingChannel}>
               {t("notifications.dialogCancel")}
             </Button>
@@ -512,24 +563,35 @@ export default function NotificationChannelDetailPage() {
       </Dialog>
 
       <Dialog open={isRecipientsDialogOpen} onOpenChange={setIsRecipientsDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t("notifications.recipientsDialogTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("notifications.recipientsDialogDescription", { name: channel.name || "-" })}
-            </DialogDescription>
+        <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg" showCloseButton={false}>
+          <DialogHeader className="sticky top-0 z-10 border-b bg-background px-6 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1 pr-2">
+                <DialogTitle>{t("notifications.recipientsDialogTitle")}</DialogTitle>
+                <DialogDescription>
+                  {t("notifications.recipientsDialogDescription", { name: channel.name || "-" })}
+                </DialogDescription>
+              </div>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="detail-recipients-input">{t("notifications.recipientsDialogField")}</Label>
-            <Textarea
-              id="detail-recipients-input"
-              value={recipientsInput}
-              onChange={(event) => setRecipientsInput(event.target.value)}
-              className="min-h-[180px]"
-            />
-            <p className="text-xs text-muted-foreground">{t("notifications.recipientsDialogHint")}</p>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="detail-recipients-input">{t("notifications.recipientsDialogField")}</Label>
+              <Textarea
+                id="detail-recipients-input"
+                value={recipientsInput}
+                onChange={(event) => setRecipientsInput(event.target.value)}
+                className="min-h-[180px]"
+              />
+              <p className="text-xs text-muted-foreground">{t("notifications.recipientsDialogHint")}</p>
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 z-10 border-t bg-background px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setIsRecipientsDialogOpen(false)} disabled={savingRecipients}>
               {t("notifications.recipientsDialogCancel")}
             </Button>
