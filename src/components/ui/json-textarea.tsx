@@ -1,13 +1,15 @@
 "use client"
 
 import * as React from "react"
+import CodeMirror from "@uiw/react-codemirror"
+import { json } from "@codemirror/lang-json"
+import { EditorView, placeholder as cmPlaceholder } from "@codemirror/view"
 import JSON5 from "json5"
 import { Check, Copy, WandSparkles } from "lucide-react"
 import { toast } from "sonner"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 
 type JsonTextareaProps = Omit<React.ComponentProps<"textarea">, "value" | "onChange"> & {
   value: string
@@ -16,6 +18,7 @@ type JsonTextareaProps = Omit<React.ComponentProps<"textarea">, "value" | "onCha
   showInvalidHint?: boolean
   enableRepair?: boolean
   repairOnBlur?: boolean
+  maxHeightClassName?: string
 }
 
 function tryFormatJson(value: string) {
@@ -50,6 +53,34 @@ function safeParseLenient(value: string) {
   }
 }
 
+const SENSITIVE_KEY_PATTERN =
+  /(secret|token|password|passwd|api[_-]?key|access[_-]?key|private[_-]?key|sign|signature|credential)/i
+
+function sanitizeSensitiveValues(input: unknown): unknown {
+  if (Array.isArray(input)) {
+    return input.map((item) => sanitizeSensitiveValues(item))
+  }
+
+  if (!input || typeof input !== "object") {
+    return input
+  }
+
+  const next: Record<string, unknown> = {}
+
+  for (const [key, rawValue] of Object.entries(input as Record<string, unknown>)) {
+    const value = sanitizeSensitiveValues(rawValue)
+
+    if (typeof value === "string" && SENSITIVE_KEY_PATTERN.test(key)) {
+      next[key] = value.replace(/[\r\n]+/g, "").trim()
+      continue
+    }
+
+    next[key] = value
+  }
+
+  return next
+}
+
 function unwrapCodeFence(value: string) {
   const lines = value.trim().split("\n")
 
@@ -70,6 +101,54 @@ function normalizeMismatchedStringQuotes(value: string) {
   return value
     .replace(/"([^"\n\\]*(?:\\.[^"\n\\]*)*)'(\s*[,}\]])/g, "\"$1\"$2")
     .replace(/'([^'\n\\]*(?:\\.[^'\n\\]*)*)"(\s*[,}\]])/g, "\"$1\"$2")
+}
+
+function normalizeRawLineBreaksInStrings(value: string) {
+  let inString = false
+  let escaped = false
+  let result = ""
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index]
+
+    if (escaped) {
+      result += char
+      escaped = false
+      continue
+    }
+
+    if (char === "\\") {
+      result += char
+      escaped = true
+      continue
+    }
+
+    if (char === "\"") {
+      result += char
+      inString = !inString
+      continue
+    }
+
+    if (inString && (char === "\n" || char === "\r")) {
+      let cursor = index + 1
+
+      while (cursor < value.length && (value[cursor] === "\n" || value[cursor] === "\r" || value[cursor] === " " || value[cursor] === "\t")) {
+        cursor += 1
+      }
+
+      if (value[cursor] === "\"") {
+        index = cursor - 1
+        continue
+      }
+
+      result += "\\n"
+      continue
+    }
+
+    result += char
+  }
+
+  return result
 }
 
 function normalizeFullwidthPunctuationOutsideStrings(value: string) {
@@ -429,7 +508,7 @@ function tryRepairAndFormatJson(value: string) {
 
   const initialParsed = safeParseLenient(raw)
   if (initialParsed !== null) {
-    return JSON.stringify(initialParsed, null, 2)
+    return JSON.stringify(sanitizeSensitiveValues(initialParsed), null, 2)
   }
 
   const candidates = [
@@ -443,6 +522,7 @@ function tryRepairAndFormatJson(value: string) {
     candidate = stripBom(candidate)
     candidate = replaceSmartQuotes(candidate)
     candidate = normalizeMismatchedStringQuotes(candidate)
+    candidate = normalizeRawLineBreaksInStrings(candidate)
     candidate = normalizeFullwidthPunctuationOutsideStrings(candidate)
     candidate = stripJsonComments(candidate)
     candidate = convertPythonLikeLiterals(candidate)
@@ -465,7 +545,7 @@ function tryRepairAndFormatJson(value: string) {
 
     const repairedParsed = safeParseLenient(withClosers)
     if (repairedParsed !== null) {
-      return JSON.stringify(repairedParsed, null, 2)
+      return JSON.stringify(sanitizeSensitiveValues(repairedParsed), null, 2)
     }
   }
 
@@ -478,12 +558,15 @@ export function JsonTextarea({
   autoFormat = true,
   showInvalidHint = true,
   enableRepair = true,
-  repairOnBlur = true,
+  repairOnBlur = false,
+  maxHeightClassName = "max-h-[40vh]",
   className,
   disabled,
   onBlur,
   onFocus,
-  ...props
+  id,
+  placeholder,
+  "aria-invalid": ariaInvalid,
 }: JsonTextareaProps) {
   const { t } = useAppTranslations("common")
   const [focused, setFocused] = React.useState(false)
@@ -623,22 +706,50 @@ export function JsonTextarea({
           {t("jsonEditor.copy")}
         </Button>
       </div>
-      <Textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onFocus={(event) => {
-          setFocused(true)
-          onFocus?.(event)
-        }}
-        onBlur={(event) => {
-          setFocused(false)
-          normalizeValue(false, enableRepair && repairOnBlur)
-          onBlur?.(event)
-        }}
-        className={cn("font-mono text-xs", className)}
-        disabled={disabled}
-        {...props}
-      />
+      <div
+        aria-invalid={ariaInvalid}
+        className={cn(
+          "rounded-md border border-input bg-transparent text-xs shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px] aria-invalid:border-destructive aria-invalid:ring-destructive/20",
+          "overflow-hidden",
+          "[&_.cm-editor]:border-0 [&_.cm-editor]:bg-transparent [&_.cm-editor]:outline-none",
+          "[&_.cm-focused]:outline-none",
+          "[&_.cm-content]:py-2 [&_.cm-content]:font-mono [&_.cm-content]:text-xs",
+          "[&_.cm-lineNumbers]:text-muted-foreground",
+          "[&_.cm-gutters]:border-r [&_.cm-gutters]:border-border [&_.cm-gutters]:bg-muted/30",
+          "[&_.cm-scroller]:overflow-auto",
+          "[&_.cm-scroller]:max-h-[40vh]",
+          "[&_.cm-scroller]:min-h-[10rem]",
+          maxHeightClassName,
+          disabled ? "opacity-50" : null,
+          className
+        )}
+      >
+        <CodeMirror
+          id={id}
+          value={value}
+          onChange={(nextValue) => onChange(nextValue)}
+          editable={!disabled}
+          basicSetup={{
+            highlightActiveLine: false,
+            highlightActiveLineGutter: false,
+            foldGutter: true,
+          }}
+          extensions={[
+            json(),
+            EditorView.lineWrapping,
+            ...(placeholder ? [cmPlaceholder(placeholder)] : []),
+          ]}
+          onFocus={() => {
+            setFocused(true)
+            onFocus?.({} as React.FocusEvent<HTMLTextAreaElement>)
+          }}
+          onBlur={() => {
+            setFocused(false)
+            normalizeValue(false, enableRepair && repairOnBlur)
+            onBlur?.({} as React.FocusEvent<HTMLTextAreaElement>)
+          }}
+        />
+      </div>
       {showInvalidHint && isInvalid ? (
         <p className="text-xs text-destructive">{t("jsonEditor.invalidHint")}</p>
       ) : null}

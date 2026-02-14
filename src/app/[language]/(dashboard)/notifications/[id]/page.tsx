@@ -225,7 +225,7 @@ export default function NotificationChannelDetailPage() {
       description: channel.description || "",
       minSeverity: channel.min_severity || "info",
       enabled: channel.enabled,
-      recipientsInput: "",
+      recipientsInput: (channel.recipients || []).join("\n"),
       configJson: data.configJson || "{}",
     })
     setIsEditDialogOpen(true)
@@ -246,6 +246,7 @@ export default function NotificationChannelDetailPage() {
         description: channelForm.description.trim() || null,
         min_severity: channelForm.minSeverity,
         enabled: channelForm.enabled,
+        recipients: normalizeRecipientsInput(channelForm.recipientsInput),
         system_config_id: channelForm.systemConfigId || null,
         config_json: channelForm.configJson,
       })
