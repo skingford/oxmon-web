@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { NotificationChannelFormFields, type NotificationChannelFormState } from "@/components/notifications/NotificationChannelFormFields"
+import { JsonTextarea } from "@/components/ui/json-textarea"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -67,6 +68,19 @@ type ChannelDetailState = {
     updated_at: string
   } | null
   configJson: string
+}
+
+function formatConfigJson(value: string) {
+  const raw = value.trim()
+  if (!raw) {
+    return ""
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return value
+  }
 }
 
 export default function NotificationChannelDetailPage() {
@@ -120,7 +134,7 @@ export default function NotificationChannelDetailPage() {
 
         const configJson =
           typeof config?.config_json === "string"
-            ? config.config_json
+            ? formatConfigJson(config.config_json)
             : config?.config_json && typeof config.config_json === "object"
               ? JSON.stringify(config.config_json, null, 2)
               : config?.config && typeof config.config === "object"
@@ -466,9 +480,18 @@ export default function NotificationChannelDetailPage() {
         <CardContent>
           {isConfigExpanded ? (
             data.configJson ? (
-              <pre className="max-h-[420px] overflow-auto rounded-md border bg-muted/40 p-4 text-xs leading-5">
-                {data.configJson}
-              </pre>
+              <JsonTextarea
+                value={data.configJson}
+                onChange={() => {}}
+                readOnly
+                autoFormat={false}
+                showToolbar
+                showFormatButton={false}
+                showCopyButton
+                enableRepair={false}
+                showInvalidHint={false}
+                maxHeightClassName="max-h-[420px]"
+              />
             ) : (
               <p className="text-sm text-muted-foreground">-</p>
             )

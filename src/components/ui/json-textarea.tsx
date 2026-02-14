@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button"
 type JsonTextareaProps = Omit<React.ComponentProps<"textarea">, "value" | "onChange"> & {
   value: string
   onChange: (value: string) => void
+  readOnly?: boolean
   autoFormat?: boolean
+  showToolbar?: boolean
+  showFormatButton?: boolean
+  showCopyButton?: boolean
   showInvalidHint?: boolean
   enableRepair?: boolean
   repairOnBlur?: boolean
@@ -555,7 +559,11 @@ function tryRepairAndFormatJson(value: string) {
 export function JsonTextarea({
   value,
   onChange,
+  readOnly = false,
   autoFormat = true,
+  showToolbar = true,
+  showFormatButton = true,
+  showCopyButton = true,
   showInvalidHint = true,
   enableRepair = true,
   repairOnBlur = false,
@@ -690,22 +698,28 @@ export function JsonTextarea({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => normalizeValue(true, enableRepair)}
-          disabled={disabled}
-        >
-          <WandSparkles className="mr-1 h-3.5 w-3.5" />
-          {t("jsonEditor.format")}
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={handleCopy} disabled={disabled}>
-          {copied ? <Check className="mr-1 h-3.5 w-3.5" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
-          {t("jsonEditor.copy")}
-        </Button>
-      </div>
+      {showToolbar ? (
+        <div className="flex items-center justify-end gap-2">
+          {showFormatButton ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => normalizeValue(true, enableRepair)}
+              disabled={disabled || readOnly}
+            >
+              <WandSparkles className="mr-1 h-3.5 w-3.5" />
+              {t("jsonEditor.format")}
+            </Button>
+          ) : null}
+          {showCopyButton ? (
+            <Button type="button" variant="outline" size="sm" onClick={handleCopy} disabled={disabled}>
+              {copied ? <Check className="mr-1 h-3.5 w-3.5" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
+              {t("jsonEditor.copy")}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <div
         aria-invalid={ariaInvalid}
         className={cn(
@@ -728,7 +742,7 @@ export function JsonTextarea({
           id={id}
           value={value}
           onChange={(nextValue) => onChange(nextValue)}
-          editable={!disabled}
+          editable={!disabled && !readOnly}
           basicSetup={{
             highlightActiveLine: false,
             highlightActiveLineGutter: false,

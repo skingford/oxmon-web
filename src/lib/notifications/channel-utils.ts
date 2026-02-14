@@ -30,36 +30,38 @@ const CHANNEL_CONFIG_SCHEMA: Record<string, ChannelConfigFieldSchema[]> = {
       placeholderKey: "notifications.configFieldEmailSmtpPortPlaceholder",
       type: "number",
       required: true,
-      defaultValue: "587",
+      defaultValue: "465",
     },
     {
-      key: "username",
+      key: "smtp_username",
       labelKey: "notifications.configFieldEmailUsername",
       placeholderKey: "notifications.configFieldEmailUsernamePlaceholder",
-      type: "text",
-      defaultValue: "",
-    },
-    {
-      key: "password",
-      labelKey: "notifications.configFieldEmailPassword",
-      placeholderKey: "notifications.configFieldEmailPasswordPlaceholder",
-      type: "password",
-      defaultValue: "",
-    },
-    {
-      key: "from_address",
-      labelKey: "notifications.configFieldEmailFromAddress",
-      placeholderKey: "notifications.configFieldEmailFromAddressPlaceholder",
       type: "text",
       required: true,
       defaultValue: "",
     },
     {
-      key: "use_tls",
-      labelKey: "notifications.configFieldEmailUseTls",
-      placeholderKey: "notifications.configFieldEmailUseTlsPlaceholder",
-      type: "boolean",
-      defaultValue: true,
+      key: "smtp_password",
+      labelKey: "notifications.configFieldEmailPassword",
+      placeholderKey: "notifications.configFieldEmailPasswordPlaceholder",
+      type: "password",
+      required: true,
+      defaultValue: "",
+    },
+    {
+      key: "from_name",
+      labelKey: "notifications.configFieldEmailFromName",
+      placeholderKey: "notifications.configFieldEmailFromNamePlaceholder",
+      type: "text",
+      defaultValue: "",
+    },
+    {
+      key: "from_email",
+      labelKey: "notifications.configFieldEmailFromEmail",
+      placeholderKey: "notifications.configFieldEmailFromEmailPlaceholder",
+      type: "text",
+      required: true,
+      defaultValue: "",
     },
   ],
   dingtalk: [
@@ -258,8 +260,60 @@ export function getConfigFormValuesFromConfigJson(
 
   const values = { ...defaults }
 
+  const normalizedChannelType = channelType.trim().toLowerCase()
+  const emailFromRaw = normalizedChannelType === "email" ? configRecord.from : undefined
+  let parsedFromName = ""
+  let parsedFromEmail = ""
+
+  if (typeof emailFromRaw === "string") {
+    const trimmedFrom = emailFromRaw.trim()
+    const matched = trimmedFrom.match(/^(.*)<([^>]+)>$/)
+
+    if (matched) {
+      parsedFromName = matched[1].trim().replace(/^"|"$/g, "")
+      parsedFromEmail = matched[2].trim()
+    } else if (trimmedFrom.includes("@")) {
+      parsedFromEmail = trimmedFrom
+    } else {
+      parsedFromName = trimmedFrom
+    }
+  }
+  const resolveRawValue = (fieldKey: string) => {
+    if (configRecord[fieldKey] !== undefined && configRecord[fieldKey] !== null) {
+      return configRecord[fieldKey]
+    }
+
+    if (normalizedChannelType === "email") {
+      const emailLegacyAliasMap: Record<string, string[]> = {
+        from_name: [],
+        from_email: ["from_address"],
+        smtp_username: ["username"],
+        smtp_password: ["password"],
+      }
+
+      if (fieldKey === "from_name" && parsedFromName) {
+        return parsedFromName
+      }
+
+      if (fieldKey === "from_email" && parsedFromEmail) {
+        return parsedFromEmail
+      }
+
+      const aliases = emailLegacyAliasMap[fieldKey] || []
+
+      for (const aliasKey of aliases) {
+        const aliasValue = configRecord[aliasKey]
+        if (aliasValue !== undefined && aliasValue !== null) {
+          return aliasValue
+        }
+      }
+    }
+
+    return undefined
+  }
+
   schema.forEach((field) => {
-    const rawValue = configRecord[field.key]
+    const rawValue = resolveRawValue(field.key)
 
     if (rawValue === undefined || rawValue === null) {
       return
@@ -301,6 +355,7 @@ export function serializeChannelConfigJson({
   configJson: string
   configFormValues: ChannelConfigFormValues
 }): SerializeChannelConfigResult {
+  const normalizedChannelType = channelType.trim().toLowerCase()
   const schema = getChannelConfigSchema(channelType)
 
   if (schema.length === 0) {
@@ -386,6 +441,30 @@ export function serializeChannelConfigJson({
     }
 
     nextConfig[field.key] = textValue
+  }
+
+  if (normalizedChannelType === "email") {
+    const fromNameRaw = configFormValues.from_name
+    const fromEmailRaw = configFormValues.from_email
+    const fromName = typeof fromNameRaw === "string" ? fromNameRaw.trim() : ""
+    const fromEmail = typeof fromEmailRaw === "string" ? fromEmailRaw.trim() : ""
+
+    if (!fromEmail) {
+      return {
+        ok: false,
+        reason: "required",
+        fieldLabelKey: "notifications.configFieldEmailFromEmail",
+      }
+    }
+
+    nextConfig.from_name = fromName
+    nextConfig.from_email = fromEmail
+
+    delete nextConfig.from
+    delete nextConfig.from_address
+    delete nextConfig.username
+    delete nextConfig.password
+    delete nextConfig.use_tls
   }
 
   return {
