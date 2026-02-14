@@ -77,7 +77,7 @@ export default function LoginPage() {
 
   if (checkingAuth) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Checking session...</span>
@@ -87,7 +87,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen items-center justify-center bg-gray-50">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-2xl">Login</CardTitle>

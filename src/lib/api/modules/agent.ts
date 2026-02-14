@@ -70,7 +70,7 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     })
 
   const getAgentLatestMetrics = (id: string, token?: string) =>
-    request<LatestMetric[]>(`/v1/agents/${id}/latest`, { token })
+    request<LatestMetric[]>(`/v1/agents/${encodeURIComponent(id)}/latest`, { token })
 
   const updateAgent = (id: string, data: UpdateAgentRequest, token?: string) =>
     updateWhitelistAgent(id, data, token)

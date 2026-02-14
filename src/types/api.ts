@@ -1,4 +1,5 @@
 export interface AgentResponse {
+  id?: string;
   agent_id: string;
   last_seen: string | null;
   status: string;

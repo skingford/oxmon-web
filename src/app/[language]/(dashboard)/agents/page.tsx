@@ -313,8 +313,9 @@ export default function AgentsPage() {
                   filteredAgents.map((agent) => {
                     const statusMeta = getStatusMeta(agent.status, t)
                     const AgentStatusIcon = statusMeta.icon
+                    const detailId = (typeof agent.id === "string" && agent.id.trim()) || agent.agent_id
                     const detailPath = withLocalePrefix(
-                      `/agents/${encodeURIComponent(agent.agent_id)}`,
+                      `/agents/${encodeURIComponent(detailId)}`,
                       locale
                     )
 
