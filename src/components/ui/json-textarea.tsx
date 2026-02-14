@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import JSON5 from "json5"
 import { Check, Copy, WandSparkles } from "lucide-react"
 import { toast } from "sonner"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -30,6 +31,20 @@ function tryFormatJson(value: string) {
 function safeParseJson(value: string) {
   try {
     return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
+
+function safeParseLenient(value: string) {
+  const strict = safeParseJson(value)
+
+  if (strict !== null) {
+    return strict
+  }
+
+  try {
+    return JSON5.parse(value)
   } catch {
     return null
   }
@@ -412,7 +427,7 @@ function tryRepairAndFormatJson(value: string) {
     return null
   }
 
-  const initialParsed = safeParseJson(raw)
+  const initialParsed = safeParseLenient(raw)
   if (initialParsed !== null) {
     return JSON.stringify(initialParsed, null, 2)
   }
@@ -448,7 +463,7 @@ function tryRepairAndFormatJson(value: string) {
       continue
     }
 
-    const repairedParsed = safeParseJson(withClosers)
+    const repairedParsed = safeParseLenient(withClosers)
     if (repairedParsed !== null) {
       return JSON.stringify(repairedParsed, null, 2)
     }
