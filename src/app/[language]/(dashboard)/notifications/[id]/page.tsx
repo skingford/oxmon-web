@@ -10,7 +10,6 @@ import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import {
-  createConfigMap,
   formatDateTime,
   getConfigFormValuesFromConfigJson,
   getChannelTypeLabel,
@@ -51,7 +50,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, ChevronDown, ChevronUp, Loader2, MoreHorizontal, Pencil, Send, Trash2, Users, X } from "lucide-react"
 import { toast } from "sonner"
 
@@ -69,14 +67,6 @@ type ChannelDetailState = {
     updated_at: string
   } | null
   configJson: string
-  systemConfigLabel: string
-  systemConfigs: Array<{
-    id: string
-    provider?: string | null
-    display_name: string
-    config_key: string
-    enabled: boolean
-  }>
 }
 
 export default function NotificationChannelDetailPage() {
@@ -105,8 +95,6 @@ export default function NotificationChannelDetailPage() {
     {
       channel: null,
       configJson: "",
-      systemConfigLabel: t("notifications.systemConfigNone"),
-      systemConfigs: [],
     },
     { initialLoading: true }
   )
@@ -118,37 +106,30 @@ export default function NotificationChannelDetailPage() {
 
     await execute(
       async () => {
-        const [channels, configs, systemConfigs] = await Promise.all([
-          api.listChannels(),
-          api.listChannelConfigs().catch(() => []),
-          api.listSystemConfigs().catch(() => []),
+        const [channel, config] = await Promise.all([
+          api.getChannelById(channelId),
+          api.getChannelConfigById(channelId).catch(() => null),
         ])
-
-        const channel = channels.find((item) => item.id === channelId) || null
 
         if (!channel) {
           return {
             channel: null,
             configJson: "",
-            systemConfigLabel: t("notifications.systemConfigNone"),
-            systemConfigs: [],
           }
         }
 
-        const configMap = createConfigMap(configs)
-        const systemConfig = channel.system_config_id
-          ? systemConfigs.find((item) => item.id === channel.system_config_id)
-          : null
-
-        const systemConfigLabel = systemConfig
-          ? `${systemConfig.display_name} (${systemConfig.config_key})`
-          : t("notifications.systemConfigNone")
+        const configJson =
+          typeof config?.config_json === "string"
+            ? config.config_json
+            : config?.config_json && typeof config.config_json === "object"
+              ? JSON.stringify(config.config_json, null, 2)
+              : config?.config && typeof config.config === "object"
+                ? JSON.stringify(config.config, null, 2)
+                : ""
 
         return {
           channel,
-          configJson: configMap[channel.id] || "",
-          systemConfigLabel,
-          systemConfigs,
+          configJson,
         }
       },
       {
@@ -443,13 +424,6 @@ export default function NotificationChannelDetailPage() {
           <CardTitle>{t("notifications.detailSectionDelivery")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <p className="text-xs text-muted-foreground">{t("notifications.detailFieldSystemConfig")}</p>
-            <p className="text-sm break-all">{data.systemConfigLabel}</p>
-          </div>
-
-          <Separator />
-
           <div>
             <p className="text-xs text-muted-foreground">{t("notifications.detailFieldRecipients")}</p>
             {channel.recipients.length === 0 ? (

@@ -536,6 +536,9 @@ export const api = {
     )
   },
 
+  getChannelById: (id: string) =>
+    request<ChannelOverview>(`/v1/notifications/channels/${id}`),
+
   // System
   getSystemConfig: () =>
     request<RuntimeConfig>("/v1/system/config"),
@@ -706,6 +709,9 @@ export const api = {
       request<ChannelConfig[]>(`/v1/notifications/channels/config${buildQueryString(page)}`)
     )
   },
+
+  getChannelConfigById: (id: string) =>
+    request<ChannelConfig>(`/v1/notifications/channels/config/${id}`),
 
   createChannelConfig: (data: CreateChannelRequest) =>
     request<ChannelConfig>("/v1/notifications/channels/config", { method: "POST", body: data }),

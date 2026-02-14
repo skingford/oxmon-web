@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react"
 import { api, getApiErrorMessage } from "@/lib/api"
 import {
   ChannelOverview,
-  SystemConfigResponse,
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useNotificationChannelSubmit } from "@/hooks/use-notification-channel-submit"
@@ -45,7 +44,6 @@ const CHANNEL_SEVERITY_OPTIONS = ["info", "warning", "critical"] as const
 type NotificationsQueryState = {
   channels: ChannelOverview[]
   configMap: Record<string, string>
-  systemConfigs: SystemConfigResponse[]
 }
 
 export default function NotificationsPage() {
@@ -58,12 +56,10 @@ export default function NotificationsPage() {
   } = useRequestState<NotificationsQueryState>({
     channels: [],
     configMap: {},
-    systemConfigs: [],
   })
 
   const channels = data.channels
   const configMap = data.configMap
-  const systemConfigs = data.systemConfigs
 
   const [searchKeyword, setSearchKeyword] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
@@ -85,14 +81,10 @@ export default function NotificationsPage() {
             api.listChannels(),
             api.listChannelConfigs().catch(() => []),
           ])
-          const systemConfigRows = await api
-            .listSystemConfigs()
-            .catch(() => [])
 
           return {
             channels: channelRows,
             configMap: createConfigMap(configRows),
-            systemConfigs: systemConfigRows,
           }
         },
         {
@@ -119,7 +111,7 @@ export default function NotificationsPage() {
     filterSystemConfigOptions,
   } = useNotificationChannelFilters({
     channels,
-    systemConfigs,
+    systemConfigs: [],
     searchKeyword,
     typeFilter,
     severityFilter,
