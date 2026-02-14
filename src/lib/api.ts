@@ -55,7 +55,14 @@ import {
 import { resolveAppLocale, stripLocalePrefix, withLocalePrefix } from "@/components/app-locale"
 import { createAgentApiModule } from "@/lib/api/modules/agent"
 
-const BASE_URL = ""
+function normalizeBaseUrl(value: string | undefined) {
+  if (!value) {
+    return ""
+  }
+
+  return value.trim().replace(/\/+$/, "")
+}
+const BASE_URL = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
 const inFlightGetRequests = new Map<string, Promise<unknown>>()
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE"
@@ -353,7 +360,7 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
 
-    if (response.status === 401) {
+    if (response.status === 401 && requiresAuth) {
       if (typeof window !== "undefined") {
         clearAuthToken()
 
