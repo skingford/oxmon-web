@@ -287,6 +287,9 @@ function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldIn
           placeholder={t(field.placeholderKey)}
           className="min-h-[84px]"
         />
+        {field.key === "at_user_ids" ? (
+          <p className="text-xs text-muted-foreground">{t("notifications.configFieldDingTalkAtUserIdsHint")}</p>
+        ) : null}
       </div>
     )
   }

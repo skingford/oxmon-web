@@ -748,6 +748,30 @@ export const api = {
   getNotificationLogs: (params: NotificationLogQueryParams = {}) =>
     request<NotificationLogListResponse>(`/v1/notifications/logs${buildQueryString(params)}`),
 
+  getNotificationLogById: async (id: string) => {
+    const limit = 200
+    let offset = 0
+
+    while (true) {
+      const page = await request<NotificationLogListResponse>(
+        `/v1/notifications/logs${buildQueryString({ limit, offset })}`
+      )
+      const found = page.items.find((item) => item.id === id)
+
+      if (found) {
+        return found
+      }
+
+      if (page.items.length < limit) {
+        break
+      }
+
+      offset += limit
+    }
+
+    throw new ApiRequestError("Notification log not found", { status: 404 })
+  },
+
   getNotificationLogSummary: (params: NotificationLogSummaryQueryParams = {}) =>
     request<NotificationLogSummaryResponse>(`/v1/notifications/logs/summary${buildQueryString(params)}`),
 

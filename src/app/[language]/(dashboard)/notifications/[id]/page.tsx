@@ -199,6 +199,7 @@ export default function NotificationChannelDetailPage() {
   }
 
   const channel = data.channel
+  const isDingTalkChannel = channel.channel_type.trim().toLowerCase() === "dingtalk"
 
   const openEditDialog = () => {
     const currentConfigJson = data.configJson || "{}"
@@ -355,10 +356,12 @@ export default function NotificationChannelDetailPage() {
             <Pencil className="mr-2 h-4 w-4" />
             {t("notifications.actionEdit")}
           </Button>
-          <Button type="button" variant="outline" onClick={openRecipientsDialog}>
-            <Users className="mr-2 h-4 w-4" />
-            {t("notifications.actionRecipients")}
-          </Button>
+          {!isDingTalkChannel ? (
+            <Button type="button" variant="outline" onClick={openRecipientsDialog}>
+              <Users className="mr-2 h-4 w-4" />
+              {t("notifications.actionRecipients")}
+            </Button>
+          ) : null}
           <Button type="button" variant="outline" onClick={handleTestChannel} disabled={testing || !channel.enabled}>
             {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             {t("notifications.actionTest")}
@@ -381,10 +384,12 @@ export default function NotificationChannelDetailPage() {
                 <Pencil className="h-4 w-4" />
                 {t("notifications.actionEdit")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={openRecipientsDialog}>
-                <Users className="h-4 w-4" />
-                {t("notifications.actionRecipients")}
-              </DropdownMenuItem>
+              {!isDingTalkChannel ? (
+                <DropdownMenuItem onClick={openRecipientsDialog}>
+                  <Users className="h-4 w-4" />
+                  {t("notifications.actionRecipients")}
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onClick={handleTestChannel} disabled={testing || !channel.enabled}>
                 {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 {t("notifications.actionTest")}
@@ -443,20 +448,24 @@ export default function NotificationChannelDetailPage() {
           <CardTitle>{t("notifications.detailSectionDelivery")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <p className="text-xs text-muted-foreground">{t("notifications.detailFieldRecipients")}</p>
-            {channel.recipients.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("notifications.recipientNone")}</p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {channel.recipients.map((recipient) => (
-                  <li key={recipient} className="font-mono text-sm break-all">
-                    {recipient}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {!isDingTalkChannel ? (
+            <div>
+              <p className="text-xs text-muted-foreground">{t("notifications.detailFieldRecipients")}</p>
+              {channel.recipients.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("notifications.recipientNone")}</p>
+              ) : (
+                <ul className="mt-2 space-y-1">
+                  {channel.recipients.map((recipient) => (
+                    <li key={recipient} className="font-mono text-sm break-all">
+                      {recipient}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("notifications.typeDingTalk")}</p>
+          )}
         </CardContent>
       </Card>
 
@@ -546,46 +555,48 @@ export default function NotificationChannelDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isRecipientsDialogOpen} onOpenChange={setIsRecipientsDialogOpen}>
-        <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg" showCloseButton={false}>
-          <DialogHeader className="sticky top-0 z-10 border-b bg-background px-6 py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1 pr-2">
-                <DialogTitle>{t("notifications.recipientsDialogTitle")}</DialogTitle>
-                <DialogDescription>
-                  {t("notifications.recipientsDialogDescription", { name: channel.name || "-" })}
-                </DialogDescription>
+      {!isDingTalkChannel ? (
+        <Dialog open={isRecipientsDialogOpen} onOpenChange={setIsRecipientsDialogOpen}>
+          <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg" showCloseButton={false}>
+            <DialogHeader className="sticky top-0 z-10 border-b bg-background px-6 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1 pr-2">
+                  <DialogTitle>{t("notifications.recipientsDialogTitle")}</DialogTitle>
+                  <DialogDescription>
+                    {t("notifications.recipientsDialogDescription", { name: channel.name || "-" })}
+                  </DialogDescription>
+                </div>
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DialogClose>
               </div>
-              <DialogClose asChild>
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogClose>
+            </DialogHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="detail-recipients-input">{t("notifications.recipientsDialogField")}</Label>
+                <Textarea
+                  id="detail-recipients-input"
+                  value={recipientsInput}
+                  onChange={(event) => setRecipientsInput(event.target.value)}
+                  className="min-h-[180px]"
+                />
+                <p className="text-xs text-muted-foreground">{t("notifications.recipientsDialogHint")}</p>
+              </div>
             </div>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="detail-recipients-input">{t("notifications.recipientsDialogField")}</Label>
-              <Textarea
-                id="detail-recipients-input"
-                value={recipientsInput}
-                onChange={(event) => setRecipientsInput(event.target.value)}
-                className="min-h-[180px]"
-              />
-              <p className="text-xs text-muted-foreground">{t("notifications.recipientsDialogHint")}</p>
-            </div>
-          </div>
-          <DialogFooter className="sticky bottom-0 z-10 border-t bg-background px-6 py-4">
-            <Button type="button" variant="outline" onClick={() => setIsRecipientsDialogOpen(false)} disabled={savingRecipients}>
-              {t("notifications.recipientsDialogCancel")}
-            </Button>
-            <Button type="button" onClick={handleSaveRecipients} disabled={savingRecipients}>
-              {savingRecipients ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t("notifications.recipientsDialogSubmit")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter className="sticky bottom-0 z-10 border-t bg-background px-6 py-4">
+              <Button type="button" variant="outline" onClick={() => setIsRecipientsDialogOpen(false)} disabled={savingRecipients}>
+                {t("notifications.recipientsDialogCancel")}
+              </Button>
+              <Button type="button" onClick={handleSaveRecipients} disabled={savingRecipients}>
+                {savingRecipients ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {t("notifications.recipientsDialogSubmit")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>

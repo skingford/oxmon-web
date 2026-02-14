@@ -1,12 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { api, getApiErrorMessage } from "@/lib/api"
 import {
   NotificationLogItem,
   NotificationLogSummaryQueryParams,
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { withLocalePrefix } from "@/components/app-locale"
 import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -358,25 +360,21 @@ export default function NotificationLogsPage() {
                   <TableHead>{t("notifications.logsTableColStatus")}</TableHead>
                   <TableHead>{t("notifications.logsTableColChannel")}</TableHead>
                   <TableHead>{t("notifications.logsTableColRule")}</TableHead>
-                  <TableHead>{t("notifications.logsTableColAgent")}</TableHead>
                   <TableHead>{t("notifications.logsTableColSeverity")}</TableHead>
-                  <TableHead>{t("notifications.logsTableColDuration")}</TableHead>
-                  <TableHead>{t("notifications.logsTableColRetryCount")}</TableHead>
-                  <TableHead>{t("notifications.logsTableColHttpStatus")}</TableHead>
-                  <TableHead>{t("notifications.logsTableColRecipients")}</TableHead>
                   <TableHead>{t("notifications.logsTableColError")}</TableHead>
+                  <TableHead>{t("notifications.logsTableColActions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       {t("notifications.logsTableLoading")}
                     </TableCell>
                   </TableRow>
                 ) : data.items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       {hasActiveFilters ? t("notifications.logsTableEmptyFiltered") : t("notifications.logsTableEmpty")}
                     </TableCell>
                   </TableRow>
@@ -405,14 +403,16 @@ export default function NotificationLogsPage() {
                           <p className="text-xs text-muted-foreground">{item.rule_id}</p>
                         </div>
                       </TableCell>
-                      <TableCell>{item.agent_id || t("notifications.logsUnknownValue")}</TableCell>
                       <TableCell>{item.severity || t("notifications.logsUnknownValue")}</TableCell>
-                      <TableCell>{item.duration_ms}</TableCell>
-                      <TableCell>{item.retry_count}</TableCell>
-                      <TableCell>{item.http_status_code ?? t("notifications.logsUnknownValue")}</TableCell>
-                      <TableCell>{item.recipient_count}</TableCell>
                       <TableCell className="max-w-[280px] truncate" title={item.error_message || undefined}>
                         {item.error_message || t("notifications.logsUnknownValue")}
+                      </TableCell>
+                      <TableCell>
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={withLocalePrefix(`/notifications/logs/${item.id}`, locale)}>
+                            {t("notifications.logsActionDetails")}
+                          </Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
