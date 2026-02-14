@@ -90,7 +90,11 @@ export function useNotificationChannelSubmit({
 
       const name = channelForm.name.trim()
       const channelType = channelForm.channelType.trim()
-      const recipients = normalizeRecipientsInput(channelForm.recipientsInput)
+      const normalizedChannelType = channelType.toLowerCase()
+      const recipients =
+        normalizedChannelType === "dingtalk"
+          ? []
+          : normalizeRecipientsInput(channelForm.recipientsInput)
 
       if (!name) {
         toast.error(t("notifications.toastNameRequired"))

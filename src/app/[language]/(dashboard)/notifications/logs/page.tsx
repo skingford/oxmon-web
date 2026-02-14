@@ -361,6 +361,8 @@ export default function NotificationLogsPage() {
                   <TableHead>{t("notifications.logsTableColAgent")}</TableHead>
                   <TableHead>{t("notifications.logsTableColSeverity")}</TableHead>
                   <TableHead>{t("notifications.logsTableColDuration")}</TableHead>
+                  <TableHead>{t("notifications.logsTableColRetryCount")}</TableHead>
+                  <TableHead>{t("notifications.logsTableColHttpStatus")}</TableHead>
                   <TableHead>{t("notifications.logsTableColRecipients")}</TableHead>
                   <TableHead>{t("notifications.logsTableColError")}</TableHead>
                 </TableRow>
@@ -368,13 +370,13 @@ export default function NotificationLogsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                       {t("notifications.logsTableLoading")}
                     </TableCell>
                   </TableRow>
                 ) : data.items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                       {hasActiveFilters ? t("notifications.logsTableEmptyFiltered") : t("notifications.logsTableEmpty")}
                     </TableCell>
                   </TableRow>
@@ -406,6 +408,8 @@ export default function NotificationLogsPage() {
                       <TableCell>{item.agent_id || t("notifications.logsUnknownValue")}</TableCell>
                       <TableCell>{item.severity || t("notifications.logsUnknownValue")}</TableCell>
                       <TableCell>{item.duration_ms}</TableCell>
+                      <TableCell>{item.retry_count}</TableCell>
+                      <TableCell>{item.http_status_code ?? t("notifications.logsUnknownValue")}</TableCell>
                       <TableCell>{item.recipient_count}</TableCell>
                       <TableCell className="max-w-[280px] truncate" title={item.error_message || undefined}>
                         {item.error_message || t("notifications.logsUnknownValue")}

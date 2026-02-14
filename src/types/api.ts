@@ -376,6 +376,13 @@ export interface NotificationLogItem {
   recipient_count: number;
   severity: string;
   created_at: string;
+  retry_count: number;
+  http_status_code?: number | null;
+  response_body?: string | null;
+  request_body?: string | null;
+  recipient_details?: string | null;
+  api_message_id?: string | null;
+  api_error_code?: string | null;
 }
 
 export interface NotificationLogListResponse {

@@ -81,7 +81,7 @@ const CHANNEL_CONFIG_SCHEMA: Record<string, ChannelConfigFieldSchema[]> = {
       defaultValue: "",
     },
     {
-      key: "at_all",
+      key: "is_at_all",
       labelKey: "notifications.configFieldDingTalkAtAll",
       placeholderKey: "notifications.configFieldDingTalkAtAllPlaceholder",
       type: "boolean",
@@ -91,6 +91,13 @@ const CHANNEL_CONFIG_SCHEMA: Record<string, ChannelConfigFieldSchema[]> = {
       key: "at_mobiles",
       labelKey: "notifications.configFieldDingTalkAtMobiles",
       placeholderKey: "notifications.configFieldDingTalkAtMobilesPlaceholder",
+      type: "textarea",
+      defaultValue: "",
+    },
+    {
+      key: "at_user_ids",
+      labelKey: "notifications.configFieldDingTalkAtUserIds",
+      placeholderKey: "notifications.configFieldDingTalkAtUserIdsPlaceholder",
       type: "textarea",
       defaultValue: "",
     },
@@ -260,57 +267,7 @@ export function getConfigFormValuesFromConfigJson(
 
   const values = { ...defaults }
 
-  const normalizedChannelType = channelType.trim().toLowerCase()
-  const emailFromRaw = normalizedChannelType === "email" ? configRecord.from : undefined
-  let parsedFromName = ""
-  let parsedFromEmail = ""
-
-  if (typeof emailFromRaw === "string") {
-    const trimmedFrom = emailFromRaw.trim()
-    const matched = trimmedFrom.match(/^(.*)<([^>]+)>$/)
-
-    if (matched) {
-      parsedFromName = matched[1].trim().replace(/^"|"$/g, "")
-      parsedFromEmail = matched[2].trim()
-    } else if (trimmedFrom.includes("@")) {
-      parsedFromEmail = trimmedFrom
-    } else {
-      parsedFromName = trimmedFrom
-    }
-  }
-  const resolveRawValue = (fieldKey: string) => {
-    if (configRecord[fieldKey] !== undefined && configRecord[fieldKey] !== null) {
-      return configRecord[fieldKey]
-    }
-
-    if (normalizedChannelType === "email") {
-      const emailLegacyAliasMap: Record<string, string[]> = {
-        from_name: [],
-        from_email: ["from_address"],
-        smtp_username: ["username"],
-        smtp_password: ["password"],
-      }
-
-      if (fieldKey === "from_name" && parsedFromName) {
-        return parsedFromName
-      }
-
-      if (fieldKey === "from_email" && parsedFromEmail) {
-        return parsedFromEmail
-      }
-
-      const aliases = emailLegacyAliasMap[fieldKey] || []
-
-      for (const aliasKey of aliases) {
-        const aliasValue = configRecord[aliasKey]
-        if (aliasValue !== undefined && aliasValue !== null) {
-          return aliasValue
-        }
-      }
-    }
-
-    return undefined
-  }
+  const resolveRawValue = (fieldKey: string) => configRecord[fieldKey]
 
   schema.forEach((field) => {
     const rawValue = resolveRawValue(field.key)
@@ -406,6 +363,20 @@ export function serializeChannelConfigJson({
       }
     }
 
+    if (field.key === "at_mobiles" || field.key === "at_user_ids") {
+      const list = Array.from(
+        new Set(
+          textValue
+            .split(/[\n,]/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+        )
+      )
+
+      nextConfig[field.key] = list
+      continue
+    }
+
     if (!textValue) {
       delete nextConfig[field.key]
       continue
@@ -423,20 +394,6 @@ export function serializeChannelConfigJson({
       }
 
       nextConfig[field.key] = parsedNumber
-      continue
-    }
-
-    if (field.key === "at_mobiles") {
-      const mobileList = Array.from(
-        new Set(
-          textValue
-            .split(/[\n,]/)
-            .map((item) => item.trim())
-            .filter(Boolean)
-        )
-      )
-
-      nextConfig[field.key] = mobileList
       continue
     }
 

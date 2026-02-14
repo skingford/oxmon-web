@@ -1,13 +1,15 @@
 "use client"
 
-import { Dispatch, SetStateAction } from "react"
+import { Dispatch, SetStateAction, useState } from "react"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { JsonTextarea } from "@/components/ui/json-textarea"
+import { Eye, EyeOff } from "lucide-react"
 import {
   CHANNEL_TYPE_OPTIONS,
   getChannelConfigSchema,
@@ -49,6 +51,7 @@ export function NotificationChannelFormFields({
 }: NotificationChannelFormFieldsProps) {
   const normalizedType = form.channelType.trim().toLowerCase()
   const isBuiltInType = CHANNEL_TYPE_OPTIONS.includes(normalizedType as (typeof CHANNEL_TYPE_OPTIONS)[number])
+  const isDingTalkType = normalizedType === "dingtalk"
   const typeSelectValue = isBuiltInType ? normalizedType : "__custom__"
   const configSchema = getChannelConfigSchema(form.channelType)
 
@@ -188,21 +191,23 @@ export function NotificationChannelFormFields({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-recipients`}>{t("notifications.fieldRecipients")}</Label>
-        <Textarea
-          id={`${idPrefix}-recipients`}
-          value={form.recipientsInput}
-          onChange={(event) =>
-            setForm((previous) => ({
-              ...previous,
-              recipientsInput: event.target.value,
-            }))
-          }
-          placeholder={t("notifications.fieldRecipientsPlaceholder")}
-          className="min-h-[96px]"
-        />
-      </div>
+      {!isDingTalkType ? (
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-recipients`}>{t("notifications.fieldRecipients")}</Label>
+          <Textarea
+            id={`${idPrefix}-recipients`}
+            value={form.recipientsInput}
+            onChange={(event) =>
+              setForm((previous) => ({
+                ...previous,
+                recipientsInput: event.target.value,
+              }))
+            }
+            placeholder={t("notifications.fieldRecipientsPlaceholder")}
+            className="min-h-[96px]"
+          />
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <Label>{t("notifications.fieldConfigJson")}</Label>
@@ -251,6 +256,7 @@ type ConfigFieldInputProps = {
 
 function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldInputProps) {
   const inputId = `${idPrefix}-config-${field.key}`
+  const [showPassword, setShowPassword] = useState(false)
 
   if (field.type === "boolean") {
     return (
@@ -281,6 +287,34 @@ function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldIn
           placeholder={t(field.placeholderKey)}
           className="min-h-[84px]"
         />
+      </div>
+    )
+  }
+
+  if (field.type === "password") {
+    return (
+      <div className="min-w-0 space-y-2">
+        <Label htmlFor={inputId}>{t(field.labelKey)}</Label>
+        <div className="relative">
+          <Input
+            id={inputId}
+            type={showPassword ? "text" : "password"}
+            value={typeof value === "string" ? value : ""}
+            onChange={(event) => onChange(field.key, event.target.value)}
+            placeholder={t(field.placeholderKey)}
+            className="pr-10"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2"
+            onClick={() => setShowPassword((previous) => !previous)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
     )
   }

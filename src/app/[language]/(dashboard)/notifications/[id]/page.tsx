@@ -260,13 +260,18 @@ export default function NotificationChannelDetailPage() {
     setSavingChannel(true)
 
     try {
+      const recipients =
+        channelForm.channelType.trim().toLowerCase() === "dingtalk"
+          ? []
+          : normalizeRecipientsInput(channelForm.recipientsInput)
+
       await api.updateChannelConfig(channel.id, {
         name: channelForm.name.trim(),
         channel_type: channelForm.channelType.trim(),
         description: channelForm.description.trim() || null,
         min_severity: channelForm.minSeverity,
         enabled: channelForm.enabled,
-        recipients: normalizeRecipientsInput(channelForm.recipientsInput),
+        recipients,
         config_json: serializedConfigResult.configJson,
       })
       toast.success(t("notifications.toastUpdateSuccess"))
