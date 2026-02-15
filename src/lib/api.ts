@@ -7,6 +7,7 @@ import {
   CertificateDetails,
   ChannelOverview,
   ChannelConfig,
+  NotificationLogItem,
   NotificationLogListResponse,
   NotificationLogSummaryResponse,
   NotificationLogQueryParams,
@@ -38,6 +39,7 @@ import {
   SetRecipientsRequest,
   SilenceWindow,
   CreateSilenceWindowRequest,
+  UpdateSilenceWindowRequest,
   EnableRequest,
   DictionaryItem,
   DictionaryType,
@@ -63,6 +65,7 @@ function normalizeBaseUrl(value: string | undefined) {
   return value.trim().replace(/\/+$/, "")
 }
 const BASE_URL = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL)
+const OX_APP_ID = process.env.NEXT_PUBLIC_OX_APP_ID?.trim() || ""
 const inFlightGetRequests = new Map<string, Promise<unknown>>()
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE"
@@ -123,6 +126,14 @@ function getApiErrorMessage(error: unknown, fallback: string) {
   }
 
   return fallback
+}
+
+function getRequiredAppId() {
+  if (!OX_APP_ID) {
+    throw new ApiRequestError("缺少 NEXT_PUBLIC_OX_APP_ID 配置，无法发起 API 请求")
+  }
+
+  return OX_APP_ID
 }
 
 async function requestAllPages<T>(
@@ -331,6 +342,7 @@ function resolveEnvelopeData<T>(payload: unknown, status: number): T {
 async function request<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
   const { method = "GET", body, token, requiresAuth = true, allowEmptyResponse = false } = config
   const headers: Record<string, string> = {}
+  headers["ox-app-id"] = getRequiredAppId()
 
   if (body !== undefined) {
     headers["Content-Type"] = "application/json"
@@ -469,6 +481,17 @@ export const api = {
         .map((item) => normalizeAlertEvent(item))
         .filter((item): item is AlertEventResponse => Boolean(item))
     ),
+
+  getAlertHistoryById: (id: string) =>
+    request<unknown>(`/v1/alerts/history/${id}`).then((item) => {
+      const normalized = normalizeAlertEvent(item)
+
+      if (!normalized) {
+        throw new ApiRequestError("Invalid alert event response format", { status: 200 })
+      }
+
+      return normalized
+    }),
 
   acknowledgeAlert: (id: string, token?: string) =>
     request(`/v1/alerts/history/${id}/acknowledge`, {
@@ -709,38 +732,62 @@ export const api = {
   // Notifications - Advanced
   listChannelConfigs: (params?: PaginationParams) => {
     if (params) {
-      return request<ChannelConfig[]>(`/v1/notifications/channels/config${buildQueryString(params)}`)
+      return request<ChannelConfig[]>(`/v1/notifications/channels${buildQueryString(params)}`)
     }
 
     return requestAllPages<ChannelConfig>((page) =>
-      request<ChannelConfig[]>(`/v1/notifications/channels/config${buildQueryString(page)}`)
+      request<ChannelConfig[]>(`/v1/notifications/channels${buildQueryString(page)}`)
     )
   },
 
   getChannelConfigById: (id: string) =>
-    request<ChannelConfig>(`/v1/notifications/channels/config/${id}`),
+    request<ChannelConfig>(`/v1/notifications/channels/${id}`),
 
   createChannelConfig: (data: CreateChannelRequest) =>
-    request<ChannelConfig>("/v1/notifications/channels/config", { method: "POST", body: data }),
+    request<ChannelConfig>("/v1/notifications/channels", { method: "POST", body: data }),
 
-  updateChannelConfig: (id: string, data: UpdateChannelConfigRequest) =>
-    request<ChannelConfig>(`/v1/notifications/channels/config/${id}`, { method: "PUT", body: data }),
+  updateChannelConfig: async (id: string, data: UpdateChannelConfigRequest) => {
+    const current = await request<ChannelOverview>(`/v1/notifications/channels/${id}`)
+
+    return request<ChannelConfig>(`/v1/notifications/channels/${id}`, {
+      method: "PUT",
+      body: {
+        name: data.name ?? current.name,
+        channel_type: data.channel_type ?? current.channel_type,
+        description: data.description !== undefined ? data.description : current.description,
+        min_severity: data.min_severity ?? current.min_severity,
+        enabled: data.enabled ?? current.enabled,
+        config_json: data.config_json ?? current.config_json,
+        recipients: data.recipients ?? current.recipients,
+      },
+    })
+  },
 
   deleteChannelConfig: (id: string) =>
-    request(`/v1/notifications/channels/config/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+    request(`/v1/notifications/channels/${id}`, { method: "DELETE", allowEmptyResponse: true }),
 
   getRecipients: (id: string, params?: PaginationParams) => {
-    if (params) {
-      return request<string[]>(`/v1/notifications/channels/${id}/recipients${buildQueryString(params)}`)
-    }
+    void params
 
-    return requestAllPages<string>((page) =>
-      request<string[]>(`/v1/notifications/channels/${id}/recipients${buildQueryString(page)}`)
-    )
+    return request<ChannelOverview>(`/v1/notifications/channels/${id}`)
+      .then((channel) => channel.recipients || [])
   },
 
   setRecipients: (id: string, data: SetRecipientsRequest) =>
-    request<string[]>(`/v1/notifications/channels/${id}/recipients`, { method: "PUT", body: data }),
+    request<ChannelOverview>(`/v1/notifications/channels/${id}`).then((current) =>
+      request<ChannelOverview>(`/v1/notifications/channels/${id}`, {
+        method: "PUT",
+        body: {
+          name: current.name,
+          channel_type: current.channel_type,
+          description: current.description,
+          min_severity: current.min_severity,
+          enabled: current.enabled,
+          config_json: current.config_json,
+          recipients: data.recipients,
+        },
+      }).then((channel) => channel.recipients || [])
+    ),
 
   testChannel: (id: string) =>
     request(`/v1/notifications/channels/${id}/test`, { method: "POST", allowEmptyResponse: true }),
@@ -755,29 +802,8 @@ export const api = {
   getNotificationLogs: (params: NotificationLogQueryParams = {}) =>
     request<NotificationLogListResponse>(`/v1/notifications/logs${buildQueryString(params)}`),
 
-  getNotificationLogById: async (id: string) => {
-    const limit = 200
-    let offset = 0
-
-    while (true) {
-      const page = await request<NotificationLogListResponse>(
-        `/v1/notifications/logs${buildQueryString({ limit, offset })}`
-      )
-      const found = page.items.find((item) => item.id === id)
-
-      if (found) {
-        return found
-      }
-
-      if (page.items.length < limit) {
-        break
-      }
-
-      offset += limit
-    }
-
-    throw new ApiRequestError("Notification log not found", { status: 404 })
-  },
+  getNotificationLogById: (id: string) =>
+    request<NotificationLogItem>(`/v1/notifications/logs/${id}`),
 
   getNotificationLogSummary: (params: NotificationLogSummaryQueryParams = {}) =>
     request<NotificationLogSummaryResponse>(`/v1/notifications/logs/summary${buildQueryString(params)}`),
@@ -794,6 +820,23 @@ export const api = {
 
   deleteSilenceWindow: (id: string) =>
     request(`/v1/notifications/silence-windows/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+
+  getSilenceWindowById: (id: string) =>
+    request<unknown>(`/v1/notifications/silence-windows/${id}`).then((item) => {
+      const normalized = normalizeSilenceWindow(item)
+
+      if (!normalized) {
+        throw new ApiRequestError("Invalid silence window response format", { status: 200 })
+      }
+
+      return normalized
+    }),
+
+  updateSilenceWindow: (id: string, data: UpdateSilenceWindowRequest) =>
+    request<unknown>(`/v1/notifications/silence-windows/${id}`, { method: "PUT", body: data }).then((item) => {
+      const normalized = normalizeSilenceWindow(item)
+      return (normalized || {}) as Partial<SilenceWindow>
+    }),
 
   setAlertRuleEnabled: (id: string, data: EnableRequest) =>
     request<unknown>(`/v1/alerts/rules/${id}/enable`, { method: "PUT", body: data }).then((result) => {

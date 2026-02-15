@@ -40,7 +40,7 @@ src/
 2. **Configure environment**:
    ```bash
    cp .env.example .env.local
-   # Add your GEMINI_API_KEY
+   # Add your GEMINI_API_KEY and NEXT_PUBLIC_OX_APP_ID
    ```
 
 3. **Run development**:

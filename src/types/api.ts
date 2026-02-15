@@ -3,6 +3,22 @@ export interface AgentResponse {
   agent_id: string;
   last_seen: string | null;
   status: string;
+  created_at?: string | null;
+  collection_interval_secs?: number | null;
+}
+
+export interface AgentDetail {
+  id: string;
+  agent_id: string;
+  first_seen: string;
+  last_seen: string;
+  status: string;
+  collection_interval_secs: number | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  in_whitelist: boolean;
+  whitelist_id: string | null;
 }
 
 export interface AgentWhitelistDetail {
@@ -12,6 +28,7 @@ export interface AgentWhitelistDetail {
   updated_at: string;
   description: string | null;
   token: string | null;
+  collection_interval_secs?: number | null;
   last_seen: string | null;
   status: string;
 }
@@ -19,6 +36,7 @@ export interface AgentWhitelistDetail {
 export interface AddAgentRequest {
   agent_id: string;
   description?: string | null;
+  collection_interval_secs?: number | null;
 }
 
 export interface AddAgentResponse {
@@ -30,6 +48,7 @@ export interface AddAgentResponse {
 
 export interface UpdateAgentRequest {
   description?: string | null;
+  collection_interval_secs?: number | null;
 }
 
 export interface RegenerateTokenResponse {
@@ -178,8 +197,9 @@ export interface ChannelOverview {
   min_severity: string;
   enabled: boolean;
   recipient_type: string | null;
-  system_config_id?: string | null;
   recipients: string[];
+  config_json: string;
+  system_config_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -434,6 +454,12 @@ export interface SilenceWindow {
 export interface CreateSilenceWindowRequest {
   start_time: string;
   end_time: string;
+  recurrence?: string | null;
+}
+
+export interface UpdateSilenceWindowRequest {
+  start_time?: string | null;
+  end_time?: string | null;
   recurrence?: string | null;
 }
 
