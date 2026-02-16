@@ -2,17 +2,37 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
-import { LatestMetric } from "@/types/api"
+import { AgentDetail, LatestMetric } from "@/types/api"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import { withLocalePrefix } from "@/components/app-locale"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle, ArrowLeft, Gauge, Loader2, RefreshCw } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { AlertCircle, ArrowLeft, Gauge, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 function toFiniteNumber(value: unknown) {
@@ -66,11 +86,26 @@ function getMetricValueByPriority(metrics: LatestMetric[], priorityNames: string
   return undefined
 }
 
+function getMetricValueByNamePattern(metrics: LatestMetric[], patterns: RegExp[]) {
+  for (const metric of metrics) {
+    const normalizedName = normalizeMetricName(metric.metric_name)
+    if (patterns.some((pattern) => pattern.test(normalizedName))) {
+      const value = toFiniteNumber(metric.value)
+      if (value !== undefined) {
+        return value
+      }
+    }
+  }
+
+  return undefined
+}
+
 function findUsagePercentValue(metrics: LatestMetric[], type: "cpu" | "memory" | "disk") {
   const exactPriorityMap: Record<"cpu" | "memory" | "disk", string[]> = {
     cpu: [
       "cpu_usage_percent",
       "cpu_usage",
+      "cpu_used_percent",
       "cpu.percent",
       "cpu_utilization",
       "cpu_util_percent",
@@ -80,6 +115,7 @@ function findUsagePercentValue(metrics: LatestMetric[], type: "cpu" | "memory" |
     memory: [
       "memory_usage_percent",
       "memory_usage",
+      "memory_used_percent",
       "memory.percent",
       "mem_usage_percent",
       "mem_usage",
@@ -89,6 +125,7 @@ function findUsagePercentValue(metrics: LatestMetric[], type: "cpu" | "memory" |
     disk: [
       "disk_usage_percent",
       "disk_usage",
+      "disk_used_percent",
       "disk.percent",
       "disk_util_percent",
       "filesystem_usage_percent",
@@ -103,47 +140,24 @@ function findUsagePercentValue(metrics: LatestMetric[], type: "cpu" | "memory" |
     return exact
   }
 
-  const includeKeywords =
-    type === "cpu"
-      ? ["cpu", "usage", "percent"]
-      : type === "memory"
-        ? ["mem", "memory", "usage", "percent"]
-        : ["disk", "filesystem", "fs", "usage", "percent"]
+  const patternMap: Record<"cpu" | "memory" | "disk", RegExp[]> = {
+    cpu: [
+      /cpu.*(usage|util|percent|pct)/,
+      /(usage|util|percent|pct).*cpu/,
+    ],
+    memory: [
+      /(mem|memory).*(usage|util|percent|pct)/,
+      /(usage|util|percent|pct).*(mem|memory)/,
+    ],
+    disk: [
+      /(disk|filesystem|fs).*(usage|util|percent|pct)/,
+      /(usage|util|percent|pct).*(disk|filesystem|fs)/,
+    ],
+  }
 
-  const excludeKeywords = [
-    "total",
-    "free",
-    "avail",
-    "available",
-    "bytes",
-    "size",
-    "count",
-    "temp",
-    "temperature",
-  ]
-
-  const matched = metrics.find((metric) => {
-    const normalizedName = metric.metric_name.toLowerCase()
-    const hasTypeKeyword = includeKeywords.some((keyword) => normalizedName.includes(keyword))
-    const hasUsageKeyword =
-      normalizedName.includes("usage") ||
-      normalizedName.includes("util") ||
-      normalizedName.includes("percent") ||
-      normalizedName.includes("pct")
-    const excluded = excludeKeywords.some((keyword) => normalizedName.includes(keyword))
-
-    if (type === "disk") {
-      const mountPoint = metric.labels?.mount || metric.labels?.path || metric.labels?.device
-      if (mountPoint && mountPoint !== "/" && mountPoint !== "rootfs") {
-        return false
-      }
-    }
-
-    return hasTypeKeyword && hasUsageKeyword && !excluded
-  })
-
-  if (matched) {
-    return toFiniteNumber(matched.value)
+  const byPattern = getMetricValueByNamePattern(metrics, patternMap[type])
+  if (byPattern !== undefined) {
+    return byPattern
   }
 
   // 宽松兜底：兼容仅上报 `cpu` / `mem` / `memory` / `disk` 等简写指标名
@@ -159,22 +173,13 @@ function findUsagePercentValue(metrics: LatestMetric[], type: "cpu" | "memory" |
     return loose
   }
 
-  const looseMatched = metrics.find((metric) => {
-    const normalizedName = metric.metric_name.toLowerCase()
-    const hasTypeKeyword = includeKeywords.some((keyword) => normalizedName.includes(keyword))
-    const excluded = excludeKeywords.some((keyword) => normalizedName.includes(keyword))
+  const loosePatternMap: Record<"cpu" | "memory" | "disk", RegExp[]> = {
+    cpu: [/cpu/],
+    memory: [/(mem|memory)/],
+    disk: [/(disk|filesystem|fs)/],
+  }
 
-    if (type === "disk") {
-      const mountPoint = metric.labels?.mount || metric.labels?.path || metric.labels?.device
-      if (mountPoint && mountPoint !== "/" && mountPoint !== "rootfs") {
-        return false
-      }
-    }
-
-    return hasTypeKeyword && !excluded
-  })
-
-  return toFiniteNumber(looseMatched?.value)
+  return getMetricValueByNamePattern(metrics, loosePatternMap[type])
 }
 
 function findLoadValue(metrics: LatestMetric[]) {
@@ -192,7 +197,7 @@ function findLoadValue(metrics: LatestMetric[]) {
   }
 
   const partialMatched = metrics.find((metric) => {
-    const name = metric.metric_name.toLowerCase()
+    const name = normalizeMetricName(metric.metric_name)
     return (name.includes("load") && name.includes("1")) || name === "load"
   })
 
@@ -314,6 +319,7 @@ function buildMetricItemKey(metric: LatestMetric, index: number) {
 
 export default function AgentDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const locale = useAppLocale()
   const { t } = useAppTranslations("pages")
 
@@ -336,8 +342,37 @@ export default function AgentDetailPage() {
   } = useRequestState<LatestMetric[]>([])
   const [notFound, setNotFound] = useState(false)
   const [resolvedAgentId, setResolvedAgentId] = useState("")
+  const [agentDetail, setAgentDetail] = useState<AgentDetail | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [editDescription, setEditDescription] = useState("")
+  const [editIntervalSecs, setEditIntervalSecs] = useState("")
+  const [preparingEdit, setPreparingEdit] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const agentsPath = useMemo(() => withLocalePrefix("/agents", locale), [locale])
+
+  const fetchAgentDetail = useCallback(async () => {
+    if (!agentRef) {
+      return
+    }
+
+    try {
+      const detail = await api.getAgentById(agentRef)
+      setAgentDetail(detail)
+      setResolvedAgentId((prev) => (prev === detail.agent_id ? prev : detail.agent_id))
+      setNotFound(false)
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 404) {
+        setAgentDetail(null)
+        setNotFound(true)
+        return
+      }
+
+      toast.error(getApiErrorMessage(error, t("agentDetail.toastFetchError")))
+    }
+  }, [agentRef, t])
 
   const fetchLatestMetrics = useCallback(
     async (silent = false) => {
@@ -369,9 +404,20 @@ export default function AgentDetailPage() {
             return latest
           }
 
-          const currentPageAgents = await api.getAgents({ limit: 200, offset: 0 })
-          const matchedAgent = currentPageAgents.items.find((agent) => agent.id === agentRef || agent.agent_id === agentRef)
-          const fallbackAgentId = matchedAgent?.agent_id || agentRef
+          let fallbackAgentId = agentDetail?.agent_id || agentRef
+
+          if (!agentDetail) {
+            try {
+              const detail = await api.getAgentById(agentRef)
+              setAgentDetail(detail)
+              fallbackAgentId = detail.agent_id || fallbackAgentId
+              setResolvedAgentId((prev) => (prev === detail.agent_id ? prev : detail.agent_id))
+            } catch (error) {
+              if (!(error instanceof ApiRequestError && error.status === 404)) {
+                throw error
+              }
+            }
+          }
 
           if (fallbackAgentId !== agentRef) {
             setResolvedAgentId((prev) => (prev === fallbackAgentId ? prev : fallbackAgentId))
@@ -415,12 +461,95 @@ export default function AgentDetailPage() {
         }
       )
     },
-    [agentRef, execute, setMetrics, t]
+    [agentDetail, agentRef, execute, setMetrics, t]
   )
+
+  useEffect(() => {
+    fetchAgentDetail()
+  }, [fetchAgentDetail])
 
   useEffect(() => {
     fetchLatestMetrics()
   }, [fetchLatestMetrics])
+
+  const openEditDialog = async () => {
+    if (!agentRef) {
+      return
+    }
+
+    setPreparingEdit(true)
+    try {
+      let detail = agentDetail
+
+      if (!detail) {
+        detail = await api.getAgentById(agentRef)
+        setAgentDetail(detail)
+        setResolvedAgentId((prev) => (prev === detail.agent_id ? prev : detail.agent_id))
+      }
+
+      setEditDescription(detail.description || "")
+      setEditIntervalSecs(
+        typeof detail.collection_interval_secs === "number"
+          ? String(detail.collection_interval_secs)
+          : ""
+      )
+      setIsEditDialogOpen(true)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("agentDetail.toastFetchError")))
+    } finally {
+      setPreparingEdit(false)
+    }
+  }
+
+  const handleUpdateAgent = async () => {
+    if (!agentRef) {
+      return
+    }
+
+    let normalizedInterval: number | null = null
+
+    if (editIntervalSecs.trim()) {
+      const parsed = Number(editIntervalSecs)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        toast.error(t("agentDetail.toastInvalidInterval"))
+        return
+      }
+      normalizedInterval = Math.trunc(parsed)
+    }
+
+    setUpdating(true)
+    try {
+      await api.updateAgent(agentRef, {
+        description: editDescription.trim() ? editDescription.trim() : null,
+        collection_interval_secs: normalizedInterval,
+      })
+      toast.success(t("agentDetail.toastUpdateSuccess"))
+      setIsEditDialogOpen(false)
+      await fetchAgentDetail()
+      await fetchLatestMetrics(true)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("agentDetail.toastUpdateError")))
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleDeleteAgent = async () => {
+    if (!agentRef) {
+      return
+    }
+
+    setDeleting(true)
+    try {
+      await api.deleteAgent(agentRef)
+      toast.success(t("agentDetail.toastDeleteSuccess"))
+      router.replace(agentsPath)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("agentDetail.toastDeleteError")))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const cpu = toPercent(findUsagePercentValue(metrics, "cpu"))
   const memory = toPercent(findUsagePercentValue(metrics, "memory"))
@@ -456,7 +585,7 @@ export default function AgentDetailPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Button variant="ghost" className="mb-2 -ml-3" asChild>
             <Link href={agentsPath}>
@@ -467,14 +596,32 @@ export default function AgentDetailPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{t("agentDetail.title", { agentId: resolvedAgentId || agentRef || "-" })}</h1>
           <p className="text-sm text-muted-foreground">{t("agentDetail.description")}</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => fetchLatestMetrics(true)}
-          disabled={loading || refreshing || !agentRef}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          {t("agentDetail.refreshButton")}
-        </Button>
+        <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:justify-end">
+          <Button
+            variant="outline"
+            onClick={() => fetchLatestMetrics(true)}
+            disabled={loading || refreshing || !agentRef}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {t("agentDetail.refreshButton")}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={openEditDialog}
+            disabled={notFound || preparingEdit || updating || deleting}
+          >
+            {preparingEdit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pencil className="mr-2 h-4 w-4" />}
+            {t("agentDetail.editButton")}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => setIsDeleteDialogOpen(true)}
+            disabled={notFound || deleting || updating}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t("agentDetail.deleteButton")}
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -550,6 +697,70 @@ export default function AgentDetailPage() {
           </Card>
         </>
       )}
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("agentDetail.editDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("agentDetail.editDialogDescription")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="agent-description">{t("agentDetail.fieldDescription")}</Label>
+              <Input
+                id="agent-description"
+                value={editDescription}
+                onChange={(event) => setEditDescription(event.target.value)}
+                placeholder={t("agentDetail.placeholderDescription")}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="agent-interval">{t("agentDetail.fieldIntervalSecs")}</Label>
+              <Input
+                id="agent-interval"
+                type="number"
+                min={0}
+                value={editIntervalSecs}
+                onChange={(event) => setEditIntervalSecs(event.target.value)}
+                placeholder={t("agentDetail.placeholderIntervalSecs")}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={updating}>
+              {t("agentDetail.btnCancel")}
+            </Button>
+            <Button onClick={handleUpdateAgent} disabled={updating}>
+              {updating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("agentDetail.btnSave")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("agentDetail.deleteDialogTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("agentDetail.deleteDialogDescription", {
+                agentId: resolvedAgentId || agentRef || "-",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("agentDetail.btnCancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAgent}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("agentDetail.deleteDialogConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

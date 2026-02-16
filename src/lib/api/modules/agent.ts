@@ -30,6 +30,8 @@ interface AgentApiModuleDeps {
 export interface AgentApiModule {
   getAgents: (params?: PaginationParams) => Promise<ListResponse<AgentResponse>>
   getAgentById: (id: string, token?: string) => Promise<AgentDetail>
+  updateAgent: (id: string, data: UpdateAgentRequest, token?: string) => Promise<IdResponse>
+  deleteAgent: (id: string, token?: string) => Promise<IdResponse>
   getWhitelist: (params?: PaginationParams) => Promise<ListResponse<AgentWhitelistDetail>>
   getWhitelistById: (id: string, token?: string) => Promise<AgentWhitelistDetail>
   addWhitelistAgent: (data: AddAgentRequest, token?: string) => Promise<AddAgentResponse>
@@ -37,7 +39,6 @@ export interface AgentApiModule {
   deleteWhitelistAgent: (id: string, token?: string) => Promise<IdResponse>
   regenerateToken: (id: string, token?: string) => Promise<RegenerateTokenResponse>
   getAgentLatestMetrics: (id: string, token?: string) => Promise<LatestMetric[]>
-  updateAgent: (id: string, data: UpdateAgentRequest, token?: string) => Promise<IdResponse>
 }
 
 function toObject(value: unknown): Record<string, unknown> | null {
@@ -303,6 +304,19 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
   const getAgentById = (id: string, token?: string) =>
     request<AgentDetail>(`/v1/agents/${encodeURIComponent(id)}`, { token })
 
+  const updateAgent = (id: string, data: UpdateAgentRequest, token?: string) =>
+    request<IdResponse>(`/v1/agents/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: data,
+      token,
+    })
+
+  const deleteAgent = (id: string, token?: string) =>
+    request<IdResponse>(`/v1/agents/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      token,
+    })
+
   const getWhitelist = (params: PaginationParams = {}) =>
     request<unknown>(`/v1/agents/whitelist${buildQueryString(params)}`).then((result) => {
       const items = normalizeWhitelistList(result)
@@ -352,12 +366,11 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
       extractListPayload(payload) as LatestMetric[]
     )
 
-  const updateAgent = (id: string, data: UpdateAgentRequest, token?: string) =>
-    updateWhitelistAgent(id, data, token)
-
   return {
     getAgents,
     getAgentById,
+    updateAgent,
+    deleteAgent,
     getWhitelist,
     getWhitelistById,
     addWhitelistAgent,
@@ -365,6 +378,5 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     deleteWhitelistAgent,
     regenerateToken,
     getAgentLatestMetrics,
-    updateAgent,
   }
 }
