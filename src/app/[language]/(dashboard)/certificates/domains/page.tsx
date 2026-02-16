@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
 import { pickCountKey } from "@/lib/i18n-count"
-import { CertCheckResult, CertDomain } from "@/types/api"
+import { CertCheckResult, CertDomain, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
@@ -127,7 +127,6 @@ export default function DomainsPage() {
   const [domainKeyword, setDomainKeyword] = useState(domainParamValue)
   const [statusFilter, setStatusFilter] = useState(statusParamValue === "enabled" || statusParamValue === "disabled" ? statusParamValue : "all")
   const [offset, setOffset] = useState(initialOffset)
-  const [currentPageCount, setCurrentPageCount] = useState(0)
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [batchDialogOpen, setBatchDialogOpen] = useState(false)
@@ -177,11 +176,17 @@ export default function DomainsPage() {
   )
 
   const {
-    data: domains,
+    data: domainsPage,
     loading,
     refreshing,
     execute,
-  } = useRequestState<CertDomain[]>([])
+  } = useRequestState<ListResponse<CertDomain>>({
+    items: [],
+    total: 0,
+    limit: PAGE_LIMIT,
+    offset: 0,
+  })
+  const domains = domainsPage.items
 
   const resetAutoCreateDraft = (preserveAdvanced = true) => {
     setAutoCreateDomain(null)
@@ -241,9 +246,6 @@ export default function DomainsPage() {
         }),
         {
           silent,
-          onSuccess: (data) => {
-            setCurrentPageCount(data.length)
-          },
           onError: (error) => {
             toast.error(getApiErrorMessage(error, t("certificates.domains.toastFetchError")))
           },
@@ -410,7 +412,7 @@ export default function DomainsPage() {
 
   const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
   const canGoPrev = offset > 0
-  const canGoNext = currentPageCount >= PAGE_LIMIT
+  const canGoNext = offset + domains.length < domainsPage.total
 
   const handleDomainKeywordChange = (value: string) => {
     setDomainKeyword(value)
@@ -602,9 +604,10 @@ export default function DomainsPage() {
         check_interval_secs: checkInterval,
         note: autoCreateNote.trim() ? autoCreateNote.trim() : null,
       })
-      toast.success(t("certificates.domains.toastAutoCreateSuccess", { domain: created.domain }))
+      toast.success(t("certificates.domains.toastAutoCreateSuccess", { domain }))
       resetAutoCreateDraft()
-      await handleCheckDomain(created)
+      const createdDomain = await api.getDomain(created.id)
+      await handleCheckDomain(createdDomain)
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 409) {
         try {
@@ -614,7 +617,7 @@ export default function DomainsPage() {
             domain__contains: domain,
           })
 
-          const existing = maybeExisting.find((item) => item.domain.toLowerCase() === domain.toLowerCase())
+          const existing = maybeExisting.items.find((item) => item.domain.toLowerCase() === domain.toLowerCase())
 
           if (existing) {
             toast.success(t("certificates.domains.toastAutoCreateConflict", { domain }))
@@ -670,7 +673,7 @@ export default function DomainsPage() {
       toast.success(t("certificates.domains.toastDeleteSuccess"))
       setDeleteDialogDomain(null)
 
-      if (currentPageCount === 1 && offset > 0) {
+      if (domains.length === 1 && offset > 0) {
         setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))
       } else {
         await fetchDomains(true)

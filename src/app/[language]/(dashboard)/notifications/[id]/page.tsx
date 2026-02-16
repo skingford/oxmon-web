@@ -62,7 +62,6 @@ type ChannelDetailState = {
     min_severity: string
     enabled: boolean
     description: string | null
-    system_config_id?: string | null
     recipients: string[]
     created_at: string
     updated_at: string
@@ -120,10 +119,7 @@ export default function NotificationChannelDetailPage() {
 
     await execute(
       async () => {
-        const [channel, config] = await Promise.all([
-          api.getChannelById(channelId),
-          api.getChannelConfigById(channelId).catch(() => null),
-        ])
+        const channel = await api.getChannelById(channelId)
 
         if (!channel) {
           return {
@@ -132,14 +128,7 @@ export default function NotificationChannelDetailPage() {
           }
         }
 
-        const configJson =
-          typeof config?.config_json === "string"
-            ? formatConfigJson(config.config_json)
-            : config?.config_json && typeof config.config_json === "object"
-              ? JSON.stringify(config.config_json, null, 2)
-              : config?.config && typeof config.config === "object"
-                ? JSON.stringify(config.config, null, 2)
-                : ""
+        const configJson = formatConfigJson(channel.config_json || "")
 
         return {
           channel,
@@ -207,7 +196,6 @@ export default function NotificationChannelDetailPage() {
     setChannelForm({
       name: channel.name || "",
       channelType: channel.channel_type || "email",
-      systemConfigId: channel.system_config_id || "",
       description: channel.description || "",
       minSeverity: channel.min_severity || "info",
       enabled: channel.enabled,
@@ -268,7 +256,6 @@ export default function NotificationChannelDetailPage() {
 
       await api.updateChannelConfig(channel.id, {
         name: channelForm.name.trim(),
-        channel_type: channelForm.channelType.trim(),
         description: channelForm.description.trim() || null,
         min_severity: channelForm.minSeverity,
         enabled: channelForm.enabled,

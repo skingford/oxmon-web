@@ -14,7 +14,6 @@ type NotificationsFiltersCardProps = {
   typeFilter: string
   severityFilter: string
   statusFilter: NotificationStatusFilter
-  systemConfigFilter: string
   hasActiveFilters: boolean
   typeOptions: Array<{
     value: string
@@ -24,15 +23,10 @@ type NotificationsFiltersCardProps = {
     value: string
     label: string
   }>
-  systemConfigOptions: Array<{
-    id: string
-    label: string
-  }>
   onSearchKeywordChange: (value: string) => void
   onTypeFilterChange: (value: string) => void
   onSeverityFilterChange: (value: string) => void
   onStatusFilterChange: (value: NotificationStatusFilter) => void
-  onSystemConfigFilterChange: (value: string) => void
   onResetFilters: () => void
 }
 
@@ -41,16 +35,13 @@ export function NotificationsFiltersCard({
   typeFilter,
   severityFilter,
   statusFilter,
-  systemConfigFilter,
   hasActiveFilters,
   typeOptions,
   severityOptions,
-  systemConfigOptions,
   onSearchKeywordChange,
   onTypeFilterChange,
   onSeverityFilterChange,
   onStatusFilterChange,
-  onSystemConfigFilterChange,
   onResetFilters,
 }: NotificationsFiltersCardProps) {
   const { t } = useAppTranslations("pages")
@@ -63,7 +54,7 @@ export function NotificationsFiltersCard({
         </div>
 
         <FilterToolbar
-          className="xl:grid-cols-5"
+          className="xl:grid-cols-4"
           search={{
             value: searchKeyword,
             onValueChange: onSearchKeywordChange,
@@ -94,21 +85,6 @@ export function NotificationsFiltersCard({
               {severityOptions.map((severityOption) => (
                 <SelectItem key={severityOption.value} value={severityOption.value}>
                   {severityOption.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={systemConfigFilter} onValueChange={onSystemConfigFilterChange}>
-            <SelectTrigger className="h-10 w-full bg-background">
-              <SelectValue placeholder={t("notifications.filterSystemConfigLabel")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("notifications.filterSystemConfigAll")}</SelectItem>
-              <SelectItem value="unbound">{t("notifications.filterSystemConfigUnbound")}</SelectItem>
-              {systemConfigOptions.map((systemConfigOption) => (
-                <SelectItem key={systemConfigOption.id} value={systemConfigOption.id}>
-                  {systemConfigOption.label}
                 </SelectItem>
               ))}
             </SelectContent>

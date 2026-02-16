@@ -370,7 +370,7 @@ export default function AgentDetailPage() {
           }
 
           const currentPageAgents = await api.getAgents({ limit: 200, offset: 0 })
-          const matchedAgent = currentPageAgents.find((agent) => agent.id === agentRef || agent.agent_id === agentRef)
+          const matchedAgent = currentPageAgents.items.find((agent) => agent.id === agentRef || agent.agent_id === agentRef)
           const fallbackAgentId = matchedAgent?.agent_id || agentRef
 
           if (fallbackAgentId !== agentRef) {

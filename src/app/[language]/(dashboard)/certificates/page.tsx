@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
-import { CertificateChainInfo, CertificateDetails, CertSummary } from "@/types/api"
+import { CertificateChainInfo, CertificateDetails, CertSummary, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import { withLocalePrefix } from "@/components/app-locale"
@@ -42,7 +42,7 @@ import { toast } from "sonner"
 const PAGE_LIMIT = 20
 
 type CertificatesQueryState = {
-  certs: CertificateDetails[]
+  certsPage: ListResponse<CertificateDetails>
   summary: CertSummary | null
 }
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
@@ -159,7 +159,6 @@ export default function CertificatesPage() {
   const [ipKeyword, setIpKeyword] = useState(ipParamValue)
   const [expiryDays, setExpiryDays] = useState(expiryParamValue)
   const [offset, setOffset] = useState(initialOffset)
-  const [currentPageCount, setCurrentPageCount] = useState(0)
 
   const [chainDialogOpen, setChainDialogOpen] = useState(false)
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateDetails | null>(null)
@@ -170,7 +169,12 @@ export default function CertificatesPage() {
     refreshing,
     execute,
   } = useRequestState<CertificatesQueryState>({
-    certs: [],
+    certsPage: {
+      items: [],
+      total: 0,
+      limit: PAGE_LIMIT,
+      offset: 0,
+    },
     summary: null,
   })
 
@@ -181,7 +185,8 @@ export default function CertificatesPage() {
     execute: executeChain,
   } = useRequestState<CertificateChainInfo | null>(null, { initialLoading: false })
 
-  const certs = certificatesData.certs
+  const certsPage = certificatesData.certsPage
+  const certs = certsPage.items
   const summary = certificatesData.summary
 
   const expiryLimit = useMemo(() => {
@@ -210,15 +215,12 @@ export default function CertificatesPage() {
           ])
 
           return {
-            certs: certificates,
+            certsPage: certificates,
             summary: summaryData,
           }
         },
         {
           silent,
-          onSuccess: (data) => {
-            setCurrentPageCount(data.certs.length)
-          },
           onError: (error) => {
             toast.error(getApiErrorMessage(error, t("certificates.overview.toastFetchError")))
           },
@@ -306,7 +308,7 @@ export default function CertificatesPage() {
 
   const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
   const canGoPrev = offset > 0
-  const canGoNext = currentPageCount >= PAGE_LIMIT
+  const canGoNext = offset + certs.length < certsPage.total
 
   const handleDomainKeywordChange = (value: string) => {
     setDomainKeyword(value)

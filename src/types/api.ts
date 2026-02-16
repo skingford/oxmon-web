@@ -85,8 +85,9 @@ export interface AlertEventResponse {
   value: number;
   threshold: number;
   timestamp: string;
-  acknowledged_at: string | null;
-  resolved_at: string | null;
+  predicted_breach?: string | null;
+  acknowledged_at?: string | null;
+  resolved_at?: string | null;
   status: number; // 1=未处理, 2=已确认, 3=已处理
 }
 
@@ -120,20 +121,23 @@ export interface CreateAlertRuleRequest {
 }
 
 export interface UpdateAlertRuleRequest {
-  name?: string;
-  rule_type?: string;
-  metric?: string;
-  agent_pattern?: string;
-  severity?: string;
-  enabled?: boolean;
-  config_json?: string;
-  silence_secs?: number;
+  name?: string | null;
+  metric?: string | null;
+  agent_pattern?: string | null;
+  severity?: string | null;
+  enabled?: boolean | null;
+  config_json?: string | null;
+  silence_secs?: number | null;
 }
 
 export interface ApiError {
   err_code: number;
   err_msg: string;
   trace_id?: string;
+}
+
+export interface IdResponse {
+  id: string;
 }
 
 export interface HealthResponse {
@@ -151,6 +155,13 @@ export interface LoginResponse {
 export interface PaginationParams {
   limit?: number;
   offset?: number;
+}
+
+export interface ListResponse<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface CertSummary {
@@ -187,6 +198,25 @@ export interface CertificateDetails {
   last_checked: string;
   created_at: string;
   updated_at: string;
+  serial_number?: string | null;
+  fingerprint_sha256?: string | null;
+  version?: number | null;
+  signature_algorithm?: string | null;
+  public_key_algorithm?: string | null;
+  public_key_bits?: number | null;
+  subject_cn?: string | null;
+  subject_o?: string | null;
+  key_usage?: string[] | null;
+  extended_key_usage?: string[] | null;
+  is_ca?: boolean | null;
+  is_wildcard?: boolean | null;
+  ocsp_urls?: string[] | null;
+  crl_urls?: string[] | null;
+  ca_issuer_urls?: string[] | null;
+  sct_count?: number | null;
+  tls_version?: string | null;
+  cipher_suite?: string | null;
+  chain_depth?: number | null;
 }
 
 export interface ChannelOverview {
@@ -199,7 +229,6 @@ export interface ChannelOverview {
   recipient_type: string | null;
   recipients: string[];
   config_json: string;
-  system_config_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -207,8 +236,6 @@ export interface ChannelOverview {
 export interface RuntimeConfig {
   grpc_port: number;
   http_port: number;
-  log_level?: string;
-  uptime_secs?: number;
   data_dir: string;
   retention_days: number;
   require_agent_auth: boolean;
@@ -259,8 +286,6 @@ export interface StorageInfo {
   partitions: PartitionDetail[];
   total_partitions: number;
   total_size_bytes: number;
-  alert_events_partition_count?: number;
-  metrics_partition_count?: number;
 }
 
 export interface ChangePasswordRequest {
@@ -351,35 +376,16 @@ export interface CreateChannelRequest {
   description?: string | null;
   min_severity?: string;
   config_json?: string;
-  system_config_id?: string | null;
   recipients?: string[];
 }
 
 export interface UpdateChannelConfigRequest {
-  name?: string;
-  channel_type?: string;
+  name?: string | null;
   description?: string | null;
-  min_severity?: string;
-  enabled?: boolean;
-  config_json?: string;
-  system_config_id?: string | null;
-  recipients?: string[];
-}
-
-export interface ChannelConfig {
-  id?: string;
-  name?: string;
-  channel_type?: string;
-  description?: string | null;
-  min_severity?: string;
-  enabled?: boolean;
-  recipient_type?: string | null;
-  system_config_id?: string | null;
-  recipients?: string[];
-  created_at?: string;
-  updated_at?: string;
+  min_severity?: string | null;
+  enabled?: boolean | null;
   config_json?: string | null;
-  config?: Record<string, unknown> | null;
+  recipients?: string[] | null;
 }
 
 export interface NotificationLogItem {
@@ -492,15 +498,6 @@ export interface DictionaryTypeSummary {
   dict_type: string;
   dict_type_label: string;
   count: number;
-}
-
-export interface DictionaryType {
-  dict_type: string;
-  dict_type_label: string;
-  sort_order: number;
-  description?: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface CreateDictionaryTypeRequest {

@@ -6,14 +6,7 @@ import {
   getChannelTypeLabel,
   getSeverityLabel,
 } from "@/lib/notifications/channel-utils"
-import type { ChannelOverview, SystemConfigResponse } from "@/types/api"
-
-type NotificationSystemConfigOption = {
-  id: string
-  displayName: string
-  configKey: string
-  enabled: boolean
-}
+import type { ChannelOverview } from "@/types/api"
 
 export type NotificationStatusFilter = "all" | "enabled" | "disabled"
 
@@ -22,33 +15,22 @@ type NotificationFilterOption = {
   label: string
 }
 
-type NotificationSystemConfigFilterOption = {
-  id: string
-  label: string
-}
-
 type UseNotificationChannelFiltersOptions = {
   channels: ChannelOverview[]
-  systemConfigs: SystemConfigResponse[]
   searchKeyword: string
   typeFilter: string
   severityFilter: string
   statusFilter: NotificationStatusFilter
-  systemConfigFilter: string
-  currentChannelType: string
   severityOptions: readonly string[]
   t: AppNamespaceTranslator<"pages">
 }
 
 export function useNotificationChannelFilters({
   channels,
-  systemConfigs,
   searchKeyword,
   typeFilter,
   severityFilter,
   statusFilter,
-  systemConfigFilter,
-  currentChannelType,
   severityOptions,
   t,
 }: UseNotificationChannelFiltersOptions) {
@@ -66,14 +48,6 @@ export function useNotificationChannelFilters({
     }
   }, [channels])
 
-  const systemConfigMap = useMemo(() => {
-    const map = new Map<string, SystemConfigResponse>()
-    systemConfigs.forEach((item) => {
-      map.set(item.id, item)
-    })
-    return map
-  }, [systemConfigs])
-
   const availableTypes = useMemo(() => {
     const typeSet = new Set<string>()
 
@@ -85,14 +59,6 @@ export function useNotificationChannelFilters({
 
     return Array.from(typeSet).sort((left, right) => left.localeCompare(right))
   }, [channels])
-
-  const availableSystemConfigs = useMemo(() => {
-    return systemConfigs.slice().sort((left, right) => {
-      const leftLabel = `${left.display_name} ${left.config_key}`
-      const rightLabel = `${right.display_name} ${right.config_key}`
-      return leftLabel.localeCompare(rightLabel)
-    })
-  }, [systemConfigs])
 
   const filteredChannels = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
@@ -112,18 +78,6 @@ export function useNotificationChannelFilters({
         }
 
         if (typeFilter !== "all" && channel.channel_type.toLowerCase() !== typeFilter.toLowerCase()) {
-          return false
-        }
-
-        if (systemConfigFilter === "unbound" && channel.system_config_id) {
-          return false
-        }
-
-        if (
-          systemConfigFilter !== "all" &&
-          systemConfigFilter !== "unbound" &&
-          channel.system_config_id !== systemConfigFilter
-        ) {
           return false
         }
 
@@ -148,14 +102,13 @@ export function useNotificationChannelFilters({
         const rightTime = new Date(right.updated_at).getTime()
         return rightTime - leftTime
       })
-  }, [channels, searchKeyword, severityFilter, statusFilter, systemConfigFilter, typeFilter])
+  }, [channels, searchKeyword, severityFilter, statusFilter, typeFilter])
 
   const hasActiveFilters =
     Boolean(searchKeyword.trim()) ||
     typeFilter !== "all" ||
     severityFilter !== "all" ||
-    statusFilter !== "all" ||
-    systemConfigFilter !== "all"
+    statusFilter !== "all"
 
   const filterTypeOptions = useMemo<NotificationFilterOption[]>(
     () => availableTypes.map((type) => ({ value: type, label: getChannelTypeLabel(type, t) })),
@@ -167,38 +120,11 @@ export function useNotificationChannelFilters({
     [severityOptions, t]
   )
 
-  const filterSystemConfigOptions = useMemo<NotificationSystemConfigFilterOption[]>(
-    () =>
-      availableSystemConfigs.map((item) => ({
-        id: item.id,
-        label: `${item.display_name} (${item.config_key})`,
-      })),
-    [availableSystemConfigs]
-  )
-
-  const currentChannelTypeNormalized = currentChannelType.trim().toLowerCase()
-
-  const channelSystemConfigOptions = useMemo<NotificationSystemConfigOption[]>(
-    () =>
-      systemConfigs
-        .filter((item) => item.config_type.toLowerCase() === currentChannelTypeNormalized)
-        .map((item) => ({
-          id: item.id,
-          displayName: item.display_name,
-          configKey: item.config_key,
-          enabled: item.enabled,
-        })),
-    [currentChannelTypeNormalized, systemConfigs]
-  )
-
   return {
     stats,
-    systemConfigMap,
     filteredChannels,
     hasActiveFilters,
     filterTypeOptions,
     filterSeverityOptions,
-    filterSystemConfigOptions,
-    channelSystemConfigOptions,
   }
 }

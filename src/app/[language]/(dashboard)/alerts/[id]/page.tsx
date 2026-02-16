@@ -79,13 +79,13 @@ async function findAlertById(id: string) {
 
   for (let i = 0; i < maxPages; i++) {
     const page = await api.getActiveAlerts({ limit, offset })
-    const matched = page.find((item) => item.id === id)
+    const matched = page.items.find((item) => item.id === id)
 
     if (matched) {
       return matched
     }
 
-    if (page.length < limit) {
+    if (offset + page.items.length >= page.total || page.items.length < limit) {
       break
     }
 
@@ -102,13 +102,13 @@ async function findAlertById(id: string) {
       timestamp__gte: "1970-01-01T00:00:00Z",
       timestamp__lte: nowIso,
     })
-    const matched = page.find((item) => item.id === id)
+    const matched = page.items.find((item) => item.id === id)
 
     if (matched) {
       return matched
     }
 
-    if (page.length < limit) {
+    if (offset + page.items.length >= page.total || page.items.length < limit) {
       break
     }
 

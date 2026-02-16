@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { api, getApiErrorMessage } from "@/lib/api"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
-import { AlertRuleDetailResponse } from "@/types/api"
+import { AlertRuleResponse } from "@/types/api"
 import { toast } from "sonner"
 
 type UseAlertRulesDataOptions = {
@@ -9,7 +9,7 @@ type UseAlertRulesDataOptions = {
 }
 
 export function useAlertRulesData({ t }: UseAlertRulesDataOptions) {
-  const [rules, setRules] = useState<AlertRuleDetailResponse[]>([])
+  const [rules, setRules] = useState<AlertRuleResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 

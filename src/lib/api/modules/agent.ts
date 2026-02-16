@@ -4,7 +4,9 @@ import {
   AgentDetail,
   AgentResponse,
   AgentWhitelistDetail,
+  IdResponse,
   LatestMetric,
+  ListResponse,
   PaginationParams,
   RegenerateTokenResponse,
   UpdateAgentRequest,
@@ -26,16 +28,16 @@ interface AgentApiModuleDeps {
 }
 
 export interface AgentApiModule {
-  getAgents: (params?: PaginationParams) => Promise<AgentResponse[]>
+  getAgents: (params?: PaginationParams) => Promise<ListResponse<AgentResponse>>
   getAgentById: (id: string, token?: string) => Promise<AgentDetail>
-  getWhitelist: (params?: PaginationParams) => Promise<AgentWhitelistDetail[]>
+  getWhitelist: (params?: PaginationParams) => Promise<ListResponse<AgentWhitelistDetail>>
   getWhitelistById: (id: string, token?: string) => Promise<AgentWhitelistDetail>
   addWhitelistAgent: (data: AddAgentRequest, token?: string) => Promise<AddAgentResponse>
-  updateWhitelistAgent: (id: string, data: UpdateAgentRequest, token?: string) => Promise<AgentWhitelistDetail>
-  deleteWhitelistAgent: (id: string, token?: string) => Promise<void>
+  updateWhitelistAgent: (id: string, data: UpdateAgentRequest, token?: string) => Promise<IdResponse>
+  deleteWhitelistAgent: (id: string, token?: string) => Promise<IdResponse>
   regenerateToken: (id: string, token?: string) => Promise<RegenerateTokenResponse>
   getAgentLatestMetrics: (id: string, token?: string) => Promise<LatestMetric[]>
-  updateAgent: (id: string, data: UpdateAgentRequest, token?: string) => Promise<AgentWhitelistDetail>
+  updateAgent: (id: string, data: UpdateAgentRequest, token?: string) => Promise<IdResponse>
 }
 
 function toObject(value: unknown): Record<string, unknown> | null {
@@ -112,11 +114,32 @@ function normalizeAgentList(payload: unknown): AgentResponse[] {
   const candidates = [record.items, record.agents, record.results, record.rows, record.list]
   const source = candidates.find((value) => Array.isArray(value))
 
-  if (!Array.isArray(source)) {
+  if (Array.isArray(source)) {
+    return source
+      .map((item) => normalizeAgent(item))
+      .filter((item): item is AgentResponse => Boolean(item))
+  }
+
+  const nestedData = toObject(record.data)
+
+  if (!nestedData) {
     return []
   }
 
-  return source
+  const nestedCandidates = [
+    nestedData.items,
+    nestedData.agents,
+    nestedData.results,
+    nestedData.rows,
+    nestedData.list,
+  ]
+  const nestedSource = nestedCandidates.find((value) => Array.isArray(value))
+
+  if (!Array.isArray(nestedSource)) {
+    return []
+  }
+
+  return nestedSource
     .map((item) => normalizeAgent(item))
     .filter((item): item is AgentResponse => Boolean(item))
 }
@@ -177,28 +200,123 @@ function normalizeWhitelistList(payload: unknown): AgentWhitelistDetail[] {
   const candidates = [record.items, record.agents, record.results, record.rows, record.list]
   const source = candidates.find((value) => Array.isArray(value))
 
-  if (!Array.isArray(source)) {
+  if (Array.isArray(source)) {
+    return source
+      .map((item) => normalizeWhitelistAgent(item))
+      .filter((item): item is AgentWhitelistDetail => Boolean(item))
+  }
+
+  const nestedData = toObject(record.data)
+
+  if (!nestedData) {
     return []
   }
 
-  return source
+  const nestedCandidates = [
+    nestedData.items,
+    nestedData.agents,
+    nestedData.results,
+    nestedData.rows,
+    nestedData.list,
+  ]
+  const nestedSource = nestedCandidates.find((value) => Array.isArray(value))
+
+  if (!Array.isArray(nestedSource)) {
+    return []
+  }
+
+  return nestedSource
     .map((item) => normalizeWhitelistAgent(item))
     .filter((item): item is AgentWhitelistDetail => Boolean(item))
 }
 
+function normalizeListMeta(payload: unknown, fallbackLimit = 0, fallbackOffset = 0) {
+  const record = toObject(payload)
+  const nestedData = record ? toObject(record.data) : null
+  const source = nestedData || record
+
+  const total = toNullableNumber(source?.total)
+  const limit = toNullableNumber(source?.limit)
+  const offset = toNullableNumber(source?.offset)
+
+  return {
+    total: total === null ? 0 : Math.max(0, Math.trunc(total)),
+    limit: limit === null ? Math.max(0, fallbackLimit) : Math.max(0, Math.trunc(limit)),
+    offset: offset === null ? Math.max(0, fallbackOffset) : Math.max(0, Math.trunc(offset)),
+  }
+}
+
+const LIST_KEYS = ["items", "agents", "results", "rows", "list", "records"] as const
+
+function extractListPayload(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  const record = toObject(payload)
+
+  if (!record) {
+    return []
+  }
+
+  for (const key of LIST_KEYS) {
+    const candidate = record[key]
+
+    if (Array.isArray(candidate)) {
+      return candidate
+    }
+  }
+
+  const nestedData = toObject(record.data)
+
+  if (!nestedData) {
+    return []
+  }
+
+  for (const key of LIST_KEYS) {
+    const candidate = nestedData[key]
+
+    if (Array.isArray(candidate)) {
+      return candidate
+    }
+  }
+
+  return []
+}
+
 export function createAgentApiModule({ request, buildQueryString }: AgentApiModuleDeps): AgentApiModule {
   const getAgents = (params: PaginationParams = {}) =>
-    request<unknown>(`/v1/agents${buildQueryString(params)}`).then((result) =>
-      normalizeAgentList(result)
-    )
+    request<unknown>(`/v1/agents${buildQueryString(params)}`).then((result) => {
+      const items = normalizeAgentList(result)
+      const fallbackLimit = params.limit ?? items.length
+      const fallbackOffset = params.offset ?? 0
+      const meta = normalizeListMeta(result, fallbackLimit, fallbackOffset)
+
+      return {
+        items,
+        total: meta.total || items.length,
+        limit: meta.limit || fallbackLimit,
+        offset: meta.offset || fallbackOffset,
+      }
+    })
 
   const getAgentById = (id: string, token?: string) =>
     request<AgentDetail>(`/v1/agents/${encodeURIComponent(id)}`, { token })
 
   const getWhitelist = (params: PaginationParams = {}) =>
-    request<unknown>(`/v1/agents/whitelist${buildQueryString(params)}`).then((result) =>
-      normalizeWhitelistList(result)
-    )
+    request<unknown>(`/v1/agents/whitelist${buildQueryString(params)}`).then((result) => {
+      const items = normalizeWhitelistList(result)
+      const fallbackLimit = params.limit ?? items.length
+      const fallbackOffset = params.offset ?? 0
+      const meta = normalizeListMeta(result, fallbackLimit, fallbackOffset)
+
+      return {
+        items,
+        total: meta.total || items.length,
+        limit: meta.limit || fallbackLimit,
+        offset: meta.offset || fallbackOffset,
+      }
+    })
 
   const getWhitelistById = (id: string, token?: string) =>
     request<AgentWhitelistDetail>(`/v1/agents/whitelist/${encodeURIComponent(id)}`, { token })
@@ -211,27 +329,28 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     })
 
   const updateWhitelistAgent = (id: string, data: UpdateAgentRequest, token?: string) =>
-    request<AgentWhitelistDetail>(`/v1/agents/whitelist/${id}`, {
+    request<IdResponse>(`/v1/agents/whitelist/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: data,
       token,
     })
 
   const deleteWhitelistAgent = (id: string, token?: string) =>
-    request<void>(`/v1/agents/whitelist/${id}`, {
+    request<IdResponse>(`/v1/agents/whitelist/${encodeURIComponent(id)}`, {
       method: "DELETE",
       token,
-      allowEmptyResponse: true,
     })
 
   const regenerateToken = (id: string, token?: string) =>
-    request<RegenerateTokenResponse>(`/v1/agents/whitelist/${id}/token`, {
+    request<RegenerateTokenResponse>(`/v1/agents/whitelist/${encodeURIComponent(id)}/token`, {
       method: "POST",
       token,
     })
 
   const getAgentLatestMetrics = (id: string, token?: string) =>
-    request<LatestMetric[]>(`/v1/agents/${encodeURIComponent(id)}/latest`, { token })
+    request<unknown>(`/v1/agents/${encodeURIComponent(id)}/latest`, { token }).then((payload) =>
+      extractListPayload(payload) as LatestMetric[]
+    )
 
   const updateAgent = (id: string, data: UpdateAgentRequest, token?: string) =>
     updateWhitelistAgent(id, data, token)

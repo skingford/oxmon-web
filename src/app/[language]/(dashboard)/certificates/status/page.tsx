@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
-import { CertCheckResult } from "@/types/api"
+import { CertCheckResult, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import {
@@ -83,15 +83,20 @@ export default function CertificateStatusPage() {
 
   const [search, setSearch] = useState(searchParamValue)
   const [offset, setOffset] = useState(initialOffset)
-  const [currentPageCount, setCurrentPageCount] = useState(0)
   const [checkingAll, setCheckingAll] = useState(false)
 
   const {
-    data: statuses,
+    data: statusesPage,
     loading,
     refreshing,
     execute,
-  } = useRequestState<CertCheckResult[]>([])
+  } = useRequestState<ListResponse<CertCheckResult>>({
+    items: [],
+    total: 0,
+    limit: PAGE_LIMIT,
+    offset: 0,
+  })
+  const statuses = statusesPage.items
 
   const fetchStatus = useCallback(
     async (silent = false) => {
@@ -99,9 +104,6 @@ export default function CertificateStatusPage() {
         () => api.getCertStatusAll({ limit: PAGE_LIMIT, offset }),
         {
           silent,
-          onSuccess: (data) => {
-            setCurrentPageCount(data.length)
-          },
           onError: (error) => {
             toast.error(getApiErrorMessage(error, t("certificates.status.toastFetchError")))
           },
@@ -201,7 +203,7 @@ export default function CertificateStatusPage() {
 
   const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
   const canGoPrev = offset > 0
-  const canGoNext = currentPageCount >= PAGE_LIMIT
+  const canGoNext = offset + statuses.length < statusesPage.total
 
   const handleCheckAllDomains = async () => {
     setCheckingAll(true)

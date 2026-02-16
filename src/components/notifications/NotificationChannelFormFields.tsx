@@ -21,7 +21,6 @@ import {
 export type NotificationChannelFormState = {
   name: string
   channelType: string
-  systemConfigId: string
   description: string
   minSeverity: string
   enabled: boolean
@@ -87,6 +86,7 @@ export function NotificationChannelFormFields({
           <Label htmlFor={`${idPrefix}-type`}>{t("notifications.fieldType")}</Label>
           <Select
             value={typeSelectValue}
+            disabled={isEditing}
             onValueChange={(value) =>
               setForm((previous) => ({
                 ...previous,
@@ -118,6 +118,7 @@ export function NotificationChannelFormFields({
           <Label htmlFor={`${idPrefix}-custom-type`}>{t("notifications.fieldCustomType")}</Label>
           <Input
             id={`${idPrefix}-custom-type`}
+            disabled={isEditing}
             value={form.channelType}
             onChange={(event) =>
               setForm((previous) => ({

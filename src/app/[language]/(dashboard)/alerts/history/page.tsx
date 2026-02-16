@@ -168,6 +168,7 @@ function formatTimestamp(timestamp: string, locale: "zh" | "en") {
 export default function AlertHistoryPage() {
   const { t, locale } = useAppTranslations("alerts")
   const [alerts, setAlerts] = useState<AlertEventResponse[]>([])
+  const [alertsTotal, setAlertsTotal] = useState(0)
   const [loading, setLoading] = useState(true)
 
   const [filterAgentId, setFilterAgentId] = useState("")
@@ -202,7 +203,8 @@ export default function AlertHistoryPage() {
       }
 
       const data = await api.getAlertHistory(params)
-      setAlerts(data)
+      setAlerts(data.items)
+      setAlertsTotal(data.total)
     } catch (error) {
       toast.error(getApiErrorMessage(error, t("history.toastFetchError")))
     } finally {
@@ -245,7 +247,7 @@ export default function AlertHistoryPage() {
     filterAgentId || filterSeverity || filterStatus || filterTimeFrom || filterTimeTo
 
   const canGoPrev = offset > 0
-  const canGoNext = alerts.length >= limit
+  const canGoNext = offset + alerts.length < alertsTotal
 
   return (
     <div className="space-y-6">

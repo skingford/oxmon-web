@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
-import { AgentWhitelistDetail } from "@/types/api"
+import { AgentWhitelistDetail, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
@@ -109,11 +109,17 @@ function getStatusMeta(
 export default function WhitelistPage() {
   const { t, locale } = useAppTranslations("pages")
   const {
-    data: agents,
+    data: agentsPage,
     loading,
     refreshing,
     execute,
-  } = useRequestState<AgentWhitelistDetail[]>([])
+  } = useRequestState<ListResponse<AgentWhitelistDetail>>({
+    items: [],
+    total: 0,
+    limit: PAGE_LIMIT,
+    offset: 0,
+  })
+  const agents = agentsPage.items
 
   const router = useRouter()
   const pathname = usePathname()
@@ -127,7 +133,6 @@ export default function WhitelistPage() {
     : 0
 
   const [offset, setOffset] = useState(initialOffset)
-  const [currentPageCount, setCurrentPageCount] = useState(0)
   const [search, setSearch] = useState(searchParamValue)
 
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -170,9 +175,6 @@ export default function WhitelistPage() {
         () => api.getWhitelist({ limit: PAGE_LIMIT, offset }),
         {
           silent,
-          onSuccess: (data) => {
-            setCurrentPageCount(data.length)
-          },
           onError: (error) => {
             toast.error(getApiErrorMessage(error, t("whitelist.toastFetchError")))
           },
@@ -319,7 +321,7 @@ export default function WhitelistPage() {
       toast.success(t("whitelist.toastRemoveSuccess"))
       setDeleteDialogAgent(null)
 
-      if (currentPageCount === 1 && offset > 0) {
+      if (agents.length === 1 && offset > 0) {
         setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))
       } else {
         await fetchAgents(true)
@@ -433,7 +435,7 @@ export default function WhitelistPage() {
 
   const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
   const canGoPrev = offset > 0
-  const canGoNext = currentPageCount >= PAGE_LIMIT
+  const canGoNext = offset + agents.length < agentsPage.total
 
   return (
     <div className="space-y-6 p-4 md:p-6">

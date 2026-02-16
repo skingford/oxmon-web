@@ -4,6 +4,7 @@ import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useAlertRulesActions } from "@/hooks/use-alert-rules-actions"
 import { useAlertRulesData } from "@/hooks/use-alert-rules-data"
 import { useAlertRulesDialogState } from "@/hooks/use-alert-rules-dialog-state"
+import { api, getApiErrorMessage } from "@/lib/api"
 import { AlertRuleDeleteDialog } from "@/components/alerts/AlertRuleDeleteDialog"
 import { AlertRuleFormFields } from "@/components/alerts/AlertRuleFormFields"
 import { AlertRulesPageHeader } from "@/components/alerts/AlertRulesHeader"
@@ -18,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 export default function AlertRulesPage() {
   const { t } = useAppTranslations("alerts")
@@ -54,9 +56,14 @@ export default function AlertRulesPage() {
     fetchMetricNames()
   }
 
-  const handleOpenEditDialog = (rule: Parameters<typeof openEditDialog>[0]) => {
-    openEditDialog(rule)
-    fetchMetricNames()
+  const handleOpenEditDialog = async (ruleId: string) => {
+    try {
+      const detail = await api.getAlertRule(ruleId)
+      openEditDialog(detail)
+      fetchMetricNames()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("rules.toastFetchError")))
+    }
   }
 
   const { submitting, deleting, handleSubmit, handleConfirmDelete, handleToggleEnabled } = useAlertRulesActions({
@@ -82,7 +89,7 @@ export default function AlertRulesPage() {
         loading={loading}
         rules={rules}
         onToggleEnabled={handleToggleEnabled}
-        onEditRule={handleOpenEditDialog}
+        onEditRule={(rule) => handleOpenEditDialog(rule.id)}
         onDeleteRule={openDeleteDialog}
       />
 

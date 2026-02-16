@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import { AlertCircle, AlertTriangle, Edit2, Info, Loader2, Trash2 } from "lucide-react"
-import { AlertRuleDetailResponse } from "@/types/api"
+import { AlertRuleResponse } from "@/types/api"
 import { getAlertRuleTypeLabelInfo } from "@/lib/alerts/rule-form"
 import {
   useAppTranslations,
@@ -83,9 +83,9 @@ function getRuleTypeText(ruleType: string, t: AppNamespaceTranslator<"alerts">) 
 
 type AlertRulesTableProps = {
   loading: boolean
-  rules: AlertRuleDetailResponse[]
-  onToggleEnabled: (rule: AlertRuleDetailResponse) => void
-  onEditRule: (rule: AlertRuleDetailResponse) => void
+  rules: AlertRuleResponse[]
+  onToggleEnabled: (rule: AlertRuleResponse) => void
+  onEditRule: (rule: AlertRuleResponse) => void
   onDeleteRule: (id: string) => void
 }
 
@@ -156,7 +156,7 @@ export function AlertRulesTable({
                           {getSeverityText(rule.severity, t)}
                         </Badge>
                       </TableCell>
-                      <TableCell>{rule.silence_secs}s</TableCell>
+                      <TableCell>-</TableCell>
                       <TableCell>
                         <Switch checked={rule.enabled} onCheckedChange={() => onToggleEnabled(rule)} />
                       </TableCell>

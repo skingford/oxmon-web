@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
-import { AgentResponse } from "@/types/api"
+import { AgentResponse, ListResponse } from "@/types/api"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
@@ -110,14 +110,18 @@ export default function AgentsPage() {
   const [offset, setOffset] = useState(initialOffset)
   const limit = 20
 
-  const [currentPageCount, setCurrentPageCount] = useState(0)
-
   const {
-    data: agents,
+    data: agentsPage,
     loading,
     refreshing,
     execute,
-  } = useRequestState<AgentResponse[]>([])
+  } = useRequestState<ListResponse<AgentResponse>>({
+    items: [],
+    total: 0,
+    limit,
+    offset: 0,
+  })
+  const agents = agentsPage.items
 
   const whitelistPath = useMemo(() => withLocalePrefix("/whitelist", locale), [locale])
 
@@ -127,9 +131,6 @@ export default function AgentsPage() {
         () => api.getAgents({ limit, offset }),
         {
           silent,
-          onSuccess: (data) => {
-            setCurrentPageCount(data.length)
-          },
           onError: (error) => {
             toast.error(getApiErrorMessage(error, t("agents.toastFetchError")))
           },
@@ -216,7 +217,7 @@ export default function AgentsPage() {
 
   const pageNumber = Math.floor(offset / limit) + 1
   const canGoPrev = offset > 0
-  const canGoNext = currentPageCount >= limit
+  const canGoNext = offset + agents.length < agentsPage.total
 
   return (
     <div className="space-y-6 p-4 md:p-6">

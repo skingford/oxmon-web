@@ -2,7 +2,7 @@ import { useCallback, useState } from "react"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { normalizeAlertRulePayload } from "@/lib/alerts/rule-form"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
-import { AlertRuleDetailResponse, CreateAlertRuleRequest } from "@/types/api"
+import { AlertRuleResponse, CreateAlertRuleRequest } from "@/types/api"
 import { toast } from "sonner"
 
 type UseAlertRulesActionsOptions = {
@@ -77,7 +77,7 @@ export function useAlertRulesActions({
   }, [deletingRuleId, fetchRules, onDeleteDone, t])
 
   const handleToggleEnabled = useCallback(
-    async (rule: AlertRuleDetailResponse) => {
+    async (rule: AlertRuleResponse) => {
       try {
         await api.setAlertRuleEnabled(rule.id, { enabled: !rule.enabled })
         toast.success(rule.enabled ? t("rules.toastDisabled") : t("rules.toastEnabled"))

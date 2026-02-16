@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { api, getApiErrorMessage } from "@/lib/api"
 import {
-  ChannelOverview,
   CreateSystemConfigRequest,
   RuntimeConfig,
   StorageInfo,
@@ -65,7 +64,6 @@ export default function SystemPage() {
   const [config, setConfig] = useState<RuntimeConfig | null>(null)
   const [storage, setStorage] = useState<StorageInfo | null>(null)
   const [systemConfigs, setSystemConfigs] = useState<SystemConfigResponse[]>([])
-  const [notificationChannels, setNotificationChannels] = useState<ChannelOverview[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [cleaning, setCleaning] = useState(false)
@@ -92,16 +90,14 @@ export default function SystemPage() {
     }
 
     try {
-      const [configData, storageData, systemConfigRows, channelRows] = await Promise.all([
+      const [configData, storageData, systemConfigRows] = await Promise.all([
         api.getSystemConfig(),
         api.getStorageInfo(),
         api.listSystemConfigs(),
-        api.listChannels().catch(() => []),
       ])
       setConfig(configData)
       setStorage(storageData)
       setSystemConfigs(systemConfigRows)
-      setNotificationChannels(channelRows)
     } catch (error) {
       toast.error(getApiErrorMessage(error, t("toastFetchError")))
     } finally {
@@ -191,33 +187,6 @@ export default function SystemPage() {
       a.localeCompare(b)
     )
   }, [systemConfigs])
-
-  const systemConfigReferenceMap = useMemo(() => {
-    const map = new Map<string, { count: number; channelNames: string[] }>()
-
-    notificationChannels.forEach((channel) => {
-      if (!channel.system_config_id) {
-        return
-      }
-
-      const previous = map.get(channel.system_config_id) || {
-        count: 0,
-        channelNames: [],
-      }
-
-      previous.count += 1
-      if (!previous.channelNames.includes(channel.name) && previous.channelNames.length < 3) {
-        previous.channelNames.push(channel.name)
-      }
-      map.set(channel.system_config_id, previous)
-    })
-
-    return map
-  }, [notificationChannels])
-
-  const deletingTargetReference = systemConfigDeleteTarget
-    ? systemConfigReferenceMap.get(systemConfigDeleteTarget.id) || { count: 0, channelNames: [] }
-    : { count: 0, channelNames: [] }
 
   const filteredSystemConfigs = useMemo(() => {
     const keyword = systemConfigSearchKeyword.trim().toLowerCase()
@@ -376,9 +345,9 @@ export default function SystemPage() {
     setTogglingSystemConfigId(item.id)
 
     try {
-      const updated = await api.updateSystemConfig(item.id, { enabled })
+      await api.updateSystemConfig(item.id, { enabled })
       setSystemConfigs((previous) =>
-        previous.map((row) => (row.id === updated.id ? updated : row))
+        previous.map((row) => (row.id === item.id ? { ...row, enabled } : row))
       )
       toast.success(
         enabled
@@ -394,16 +363,6 @@ export default function SystemPage() {
 
   const handleDeleteSystemConfig = async () => {
     if (!systemConfigDeleteTarget) {
-      return
-    }
-
-    const reference = systemConfigReferenceMap.get(systemConfigDeleteTarget.id)
-    if (reference && reference.count > 0) {
-      toast.error(
-        t("systemConfigToastDeleteReferenced", {
-          count: reference.count,
-        })
-      )
       return
     }
 
@@ -770,13 +729,6 @@ export default function SystemPage() {
                     key: systemConfigDeleteTarget?.config_key || "-",
                   })}
                 </p>
-                {deletingTargetReference.count > 0 ? (
-                  <p className="text-amber-600">
-                    {t("systemConfigDeleteDialogReferencedHint", {
-                      count: deletingTargetReference.count,
-                    })}
-                  </p>
-                ) : null}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -786,7 +738,7 @@ export default function SystemPage() {
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteSystemConfig}
-              disabled={Boolean(deletingSystemConfigId) || deletingTargetReference.count > 0}
+              disabled={Boolean(deletingSystemConfigId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deletingSystemConfigId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

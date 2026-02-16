@@ -485,11 +485,11 @@ export default function SystemDictionaryEntriesPage() {
     setTogglingEnabledId(item.id)
 
     try {
-      const updatedItem = await api.updateDictionary(item.id, { enabled })
+      await api.updateDictionary(item.id, { enabled })
 
       setItems((previous) =>
         previous.map((previousItem) =>
-          previousItem.id === item.id ? { ...previousItem, ...updatedItem } : previousItem
+          previousItem.id === item.id ? { ...previousItem, enabled } : previousItem
         )
       )
 

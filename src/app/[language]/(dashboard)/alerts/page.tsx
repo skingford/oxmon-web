@@ -176,6 +176,7 @@ export default function ActiveAlertsPage() {
   const router = useRouter()
   const { t, locale } = useAppTranslations("alerts")
   const [alerts, setAlerts] = useState<AlertEventResponse[]>([])
+  const [alertsTotal, setAlertsTotal] = useState(0)
   const [summary, setSummary] = useState<AlertSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -206,7 +207,8 @@ export default function ActiveAlertsPage() {
           api.getAlertSummary(),
         ])
 
-        setAlerts(alertsData)
+        setAlerts(alertsData.items)
+        setAlertsTotal(alertsData.total)
         setSummary(summaryData)
       } catch (error) {
         toast.error(getApiErrorMessage(error, t("active.toastFetchError")))
@@ -345,7 +347,7 @@ export default function ActiveAlertsPage() {
   }
 
   const canGoPrev = offset > 0
-  const canGoNext = alerts.length >= limit
+  const canGoNext = offset + alerts.length < alertsTotal
   const allSelected = filteredAlerts.length > 0 && selectedAlerts.size === filteredAlerts.length
 
   // 生成趋势数据（按小时聚合）

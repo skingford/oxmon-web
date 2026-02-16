@@ -14,7 +14,6 @@ import {
 } from "@/components/notifications/NotificationChannelFormFields"
 import { useRequestState } from "@/hooks/use-request-state"
 import {
-  createConfigMap,
   getInitialFormState,
   getSeverityLabel,
 } from "@/lib/notifications/channel-utils"
@@ -43,7 +42,6 @@ const CHANNEL_SEVERITY_OPTIONS = ["info", "warning", "critical"] as const
 
 type NotificationsQueryState = {
   channels: ChannelOverview[]
-  configMap: Record<string, string>
 }
 
 export default function NotificationsPage() {
@@ -55,17 +53,14 @@ export default function NotificationsPage() {
     execute,
   } = useRequestState<NotificationsQueryState>({
     channels: [],
-    configMap: {},
   })
 
   const channels = data.channels
-  const configMap = data.configMap
 
   const [searchKeyword, setSearchKeyword] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [severityFilter, setSeverityFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<NotificationStatusFilter>("all")
-  const [systemConfigFilter, setSystemConfigFilter] = useState("all")
 
   const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false)
   const [editingChannel, setEditingChannel] = useState<ChannelOverview | null>(null)
@@ -77,14 +72,8 @@ export default function NotificationsPage() {
     async (silent = false) => {
       await execute(
         async () => {
-          const [channelRows, configRows] = await Promise.all([
-            api.listChannels(),
-            api.listChannelConfigs().catch(() => []),
-          ])
-
           return {
-            channels: channelRows,
-            configMap: createConfigMap(configRows),
+            channels: await api.listChannels(),
           }
         },
         {
@@ -108,16 +97,12 @@ export default function NotificationsPage() {
     hasActiveFilters,
     filterTypeOptions,
     filterSeverityOptions,
-    filterSystemConfigOptions,
   } = useNotificationChannelFilters({
     channels,
-    systemConfigs: [],
     searchKeyword,
     typeFilter,
     severityFilter,
     statusFilter,
-    systemConfigFilter,
-    currentChannelType: channelForm.channelType,
     severityOptions: CHANNEL_SEVERITY_OPTIONS,
     t,
   })
@@ -134,7 +119,6 @@ export default function NotificationsPage() {
     setTypeFilter("all")
     setSeverityFilter("all")
     setStatusFilter("all")
-    setSystemConfigFilter("all")
   }
 
   const {
@@ -147,7 +131,6 @@ export default function NotificationsPage() {
   } = useNotificationChannelSubmit({
     t,
     fetchChannels,
-    configMap,
     editingChannel,
     setEditingChannel,
     channelForm,
@@ -211,16 +194,13 @@ export default function NotificationsPage() {
         typeFilter={typeFilter}
         severityFilter={severityFilter}
         statusFilter={statusFilter}
-        systemConfigFilter={systemConfigFilter}
         hasActiveFilters={hasActiveFilters}
         typeOptions={filterTypeOptions}
         severityOptions={filterSeverityOptions}
-        systemConfigOptions={filterSystemConfigOptions}
         onSearchKeywordChange={setSearchKeyword}
         onTypeFilterChange={setTypeFilter}
         onSeverityFilterChange={setSeverityFilter}
         onStatusFilterChange={setStatusFilter}
-        onSystemConfigFilterChange={setSystemConfigFilter}
         onResetFilters={resetFilters}
       />
 

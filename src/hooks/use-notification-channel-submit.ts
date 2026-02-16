@@ -20,7 +20,6 @@ import { toast } from "sonner"
 type UseNotificationChannelSubmitOptions = {
   t: AppNamespaceTranslator<"pages">
   fetchChannels: (silent?: boolean) => Promise<void>
-  configMap: Record<string, string>
   editingChannel: ChannelOverview | null
   setEditingChannel: Dispatch<SetStateAction<ChannelOverview | null>>
   channelForm: NotificationChannelFormState
@@ -31,7 +30,6 @@ type UseNotificationChannelSubmitOptions = {
 export function useNotificationChannelSubmit({
   t,
   fetchChannels,
-  configMap,
   editingChannel,
   setEditingChannel,
   channelForm,
@@ -52,20 +50,19 @@ export function useNotificationChannelSubmit({
       setChannelForm({
         name: channel.name,
         channelType: channel.channel_type,
-        systemConfigId: channel.system_config_id || "",
         description: channel.description || "",
         minSeverity: channel.min_severity || "info",
         enabled: channel.enabled,
         recipientsInput: channel.recipients.join("\n"),
-        configJson: configMap[channel.id] || "{}",
+        configJson: channel.config_json || "{}",
         configFormValues: getConfigFormValuesFromConfigJson(
           channel.channel_type,
-          configMap[channel.id] || "{}"
+          channel.config_json || "{}"
         ),
       })
       setIsChannelDialogOpen(true)
     },
-    [configMap, setChannelForm, setEditingChannel, setIsChannelDialogOpen]
+    [setChannelForm, setEditingChannel, setIsChannelDialogOpen]
   )
 
   const closeChannelDialog = useCallback(() => {
@@ -154,7 +151,11 @@ export function useNotificationChannelSubmit({
 
         if (editingChannel) {
           const payload: UpdateChannelConfigRequest = {
-            ...basePayload,
+            name: basePayload.name,
+            description: basePayload.description,
+            min_severity: basePayload.min_severity,
+            recipients: basePayload.recipients,
+            config_json: basePayload.config_json,
             enabled: channelForm.enabled,
           }
 

@@ -72,6 +72,12 @@ src/
 - 🎤 **Live Assistant** - Voice AI (Gemini Native Audio)
 - 🌍 **Bilingual UI** - English / 中文 language switch with persisted preference
 
+## 🧪 API 联调文档
+
+- 文档总入口：`docs/README.md`
+- 联调执行手册：`docs/api-joint-debugging-playbook.md`
+- OpenAPI 对齐报告：`docs/openapi-alignment-report.md`
+
 ## 📦 Migration & Optimization Complete
 
 This project was successfully migrated from **Vite 6 + pnpm** to **Next.js 16 + bun** and optimized with **Vercel React Best Practices**:

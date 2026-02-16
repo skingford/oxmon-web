@@ -1,5 +1,4 @@
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
-import type { ChannelConfig } from "@/types/api"
 
 export const CHANNEL_TYPE_OPTIONS = ["email", "dingtalk", "webhook", "slack", "sms"] as const
 
@@ -199,7 +198,6 @@ export function getInitialFormState() {
   return {
     name: "",
     channelType: "email",
-    systemConfigId: "",
     description: "",
     minSeverity: "info",
     enabled: true,
@@ -428,39 +426,6 @@ export function serializeChannelConfigJson({
     ok: true,
     configJson: JSON.stringify(nextConfig),
   }
-}
-
-export function createConfigMap(rows: ChannelConfig[] | unknown[]): Record<string, string> {
-  const map: Record<string, string> = {}
-
-  rows.forEach((row) => {
-    if (!row || typeof row !== "object") {
-      return
-    }
-
-    const record = row as Record<string, unknown>
-    const id = typeof record.id === "string" ? record.id : null
-
-    if (!id) {
-      return
-    }
-
-    if (typeof record.config_json === "string") {
-      map[id] = record.config_json
-      return
-    }
-
-    if (record.config_json && typeof record.config_json === "object") {
-      map[id] = JSON.stringify(record.config_json, null, 2)
-      return
-    }
-
-    if (record.config && typeof record.config === "object") {
-      map[id] = JSON.stringify(record.config, null, 2)
-    }
-  })
-
-  return map
 }
 
 export function getChannelTypeLabel(type: string, t: AppNamespaceTranslator<"pages">) {

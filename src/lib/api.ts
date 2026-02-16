@@ -6,7 +6,6 @@ import {
   ApiResponseEnvelope,
   CertificateDetails,
   ChannelOverview,
-  ChannelConfig,
   NotificationLogItem,
   NotificationLogListResponse,
   NotificationLogSummaryResponse,
@@ -18,6 +17,7 @@ import {
   LoginRequest,
   LoginResponse,
   HealthResponse,
+  ListResponse,
   PaginationParams,
   RuntimeConfig,
   SystemConfigResponse,
@@ -41,8 +41,8 @@ import {
   CreateSilenceWindowRequest,
   UpdateSilenceWindowRequest,
   EnableRequest,
+  IdResponse,
   DictionaryItem,
-  DictionaryType,
   DictionaryTypeSummary,
   CreateDictionaryRequest,
   UpdateDictionaryRequest,
@@ -198,6 +198,71 @@ function toNumberValue(value: unknown, fallback = 0) {
   return fallback
 }
 
+const LIST_KEYS = ["items", "agents", "results", "rows", "list", "records"] as const
+
+function extractListPayload(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  const record = toObject(payload)
+
+  if (!record) {
+    return []
+  }
+
+  for (const key of LIST_KEYS) {
+    const candidate = record[key]
+
+    if (Array.isArray(candidate)) {
+      return candidate
+    }
+  }
+
+  const nestedData = toObject(record.data)
+
+  if (!nestedData) {
+    return []
+  }
+
+  for (const key of LIST_KEYS) {
+    const candidate = nestedData[key]
+
+    if (Array.isArray(candidate)) {
+      return candidate
+    }
+  }
+
+  return []
+}
+
+function toStringList(payload: unknown): string[] {
+  return extractListPayload(payload).map((item) => String(item))
+}
+
+function normalizeListResponse<T>(
+  payload: unknown,
+  options: { fallbackLimit?: number; fallbackOffset?: number } = {}
+): ListResponse<T> {
+  const items = extractListPayload(payload) as T[]
+  const record = toObject(payload)
+  const nestedData = record ? toObject(record.data) : null
+  const source = nestedData || record
+  const fallbackLimit = options.fallbackLimit ?? items.length
+  const fallbackOffset = options.fallbackOffset ?? 0
+
+  const total = Math.max(0, Math.trunc(toNumberValue(source?.total, items.length)))
+  const limit = Math.max(0, Math.trunc(toNumberValue(source?.limit, fallbackLimit)))
+  const offset = Math.max(0, Math.trunc(toNumberValue(source?.offset, fallbackOffset)))
+
+  return {
+    items,
+    total,
+    limit,
+    offset,
+  }
+}
+
 function normalizeAlertEvent(value: unknown): AlertEventResponse | null {
   const record = toObject(value)
 
@@ -314,6 +379,42 @@ function normalizeAlertRuleDetail(value: unknown): AlertRuleDetailResponse | nul
     source,
     created_at: createdAt || "",
     updated_at: updatedAt || "",
+  }
+}
+
+function normalizeAlertRule(value: unknown): AlertRuleResponse | null {
+  const record = toObject(value)
+
+  if (!record) {
+    return null
+  }
+
+  const id = toStringValue(record.id)
+  const name = toStringValue(record.name)
+  const ruleType = toStringValue(record.rule_type)
+  const metric = toStringValue(record.metric)
+  const agentPattern = toStringValue(record.agent_pattern)
+  const severity = toStringValue(record.severity)
+
+  if (
+    !id ||
+    !name ||
+    !ruleType ||
+    !metric ||
+    !agentPattern ||
+    !severity
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    name,
+    rule_type: ruleType,
+    metric,
+    agent_pattern: agentPattern,
+    severity,
+    enabled: Boolean(record.enabled),
   }
 }
 
@@ -464,11 +565,19 @@ export const api = {
   ...agentApi,
 
   getActiveAlerts: (params: PaginationParams = {}) =>
-    request<unknown[]>(`/v1/alerts/active${buildQueryString(params)}`).then((items) =>
-      items
-        .map((item) => normalizeAlertEvent(item))
-        .filter((item): item is AlertEventResponse => Boolean(item))
-    ),
+    request<unknown>(`/v1/alerts/active${buildQueryString(params)}`).then((payload) => {
+      const page = normalizeListResponse<unknown>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+
+      return {
+        ...page,
+        items: page.items
+          .map((item) => normalizeAlertEvent(item))
+          .filter((item): item is AlertEventResponse => Boolean(item)),
+      }
+    }),
 
   getAlertHistory: (params: PaginationParams & {
     agent_id__eq?: string
@@ -476,11 +585,19 @@ export const api = {
     timestamp__gte?: string
     timestamp__lte?: string
   } = {}) =>
-    request<unknown[]>(`/v1/alerts/history${buildQueryString(params)}`).then((items) =>
-      items
-        .map((item) => normalizeAlertEvent(item))
-        .filter((item): item is AlertEventResponse => Boolean(item))
-    ),
+    request<unknown>(`/v1/alerts/history${buildQueryString(params)}`).then((payload) => {
+      const page = normalizeListResponse<unknown>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+
+      return {
+        ...page,
+        items: page.items
+          .map((item) => normalizeAlertEvent(item))
+          .filter((item): item is AlertEventResponse => Boolean(item)),
+      }
+    }),
 
   getAlertHistoryById: (id: string) =>
     request<unknown>(`/v1/alerts/history/${id}`).then((item) => {
@@ -494,50 +611,39 @@ export const api = {
     }),
 
   acknowledgeAlert: (id: string, token?: string) =>
-    request(`/v1/alerts/history/${id}/acknowledge`, {
+    request<IdResponse>(`/v1/alerts/history/${id}/acknowledge`, {
       method: "POST",
       token,
-      allowEmptyResponse: true,
     }),
 
   resolveAlert: (id: string, token?: string) =>
-    request(`/v1/alerts/history/${id}/resolve`, {
+    request<IdResponse>(`/v1/alerts/history/${id}/resolve`, {
       method: "POST",
       token,
-      allowEmptyResponse: true,
     }),
 
   getAlertRules: (params?: PaginationParams) => {
     if (params) {
-      return request<unknown[]>(`/v1/alerts/rules${buildQueryString(params)}`).then((items) =>
-        items
-          .map((item) => normalizeAlertRuleDetail(item))
-          .filter((item): item is AlertRuleDetailResponse => Boolean(item))
+      return request<unknown>(`/v1/alerts/rules${buildQueryString(params)}`).then((items) =>
+        extractListPayload(items)
+          .map((item) => normalizeAlertRule(item))
+          .filter((item): item is AlertRuleResponse => Boolean(item))
       )
     }
 
     return requestAllPages<unknown>((page) =>
-      request<unknown[]>(`/v1/alerts/rules${buildQueryString(page)}`)
+      request<unknown>(`/v1/alerts/rules${buildQueryString(page)}`).then((payload) =>
+        extractListPayload(payload)
+      )
     ).then((items) =>
       items
-        .map((item) => normalizeAlertRuleDetail(item))
-        .filter((item): item is AlertRuleDetailResponse => Boolean(item))
+        .map((item) => normalizeAlertRule(item))
+        .filter((item): item is AlertRuleResponse => Boolean(item))
     )
   },
 
   createAlertRule: (data: CreateAlertRuleRequest) =>
-    request<unknown>("/v1/alerts/rules", {
-      method: "POST",
-      body: data,
-    }).then((result) => {
-      const normalized = normalizeAlertRuleDetail(result)
-
-      if (!normalized) {
-        throw new ApiRequestError("Invalid alert rule response format", { status: 200 })
-      }
-
-      return normalized
-    }),
+    request<IdResponse>("/v1/alerts/rules", { method: "POST", body: data }),
 
 
   // Dashboard
@@ -550,7 +656,12 @@ export const api = {
     ip_address__contains?: string
     issuer__contains?: string
   } = {}) =>
-    request<CertificateDetails[]>(`/v1/certificates${buildQueryString(params)}`),
+    request<unknown>(`/v1/certificates${buildQueryString(params)}`).then((payload) =>
+      normalizeListResponse<CertificateDetails>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+    ),
 
   getCertificate: (id: string) =>
     request<CertificateDetails>(`/v1/certificates/${id}`),
@@ -558,11 +669,15 @@ export const api = {
   // Notifications
   listChannels: (params?: PaginationParams) => {
     if (params) {
-      return request<ChannelOverview[]>(`/v1/notifications/channels${buildQueryString(params)}`)
+      return request<unknown>(`/v1/notifications/channels${buildQueryString(params)}`).then(
+        (payload) => extractListPayload(payload) as ChannelOverview[]
+      )
     }
 
     return requestAllPages<ChannelOverview>((page) =>
-      request<ChannelOverview[]>(`/v1/notifications/channels${buildQueryString(page)}`)
+      request<unknown>(`/v1/notifications/channels${buildQueryString(page)}`).then((payload) =>
+        extractListPayload(payload) as ChannelOverview[]
+      )
     )
   },
 
@@ -581,11 +696,15 @@ export const api = {
 
   listSystemConfigs: (params?: PaginationParams) => {
     if (params) {
-      return request<SystemConfigResponse[]>(`/v1/system/configs${buildQueryString(params)}`)
+      return request<unknown>(`/v1/system/configs${buildQueryString(params)}`).then((payload) =>
+        extractListPayload(payload) as SystemConfigResponse[]
+      )
     }
 
     return requestAllPages<SystemConfigResponse>((page) =>
-      request<SystemConfigResponse[]>(`/v1/system/configs${buildQueryString(page)}`)
+      request<unknown>(`/v1/system/configs${buildQueryString(page)}`).then((payload) =>
+        extractListPayload(payload) as SystemConfigResponse[]
+      )
     )
   },
 
@@ -593,33 +712,37 @@ export const api = {
     request<SystemConfigResponse>(`/v1/system/configs/${id}`),
 
   createSystemConfig: (data: CreateSystemConfigRequest) =>
-    request<SystemConfigResponse>("/v1/system/configs", { method: "POST", body: data }),
+    request<IdResponse>("/v1/system/configs", { method: "POST", body: data }),
 
   updateSystemConfig: (id: string, data: UpdateSystemConfigRequest) =>
-    request<SystemConfigResponse>(`/v1/system/configs/${id}`, { method: "PUT", body: data }),
+    request<IdResponse>(`/v1/system/configs/${id}`, { method: "PUT", body: data }),
 
   deleteSystemConfig: (id: string) =>
-    request(`/v1/system/configs/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+    request<IdResponse>(`/v1/system/configs/${id}`, { method: "DELETE" }),
 
   // Dictionaries
   listDictionaryTypes: (params?: PaginationParams) => {
     if (params) {
-      return request<DictionaryTypeSummary[]>(`/v1/dictionaries/types${buildQueryString(params)}`)
+      return request<unknown>(`/v1/dictionaries/types${buildQueryString(params)}`).then(
+        (payload) => extractListPayload(payload) as DictionaryTypeSummary[]
+      )
     }
 
     return requestAllPages<DictionaryTypeSummary>((page) =>
-      request<DictionaryTypeSummary[]>(`/v1/dictionaries/types${buildQueryString(page)}`)
+      request<unknown>(`/v1/dictionaries/types${buildQueryString(page)}`).then((payload) =>
+        extractListPayload(payload) as DictionaryTypeSummary[]
+      )
     )
   },
 
   createDictionaryType: (data: CreateDictionaryTypeRequest) =>
-    request<DictionaryType>("/v1/dictionaries/types", { method: "POST", body: data }),
+    request<IdResponse>("/v1/dictionaries/types", { method: "POST", body: data }),
 
   updateDictionaryType: (dictType: string, data: UpdateDictionaryTypeRequest) =>
-    request<DictionaryType>(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "PUT", body: data }),
+    request<IdResponse>(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "PUT", body: data }),
 
   deleteDictionaryType: (dictType: string) =>
-    request(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "DELETE", allowEmptyResponse: true }),
+    request<IdResponse>(`/v1/dictionaries/types/${encodeURIComponent(dictType)}`, { method: "DELETE" }),
 
   listDictionariesByType: async (
     dictType: string,
@@ -628,22 +751,13 @@ export const api = {
   ) => {
     const encodedType = encodeURIComponent(dictType)
 
-    const requestDictionaryPage = async (page: Required<PaginationFetchConfig>) => {
-      const query = buildQueryString({
+    const requestDictionaryPage = (page: Required<PaginationFetchConfig>) =>
+      request<unknown>(`/v1/dictionaries/type/${encodedType}${buildQueryString({
         enabled_only: enabledOnly,
         ...page,
-      })
-
-      try {
-        return await request<DictionaryItem[]>(`/v1/dictionaries/type/${encodedType}${query}`)
-      } catch (error) {
-        if (error instanceof ApiRequestError && error.status === 404) {
-          return request<DictionaryItem[]>(`/v1/dictionaries/type/${encodedType}/${enabledOnly}${buildQueryString(page)}`)
-        }
-
-        throw error
-      }
-    }
+      })}`).then(
+        (payload) => extractListPayload(payload) as DictionaryItem[]
+      )
 
     if (params) {
       return requestDictionaryPage({
@@ -656,16 +770,16 @@ export const api = {
   },
 
   createDictionary: (data: CreateDictionaryRequest) =>
-    request<DictionaryItem>("/v1/dictionaries", { method: "POST", body: data }),
+    request<IdResponse>("/v1/dictionaries", { method: "POST", body: data }),
 
   getDictionary: (id: string) =>
     request<DictionaryItem>(`/v1/dictionaries/${id}`),
 
   updateDictionary: (id: string, data: UpdateDictionaryRequest) =>
-    request<DictionaryItem>(`/v1/dictionaries/${id}`, { method: "PUT", body: data }),
+    request<IdResponse>(`/v1/dictionaries/${id}`, { method: "PUT", body: data }),
 
   deleteDictionary: (id: string) =>
-    request(`/v1/dictionaries/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+    request<IdResponse>(`/v1/dictionaries/${id}`, { method: "DELETE" }),
 
   // Auth - Security
   changePassword: (data: ChangePasswordRequest) =>
@@ -676,34 +790,50 @@ export const api = {
     request<CertificateChainInfo>(`/v1/certificates/${id}/chain`),
 
   checkAllDomains: () =>
-    request<CertCheckResult[]>("/v1/certs/check", { method: "POST" }),
+    request<unknown>("/v1/certs/check", { method: "POST" }).then((payload) =>
+      extractListPayload(payload) as CertCheckResult[]
+    ),
 
   listDomains: (params: PaginationParams & { enabled__eq?: boolean; domain__contains?: string } = {}) =>
-    request<CertDomain[]>(`/v1/certs/domains${buildQueryString(params)}`),
+    request<unknown>(`/v1/certs/domains${buildQueryString(params)}`).then((payload) =>
+      normalizeListResponse<CertDomain>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+    ),
 
   createDomain: (data: CreateDomainRequest) =>
-    request<CertDomain>("/v1/certs/domains", { method: "POST", body: data }),
+    request<IdResponse>("/v1/certs/domains", { method: "POST", body: data }),
 
   createDomainsBatch: (data: BatchCreateDomainsRequest) =>
-    request<CertDomain[]>("/v1/certs/domains/batch", { method: "POST", body: data }),
+    request<unknown>("/v1/certs/domains/batch", { method: "POST", body: data }).then((payload) =>
+      extractListPayload(payload) as CertDomain[]
+    ),
 
   getDomain: (id: string) =>
     request<CertDomain>(`/v1/certs/domains/${id}`),
 
   updateDomain: (id: string, data: UpdateDomainRequest) =>
-    request<CertDomain>(`/v1/certs/domains/${id}`, { method: "PUT", body: data }),
+    request<IdResponse>(`/v1/certs/domains/${id}`, { method: "PUT", body: data }),
 
   deleteDomain: (id: string) =>
-    request(`/v1/certs/domains/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+    request<IdResponse>(`/v1/certs/domains/${id}`, { method: "DELETE" }),
 
   checkSingleDomain: (id: string) =>
     request<CertCheckResult>(`/v1/certs/domains/${id}/check`, { method: "POST" }),
 
   getCertCheckHistory: (id: string, params: PaginationParams = {}) =>
-    request<CertCheckResult[]>(`/v1/certs/domains/${id}/history${buildQueryString(params)}`),
+    request<unknown>(`/v1/certs/domains/${id}/history${buildQueryString(params)}`).then((payload) =>
+      extractListPayload(payload) as CertCheckResult[]
+    ),
 
   getCertStatusAll: (params: PaginationParams = {}) =>
-    request<CertCheckResult[]>(`/v1/certs/status${buildQueryString(params)}`),
+    request<unknown>(`/v1/certs/status${buildQueryString(params)}`).then((payload) =>
+      normalizeListResponse<CertCheckResult>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+    ),
 
   getCertStatusByDomain: (domain: string) =>
     request<CertCheckResult>(`/v1/certs/status/${encodeURIComponent(domain)}`),
@@ -718,53 +848,41 @@ export const api = {
     timestamp__gte?: string
     timestamp__lte?: string
   } = {}) =>
-    request<MetricDataPointResponse[]>(`/v1/metrics${buildQueryString(params)}`),
+    request<unknown>(`/v1/metrics${buildQueryString(params)}`).then((payload) =>
+      extractListPayload(payload) as MetricDataPointResponse[]
+    ),
 
   getMetricAgents: (params?: { timestamp__gte?: string; timestamp__lte?: string }) =>
-    request<string[]>(`/v1/metrics/agents${buildQueryString(params || {})}`),
+    request<unknown>(`/v1/metrics/agents${buildQueryString(params || {})}`).then((payload) =>
+      toStringList(payload)
+    ),
 
   getMetricNames: (params?: { timestamp__gte?: string; timestamp__lte?: string }) =>
-    request<string[]>(`/v1/metrics/names${buildQueryString(params || {})}`),
+    request<unknown>(`/v1/metrics/names${buildQueryString(params || {})}`).then((payload) =>
+      toStringList(payload)
+    ),
 
   getMetricSummary: (params: { agent_id: string; metric_name: string; timestamp__gte?: string; timestamp__lte?: string }) =>
     request<MetricSummaryResponse>(`/v1/metrics/summary${buildQueryString(params)}`),
 
-  // Notifications - Advanced
-  listChannelConfigs: (params?: PaginationParams) => {
-    if (params) {
-      return request<ChannelConfig[]>(`/v1/notifications/channels${buildQueryString(params)}`)
-    }
-
-    return requestAllPages<ChannelConfig>((page) =>
-      request<ChannelConfig[]>(`/v1/notifications/channels${buildQueryString(page)}`)
-    )
-  },
-
-  getChannelConfigById: (id: string) =>
-    request<ChannelConfig>(`/v1/notifications/channels/${id}`),
-
   createChannelConfig: (data: CreateChannelRequest) =>
-    request<ChannelConfig>("/v1/notifications/channels", { method: "POST", body: data }),
+    request<IdResponse>("/v1/notifications/channels", { method: "POST", body: data }),
 
-  updateChannelConfig: async (id: string, data: UpdateChannelConfigRequest) => {
-    const current = await request<ChannelOverview>(`/v1/notifications/channels/${id}`)
-
-    return request<ChannelConfig>(`/v1/notifications/channels/${id}`, {
+  updateChannelConfig: (id: string, data: UpdateChannelConfigRequest) =>
+    request<IdResponse>(`/v1/notifications/channels/${id}`, {
       method: "PUT",
       body: {
-        name: data.name ?? current.name,
-        channel_type: data.channel_type ?? current.channel_type,
-        description: data.description !== undefined ? data.description : current.description,
-        min_severity: data.min_severity ?? current.min_severity,
-        enabled: data.enabled ?? current.enabled,
-        config_json: data.config_json ?? current.config_json,
-        recipients: data.recipients ?? current.recipients,
+        name: data.name,
+        description: data.description,
+        min_severity: data.min_severity,
+        enabled: data.enabled,
+        config_json: data.config_json,
+        recipients: data.recipients,
       },
-    })
-  },
+    }),
 
   deleteChannelConfig: (id: string) =>
-    request(`/v1/notifications/channels/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+    request<IdResponse>(`/v1/notifications/channels/${id}`, { method: "DELETE" }),
 
   getRecipients: (id: string, params?: PaginationParams) => {
     void params
@@ -774,27 +892,17 @@ export const api = {
   },
 
   setRecipients: (id: string, data: SetRecipientsRequest) =>
-    request<ChannelOverview>(`/v1/notifications/channels/${id}`).then((current) =>
-      request<ChannelOverview>(`/v1/notifications/channels/${id}`, {
-        method: "PUT",
-        body: {
-          name: current.name,
-          channel_type: current.channel_type,
-          description: current.description,
-          min_severity: current.min_severity,
-          enabled: current.enabled,
-          config_json: current.config_json,
-          recipients: data.recipients,
-        },
-      }).then((channel) => channel.recipients || [])
-    ),
+    request<IdResponse>(`/v1/notifications/channels/${id}`, {
+      method: "PUT",
+      body: { recipients: data.recipients },
+    }),
 
   testChannel: (id: string) =>
     request(`/v1/notifications/channels/${id}/test`, { method: "POST", allowEmptyResponse: true }),
 
   listSilenceWindows: (params: PaginationParams = {}) =>
-    request<unknown[]>(`/v1/notifications/silence-windows${buildQueryString(params)}`).then((items) =>
-      items
+    request<unknown>(`/v1/notifications/silence-windows${buildQueryString(params)}`).then((items) =>
+      extractListPayload(items)
         .map((item) => normalizeSilenceWindow(item))
         .filter((item): item is SilenceWindow => Boolean(item))
     ),
@@ -809,17 +917,10 @@ export const api = {
     request<NotificationLogSummaryResponse>(`/v1/notifications/logs/summary${buildQueryString(params)}`),
 
   createSilenceWindow: (data: CreateSilenceWindowRequest) =>
-    request<unknown>("/v1/notifications/silence-windows", {
-      method: "POST",
-      body: data,
-      allowEmptyResponse: true,
-    }).then((result) => {
-      const normalized = normalizeSilenceWindow(result)
-      return (normalized || {}) as Partial<SilenceWindow>
-    }),
+    request<IdResponse>("/v1/notifications/silence-windows", { method: "POST", body: data }),
 
   deleteSilenceWindow: (id: string) =>
-    request(`/v1/notifications/silence-windows/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+    request<IdResponse>(`/v1/notifications/silence-windows/${id}`, { method: "DELETE" }),
 
   getSilenceWindowById: (id: string) =>
     request<unknown>(`/v1/notifications/silence-windows/${id}`).then((item) => {
@@ -833,21 +934,10 @@ export const api = {
     }),
 
   updateSilenceWindow: (id: string, data: UpdateSilenceWindowRequest) =>
-    request<unknown>(`/v1/notifications/silence-windows/${id}`, { method: "PUT", body: data }).then((item) => {
-      const normalized = normalizeSilenceWindow(item)
-      return (normalized || {}) as Partial<SilenceWindow>
-    }),
+    request<IdResponse>(`/v1/notifications/silence-windows/${id}`, { method: "PUT", body: data }),
 
   setAlertRuleEnabled: (id: string, data: EnableRequest) =>
-    request<unknown>(`/v1/alerts/rules/${id}/enable`, { method: "PUT", body: data }).then((result) => {
-      const normalized = normalizeAlertRuleDetail(result)
-
-      if (!normalized) {
-        throw new ApiRequestError("Invalid alert rule response format", { status: 200 })
-      }
-
-      return normalized
-    }),
+    request<IdResponse>(`/v1/alerts/rules/${id}/enable`, { method: "PUT", body: data }),
 
   getAlertRule: (id: string) =>
     request<unknown>(`/v1/alerts/rules/${id}`).then((result) => {
@@ -861,18 +951,21 @@ export const api = {
     }),
 
   updateAlertRule: (id: string, data: UpdateAlertRuleRequest) =>
-    request<unknown>(`/v1/alerts/rules/${id}`, { method: "PUT", body: data }).then((result) => {
-      const normalized = normalizeAlertRuleDetail(result)
-
-      if (!normalized) {
-        throw new ApiRequestError("Invalid alert rule response format", { status: 200 })
-      }
-
-      return normalized
+    request<IdResponse>(`/v1/alerts/rules/${id}`, {
+      method: "PUT",
+      body: {
+        name: data.name,
+        metric: data.metric,
+        agent_pattern: data.agent_pattern,
+        severity: data.severity,
+        enabled: data.enabled,
+        config_json: data.config_json,
+        silence_secs: data.silence_secs,
+      },
     }),
 
   deleteAlertRule: (id: string) =>
-    request(`/v1/alerts/rules/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+    request<IdResponse>(`/v1/alerts/rules/${id}`, { method: "DELETE" }),
 
   getAlertSummary: (params?: { hours?: number }) =>
     request<AlertSummary>(`/v1/alerts/summary${buildQueryString(params || {})}`),
