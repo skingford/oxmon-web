@@ -317,6 +317,34 @@ function buildMetricItemKey(metric: LatestMetric, index: number) {
   return `${metric.metric_name}-${metric.timestamp}-${labelSignature || "no-label"}-${index}`
 }
 
+function buildMetricNameLabelMap(items: Array<{ dict_key: string; dict_label: string }>) {
+  const map: Record<string, string> = {}
+  items.forEach((item) => {
+    const key = item.dict_key?.trim()
+    const label = item.dict_label?.trim()
+    if (!key || !label) {
+      return
+    }
+    map[key] = label
+    map[normalizeMetricName(key)] = label
+  })
+  return map
+}
+
+function getMetricDisplayName(metricName: string, nameLabelMap: Record<string, string>) {
+  const exact = nameLabelMap[metricName]
+  if (exact) {
+    return exact
+  }
+
+  const normalized = nameLabelMap[normalizeMetricName(metricName)]
+  if (normalized) {
+    return normalized
+  }
+
+  return metricName
+}
+
 export default function AgentDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -343,6 +371,7 @@ export default function AgentDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [resolvedAgentId, setResolvedAgentId] = useState("")
   const [agentDetail, setAgentDetail] = useState<AgentDetail | null>(null)
+  const [metricNameLabelMap, setMetricNameLabelMap] = useState<Record<string, string>>({})
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [editDescription, setEditDescription] = useState("")
@@ -467,6 +496,30 @@ export default function AgentDetailPage() {
   useEffect(() => {
     fetchAgentDetail()
   }, [fetchAgentDetail])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchMetricNameLabels = async () => {
+      try {
+        const items = await api.listDictionariesByType("metric_name", true)
+        if (cancelled) {
+          return
+        }
+        setMetricNameLabelMap(buildMetricNameLabelMap(items))
+      } catch {
+        if (!cancelled) {
+          setMetricNameLabelMap({})
+        }
+      }
+    }
+
+    fetchMetricNameLabels()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     fetchLatestMetrics()
@@ -683,7 +736,12 @@ export default function AgentDetailPage() {
                       className="rounded-md border bg-muted/20 p-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-mono text-sm font-medium">{metric.metric_name}</p>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {getMetricDisplayName(metric.metric_name, metricNameLabelMap)}
+                          </p>
+                          <p className="font-mono text-xs text-muted-foreground">{metric.metric_name}</p>
+                        </div>
                         <span className="text-sm">{metric.value}</span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
