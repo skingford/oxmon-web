@@ -39,7 +39,11 @@ type MetricsQueryToolbarTexts = {
 type MetricsQueryToolbarProps = {
   texts: MetricsQueryToolbarTexts
   agents: string[]
-  metricNames: string[]
+  metricOptions: Array<{
+    value: string
+    label: string
+    subtitle?: string
+  }>
   selectedAgent: string
   selectedMetric: string
   labelFilter: string
@@ -68,7 +72,7 @@ type MetricsQueryToolbarProps = {
 export function MetricsQueryToolbar({
   texts,
   agents,
-  metricNames,
+  metricOptions,
   selectedAgent,
   selectedMetric,
   labelFilter,
@@ -122,9 +126,14 @@ export function MetricsQueryToolbar({
             <SelectValue placeholder={texts.metricPlaceholder} />
           </SelectTrigger>
           <SelectContent>
-            {metricNames.map((metricName) => (
-              <SelectItem key={metricName} value={metricName}>
-                {metricName}
+            {metricOptions.map((metric) => (
+              <SelectItem key={metric.value} value={metric.value}>
+                <div className="flex flex-col">
+                  <span>{metric.label}</span>
+                  {metric.subtitle ? (
+                    <span className="text-xs text-muted-foreground">{metric.subtitle}</span>
+                  ) : null}
+                </div>
               </SelectItem>
             ))}
           </SelectContent>

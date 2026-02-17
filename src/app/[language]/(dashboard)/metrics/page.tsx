@@ -30,6 +30,7 @@ interface TimeBounds {
 interface MetricFilterOptionsData {
   agents: string[]
   metricNames: string[]
+  metricNameLabelMap: Record<string, string>
 }
 
 interface MetricQueryResultData {
@@ -78,6 +79,38 @@ function formatMetricValue(value: number) {
   }
 
   return value.toLocaleString(undefined, { maximumFractionDigits: 4 })
+}
+
+function normalizeMetricName(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "")
+}
+
+function buildMetricNameLabelMap(items: Array<{ dict_key: string; dict_label: string }>) {
+  const map: Record<string, string> = {}
+  items.forEach((item) => {
+    const key = item.dict_key?.trim()
+    const label = item.dict_label?.trim()
+    if (!key || !label) {
+      return
+    }
+    map[key] = label
+    map[normalizeMetricName(key)] = label
+  })
+  return map
+}
+
+function getMetricDisplayName(metricName: string, nameLabelMap: Record<string, string>) {
+  const exact = nameLabelMap[metricName]
+  if (exact) {
+    return exact
+  }
+
+  const normalized = nameLabelMap[normalizeMetricName(metricName)]
+  if (normalized) {
+    return normalized
+  }
+
+  return metricName
 }
 
 function toIsoDateTime(value?: string) {
@@ -146,6 +179,7 @@ function MetricsPageContent() {
     {
       agents: [],
       metricNames: [],
+      metricNameLabelMap: {},
     }
   )
 
@@ -165,6 +199,7 @@ function MetricsPageContent() {
 
   const agents = filterOptions.agents
   const metricNames = filterOptions.metricNames
+  const metricNameLabelMap = filterOptions.metricNameLabelMap
   const dataPoints = metricQueryResult.dataPoints
   const summary = metricQueryResult.summary
 
@@ -236,13 +271,14 @@ function MetricsPageContent() {
       return
     }
 
-    const headers = ["id", "timestamp", "created_at", "agent_id", "metric_name", "value", "labels"]
+    const headers = ["id", "timestamp", "created_at", "agent_id", "metric_name", "metric_label", "value", "labels"]
     const rows = filteredDataPoints.map((point) => [
       point.id,
       point.timestamp,
       point.created_at,
       point.agent_id,
       point.metric_name,
+      getMetricDisplayName(point.metric_name, metricNameLabelMap),
       point.value,
       JSON.stringify(point.labels || {}),
     ])
@@ -386,10 +422,18 @@ function MetricsPageContent() {
             api.getMetricAgents(),
             api.getMetricNames(),
           ])
+          let metricLabelItems: Array<{ dict_key: string; dict_label: string }> = []
+
+          try {
+            metricLabelItems = await api.listDictionariesByType("metric_name", true)
+          } catch {
+            metricLabelItems = []
+          }
 
           return {
             agents: agentList,
             metricNames: metricList,
+            metricNameLabelMap: buildMetricNameLabelMap(metricLabelItems),
           }
         },
         {
@@ -550,6 +594,23 @@ function MetricsPageContent() {
     [t]
   )
 
+  const metricOptions = useMemo(
+    () =>
+      metricNames.map((metricName) => {
+        const displayName = getMetricDisplayName(metricName, metricNameLabelMap)
+        return {
+          value: metricName,
+          label: displayName,
+          subtitle: displayName === metricName ? undefined : metricName,
+        }
+      }),
+    [metricNameLabelMap, metricNames]
+  )
+  const selectedMetricDisplayName = useMemo(
+    () => getMetricDisplayName(selectedMetric, metricNameLabelMap),
+    [metricNameLabelMap, selectedMetric]
+  )
+
   return (
     <div className="min-w-0 space-y-8 p-4 md:p-8">
       <div>
@@ -569,7 +630,7 @@ function MetricsPageContent() {
           <MetricsQueryToolbar
             texts={queryToolbarTexts}
             agents={agents}
-            metricNames={metricNames}
+            metricOptions={metricOptions}
             selectedAgent={selectedAgent}
             selectedMetric={selectedMetric}
             labelFilter={labelFilter}
@@ -639,7 +700,7 @@ function MetricsPageContent() {
               </CardTitle>
               <CardDescription>
                 {selectedAgent && selectedMetric
-                  ? `${selectedAgent} / ${selectedMetric}`
+                  ? `${selectedAgent} / ${selectedMetricDisplayName}${selectedMetricDisplayName === selectedMetric ? "" : ` (${selectedMetric})`}`
                   : t("metrics.selectQueryCondition")}
               </CardDescription>
             </CardHeader>
@@ -697,6 +758,9 @@ function MetricsPageContent() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>
+                      {t("metrics.tableColMetric")}
+                    </TableHead>
+                    <TableHead>
                       <button
                         type="button"
                         className="inline-flex items-center gap-1"
@@ -734,13 +798,21 @@ function MetricsPageContent() {
                 <TableBody>
                   {sortedTableData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                         {t("metrics.tableEmpty")}
                       </TableCell>
                     </TableRow>
                   ) : (
                     paginatedData.map((point, index) => (
                       <TableRow key={point.id || `${point.timestamp}-${index}`}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span>{getMetricDisplayName(point.metric_name, metricNameLabelMap)}</span>
+                            {getMetricDisplayName(point.metric_name, metricNameLabelMap) !== point.metric_name ? (
+                              <span className="text-xs text-muted-foreground font-mono">{point.metric_name}</span>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell>{new Date(point.timestamp).toLocaleString()}</TableCell>
                         <TableCell className="font-mono">{formatMetricValue(point.value)}</TableCell>
                         <TableCell>

@@ -1,11 +1,16 @@
 import {
+  ActiveAlertQueryParams,
   AlertEventResponse,
+  AlertRuleQueryParams,
   AlertRuleDetailResponse,
   AlertRuleResponse,
   AlertSummary,
   ApiResponseEnvelope,
+  CertStatusQueryParams,
   CertificateDetails,
   ChannelOverview,
+  DictionaryByTypeQueryParams,
+  DictionaryTypeQueryParams,
   NotificationLogItem,
   NotificationLogListResponse,
   NotificationLogSummaryResponse,
@@ -16,6 +21,7 @@ import {
   DashboardOverview,
   LoginRequest,
   LoginResponse,
+  PublicKeyResponse,
   HealthResponse,
   ListResponse,
   PaginationParams,
@@ -32,12 +38,15 @@ import {
   CreateDomainRequest,
   UpdateDomainRequest,
   BatchCreateDomainsRequest,
+  MetricCatalogQueryParams,
   MetricDataPointResponse,
   MetricSummaryResponse,
   CreateChannelRequest,
+  NotificationChannelQueryParams,
   UpdateChannelConfigRequest,
   SetRecipientsRequest,
   SilenceWindow,
+  SilenceWindowQueryParams,
   CreateSilenceWindowRequest,
   UpdateSilenceWindowRequest,
   EnableRequest,
@@ -156,6 +165,20 @@ async function requestAllPages<T>(
   }
 
   return merged
+}
+
+function hasExplicitPaginationParams(params?: PaginationParams) {
+  return params?.limit !== undefined || params?.offset !== undefined
+}
+
+function toPageFetchConfig(
+  params?: PaginationParams,
+  defaultLimit = 200
+): Required<PaginationFetchConfig> {
+  return {
+    limit: Math.max(1, params?.limit ?? defaultLimit),
+    offset: Math.max(0, params?.offset ?? 0),
+  }
 }
 
 function toObject(value: unknown): Record<string, unknown> | null {
@@ -282,17 +305,8 @@ function normalizeAlertEvent(value: unknown): AlertEventResponse | null {
     return null
   }
 
-  let status = Math.trunc(toNumberValue(record.status, 1))
-
-  if (![1, 2, 3].includes(status)) {
-    if (toNullableStringValue(record.resolved_at)) {
-      status = 3
-    } else if (toNullableStringValue(record.acknowledged_at)) {
-      status = 2
-    } else {
-      status = 1
-    }
-  }
+  const rawStatus = Math.trunc(toNumberValue(record.status, 1))
+  const status = [1, 2, 3].includes(rawStatus) ? rawStatus : 1
 
   return {
     id,
@@ -304,8 +318,7 @@ function normalizeAlertEvent(value: unknown): AlertEventResponse | null {
     value: toNumberValue(record.value, 0),
     threshold: toNumberValue(record.threshold, 0),
     timestamp,
-    acknowledged_at: toNullableStringValue(record.acknowledged_at),
-    resolved_at: toNullableStringValue(record.resolved_at),
+    predicted_breach: toNullableStringValue(record.predicted_breach),
     status,
   }
 }
@@ -493,12 +506,21 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
       return {} as T
     }
 
-    let payload: unknown
+    let payload: unknown = null
+    let responseText = ""
 
     try {
-      payload = await response.json()
+      responseText = await response.text()
     } catch {
-      payload = null
+      responseText = ""
+    }
+
+    if (responseText) {
+      try {
+        payload = JSON.parse(responseText)
+      } catch {
+        payload = null
+      }
     }
 
     if (!response.ok) {
@@ -512,6 +534,14 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
             traceId: envelope.trace_id,
           }
         )
+      }
+
+      const plainTextErrorMessage = responseText.trim()
+
+      if (plainTextErrorMessage) {
+        throw new ApiRequestError(plainTextErrorMessage, {
+          status: response.status,
+        })
       }
 
       throw new ApiRequestError(`Request failed: ${response.status} ${response.statusText}`, {
@@ -555,6 +585,11 @@ const agentApi = createAgentApiModule({
 })
 
 export const api = {
+  getAuthPublicKey: () =>
+    request<PublicKeyResponse>("/v1/auth/public-key", {
+      requiresAuth: false,
+    }),
+
   login: (credentials: LoginRequest) =>
     request<LoginResponse>("/v1/auth/login", {
       method: "POST",
@@ -564,7 +599,7 @@ export const api = {
 
   ...agentApi,
 
-  getActiveAlerts: (params: PaginationParams = {}) =>
+  getActiveAlerts: (params: ActiveAlertQueryParams = {}) =>
     request<unknown>(`/v1/alerts/active${buildQueryString(params)}`).then((payload) => {
       const page = normalizeListResponse<unknown>(payload, {
         fallbackLimit: params.limit ?? 0,
@@ -622,18 +657,26 @@ export const api = {
       token,
     }),
 
-  getAlertRules: (params?: PaginationParams) => {
-    if (params) {
-      return request<unknown>(`/v1/alerts/rules${buildQueryString(params)}`).then((items) =>
+  getAlertRules: (params?: AlertRuleQueryParams) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(`/v1/alerts/rules${buildQueryString(params || {})}`).then((items) =>
         extractListPayload(items)
           .map((item) => normalizeAlertRule(item))
           .filter((item): item is AlertRuleResponse => Boolean(item))
       )
     }
 
+    const queryParams = {
+      name__contains: params?.name__contains,
+      rule_type__eq: params?.rule_type__eq,
+      metric__contains: params?.metric__contains,
+      severity__eq: params?.severity__eq,
+      enabled__eq: params?.enabled__eq,
+    }
+
     return requestAllPages<unknown>((page) =>
-      request<unknown>(`/v1/alerts/rules${buildQueryString(page)}`).then((payload) =>
-        extractListPayload(payload)
+      request<unknown>(`/v1/alerts/rules${buildQueryString({ ...queryParams, ...page })}`).then(
+        (payload) => extractListPayload(payload)
       )
     ).then((items) =>
       items
@@ -667,16 +710,23 @@ export const api = {
     request<CertificateDetails>(`/v1/certificates/${id}`),
 
   // Notifications
-  listChannels: (params?: PaginationParams) => {
-    if (params) {
-      return request<unknown>(`/v1/notifications/channels${buildQueryString(params)}`).then(
+  listChannels: (params?: NotificationChannelQueryParams) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(`/v1/notifications/channels${buildQueryString(params || {})}`).then(
         (payload) => extractListPayload(payload) as ChannelOverview[]
       )
     }
 
+    const queryParams = {
+      name__contains: params?.name__contains,
+      channel_type__eq: params?.channel_type__eq,
+      enabled__eq: params?.enabled__eq,
+      min_severity__eq: params?.min_severity__eq,
+    }
+
     return requestAllPages<ChannelOverview>((page) =>
-      request<unknown>(`/v1/notifications/channels${buildQueryString(page)}`).then((payload) =>
-        extractListPayload(payload) as ChannelOverview[]
+      request<unknown>(`/v1/notifications/channels${buildQueryString({ ...queryParams, ...page })}`).then(
+        (payload) => extractListPayload(payload) as ChannelOverview[]
       )
     )
   },
@@ -721,16 +771,20 @@ export const api = {
     request<IdResponse>(`/v1/system/configs/${id}`, { method: "DELETE" }),
 
   // Dictionaries
-  listDictionaryTypes: (params?: PaginationParams) => {
-    if (params) {
-      return request<unknown>(`/v1/dictionaries/types${buildQueryString(params)}`).then(
+  listDictionaryTypes: (params?: DictionaryTypeQueryParams) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(`/v1/dictionaries/types${buildQueryString(params || {})}`).then(
         (payload) => extractListPayload(payload) as DictionaryTypeSummary[]
       )
     }
 
+    const queryParams = {
+      dict_type__contains: params?.dict_type__contains,
+    }
+
     return requestAllPages<DictionaryTypeSummary>((page) =>
-      request<unknown>(`/v1/dictionaries/types${buildQueryString(page)}`).then((payload) =>
-        extractListPayload(payload) as DictionaryTypeSummary[]
+      request<unknown>(`/v1/dictionaries/types${buildQueryString({ ...queryParams, ...page })}`).then(
+        (payload) => extractListPayload(payload) as DictionaryTypeSummary[]
       )
     )
   },
@@ -747,13 +801,16 @@ export const api = {
   listDictionariesByType: async (
     dictType: string,
     enabledOnly = false,
-    params?: PaginationParams
+    params?: PaginationParams,
+    filters?: Omit<DictionaryByTypeQueryParams, "limit" | "offset" | "enabled_only">
   ) => {
     const encodedType = encodeURIComponent(dictType)
 
     const requestDictionaryPage = (page: Required<PaginationFetchConfig>) =>
       request<unknown>(`/v1/dictionaries/type/${encodedType}${buildQueryString({
         enabled_only: enabledOnly,
+        key__contains: filters?.key__contains,
+        label__contains: filters?.label__contains,
         ...page,
       })}`).then(
         (payload) => extractListPayload(payload) as DictionaryItem[]
@@ -783,7 +840,7 @@ export const api = {
 
   // Auth - Security
   changePassword: (data: ChangePasswordRequest) =>
-    request("/v1/auth/password", { method: "POST", body: data }),
+    request("/v1/auth/password", { method: "POST", body: data, allowEmptyResponse: true }),
 
   // Certificates - Advanced
   getCertificateChain: (id: string) =>
@@ -807,7 +864,7 @@ export const api = {
 
   createDomainsBatch: (data: BatchCreateDomainsRequest) =>
     request<unknown>("/v1/certs/domains/batch", { method: "POST", body: data }).then((payload) =>
-      extractListPayload(payload) as CertDomain[]
+      extractListPayload(payload) as IdResponse[]
     ),
 
   getDomain: (id: string) =>
@@ -827,7 +884,7 @@ export const api = {
       extractListPayload(payload) as CertCheckResult[]
     ),
 
-  getCertStatusAll: (params: PaginationParams = {}) =>
+  getCertStatusAll: (params: CertStatusQueryParams = {}) =>
     request<unknown>(`/v1/certs/status${buildQueryString(params)}`).then((payload) =>
       normalizeListResponse<CertCheckResult>(payload, {
         fallbackLimit: params.limit ?? 0,
@@ -852,15 +909,39 @@ export const api = {
       extractListPayload(payload) as MetricDataPointResponse[]
     ),
 
-  getMetricAgents: (params?: { timestamp__gte?: string; timestamp__lte?: string }) =>
-    request<unknown>(`/v1/metrics/agents${buildQueryString(params || {})}`).then((payload) =>
-      toStringList(payload)
-    ),
+  getMetricAgents: (params?: MetricCatalogQueryParams) => {
+    const requestMetricAgentPage = (page: Required<PaginationFetchConfig>) =>
+      request<unknown>(`/v1/metrics/agents${buildQueryString({
+        timestamp__gte: params?.timestamp__gte,
+        timestamp__lte: params?.timestamp__lte,
+        ...page,
+      })}`).then((payload) => toStringList(payload))
 
-  getMetricNames: (params?: { timestamp__gte?: string; timestamp__lte?: string }) =>
-    request<unknown>(`/v1/metrics/names${buildQueryString(params || {})}`).then((payload) =>
-      toStringList(payload)
-    ),
+    if (hasExplicitPaginationParams(params)) {
+      return requestMetricAgentPage(toPageFetchConfig(params))
+    }
+
+    return requestAllPages<string>(requestMetricAgentPage).then((items) =>
+      Array.from(new Set(items))
+    )
+  },
+
+  getMetricNames: (params?: MetricCatalogQueryParams) => {
+    const requestMetricNamePage = (page: Required<PaginationFetchConfig>) =>
+      request<unknown>(`/v1/metrics/names${buildQueryString({
+        timestamp__gte: params?.timestamp__gte,
+        timestamp__lte: params?.timestamp__lte,
+        ...page,
+      })}`).then((payload) => toStringList(payload))
+
+    if (hasExplicitPaginationParams(params)) {
+      return requestMetricNamePage(toPageFetchConfig(params))
+    }
+
+    return requestAllPages<string>(requestMetricNamePage).then((items) =>
+      Array.from(new Set(items))
+    )
+  },
 
   getMetricSummary: (params: { agent_id: string; metric_name: string; timestamp__gte?: string; timestamp__lte?: string }) =>
     request<MetricSummaryResponse>(`/v1/metrics/summary${buildQueryString(params)}`),
@@ -900,7 +981,7 @@ export const api = {
   testChannel: (id: string) =>
     request(`/v1/notifications/channels/${id}/test`, { method: "POST", allowEmptyResponse: true }),
 
-  listSilenceWindows: (params: PaginationParams = {}) =>
+  listSilenceWindows: (params: SilenceWindowQueryParams = {}) =>
     request<unknown>(`/v1/notifications/silence-windows${buildQueryString(params)}`).then((items) =>
       extractListPayload(items)
         .map((item) => normalizeSilenceWindow(item))

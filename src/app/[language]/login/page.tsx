@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api";
 import { getAuthToken, isAuthTokenValid, setAuthToken } from "@/lib/auth-token";
+import { encryptPasswordWithPublicKey } from "@/lib/password-encryption";
 import { resolveAppLocale, withLocalePrefix } from "@/components/app-locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,8 +57,22 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const loginData = await api.login({ username, password });
-      setAuthToken(loginData.token);
+      const publicKeyResponse = await api.getAuthPublicKey();
+
+      if (publicKeyResponse.algorithm !== "RSA-OAEP-SHA256") {
+        throw new Error(`Unsupported login encryption algorithm: ${publicKeyResponse.algorithm}`);
+      }
+
+      const encryptedPassword = await encryptPasswordWithPublicKey(
+        publicKeyResponse.public_key,
+        password
+      );
+
+      const loginData = await api.login({
+        username,
+        encrypted_password: encryptedPassword,
+      });
+      setAuthToken(loginData.access_token);
 
       toast.success("Login successful");
       router.replace(dashboardPath);

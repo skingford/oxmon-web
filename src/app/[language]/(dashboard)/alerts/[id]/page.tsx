@@ -312,18 +312,6 @@ export default function AlertDetailPage() {
                 <p className="text-xs text-muted-foreground">{t("active.createdAt")}</p>
                 <p className="text-sm font-medium">{formatFullTimestamp(alertDetail.timestamp, locale)}</p>
               </div>
-              {alertDetail.acknowledged_at ? (
-                <div className="pb-2">
-                  <p className="text-xs text-muted-foreground">{t("active.acknowledgedAt")}</p>
-                  <p className="text-sm font-medium">{formatFullTimestamp(alertDetail.acknowledged_at, locale)}</p>
-                </div>
-              ) : null}
-              {alertDetail.resolved_at ? (
-                <div className="pb-2">
-                  <p className="text-xs text-muted-foreground">{t("active.resolvedAt")}</p>
-                  <p className="text-sm font-medium">{formatFullTimestamp(alertDetail.resolved_at, locale)}</p>
-                </div>
-              ) : null}
             </div>
           </div>
         </CardContent>

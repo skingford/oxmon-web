@@ -2,7 +2,9 @@ import {
   AddAgentRequest,
   AddAgentResponse,
   AgentDetail,
+  AgentListQueryParams,
   AgentResponse,
+  AgentWhitelistQueryParams,
   AgentWhitelistDetail,
   IdResponse,
   LatestMetric,
@@ -28,11 +30,11 @@ interface AgentApiModuleDeps {
 }
 
 export interface AgentApiModule {
-  getAgents: (params?: PaginationParams) => Promise<ListResponse<AgentResponse>>
+  getAgents: (params?: AgentListQueryParams) => Promise<ListResponse<AgentResponse>>
   getAgentById: (id: string, token?: string) => Promise<AgentDetail>
   updateAgent: (id: string, data: UpdateAgentRequest, token?: string) => Promise<IdResponse>
   deleteAgent: (id: string, token?: string) => Promise<IdResponse>
-  getWhitelist: (params?: PaginationParams) => Promise<ListResponse<AgentWhitelistDetail>>
+  getWhitelist: (params?: AgentWhitelistQueryParams) => Promise<ListResponse<AgentWhitelistDetail>>
   getWhitelistById: (id: string, token?: string) => Promise<AgentWhitelistDetail>
   addWhitelistAgent: (data: AddAgentRequest, token?: string) => Promise<AddAgentResponse>
   updateWhitelistAgent: (id: string, data: UpdateAgentRequest, token?: string) => Promise<IdResponse>
@@ -90,7 +92,7 @@ function normalizeAgent(value: unknown): AgentResponse | null {
   }
 
   return {
-    id: toNullableString(record.id) || undefined,
+    id: toNullableString(record.id),
     agent_id: agentId,
     status,
     last_seen: toNullableString(record.last_seen),
@@ -286,7 +288,7 @@ function extractListPayload(payload: unknown): unknown[] {
 }
 
 export function createAgentApiModule({ request, buildQueryString }: AgentApiModuleDeps): AgentApiModule {
-  const getAgents = (params: PaginationParams = {}) =>
+  const getAgents = (params: AgentListQueryParams = {}) =>
     request<unknown>(`/v1/agents${buildQueryString(params)}`).then((result) => {
       const items = normalizeAgentList(result)
       const fallbackLimit = params.limit ?? items.length
@@ -317,7 +319,7 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
       token,
     })
 
-  const getWhitelist = (params: PaginationParams = {}) =>
+  const getWhitelist = (params: AgentWhitelistQueryParams = {}) =>
     request<unknown>(`/v1/agents/whitelist${buildQueryString(params)}`).then((result) => {
       const items = normalizeWhitelistList(result)
       const fallbackLimit = params.limit ?? items.length

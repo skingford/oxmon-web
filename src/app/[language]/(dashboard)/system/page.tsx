@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { clearAuthToken } from "@/lib/auth-token"
+import { encryptPasswordWithPublicKey } from "@/lib/password-encryption"
 import {
   CreateSystemConfigRequest,
   RuntimeConfig,
@@ -132,10 +134,28 @@ export default function SystemPage() {
     }
     setChanging(true)
     try {
-      await api.changePassword(passwordForm)
+      const publicKeyResponse = await api.getAuthPublicKey()
+
+      if (publicKeyResponse.algorithm !== "RSA-OAEP-SHA256") {
+        throw new Error(`Unsupported login encryption algorithm: ${publicKeyResponse.algorithm}`)
+      }
+
+      const [encryptedCurrentPassword, encryptedNewPassword] = await Promise.all([
+        encryptPasswordWithPublicKey(publicKeyResponse.public_key, passwordForm.current_password),
+        encryptPasswordWithPublicKey(publicKeyResponse.public_key, passwordForm.new_password),
+      ])
+
+      await api.changePassword({
+        encrypted_current_password: encryptedCurrentPassword,
+        encrypted_new_password: encryptedNewPassword,
+      })
       toast.success(t("toastPasswordSuccess"))
+      clearAuthToken()
       setIsPasswordDialogOpen(false)
       setPasswordForm({ current_password: "", new_password: "" })
+      window.setTimeout(() => {
+        window.location.replace(withLocalePrefix("/login", locale))
+      }, 300)
     } catch (error) {
       toast.error(getApiErrorMessage(error, t("toastPasswordError")))
     } finally {

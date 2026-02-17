@@ -1,5 +1,5 @@
 export interface AgentResponse {
-  id?: string;
+  id?: string | null;
   agent_id: string;
   last_seen: string | null;
   status: string;
@@ -58,7 +58,12 @@ export interface RegenerateTokenResponse {
 
 export interface LoginRequest {
   username: string;
-  password: string;
+  encrypted_password: string;
+}
+
+export interface PublicKeyResponse {
+  public_key: string;
+  algorithm: string;
 }
 
 export interface ApiResponseEnvelope<T> {
@@ -86,8 +91,6 @@ export interface AlertEventResponse {
   threshold: number;
   timestamp: string;
   predicted_breach?: string | null;
-  acknowledged_at?: string | null;
-  resolved_at?: string | null;
   status: number; // 1=未处理, 2=已确认, 3=已处理
 }
 
@@ -133,7 +136,7 @@ export interface UpdateAlertRuleRequest {
 export interface ApiError {
   err_code: number;
   err_msg: string;
-  trace_id?: string;
+  trace_id: string;
 }
 
 export interface IdResponse {
@@ -148,13 +151,72 @@ export interface HealthResponse {
 }
 
 export interface LoginResponse {
-  token: string;
+  access_token: string;
   expires_in: number;
 }
 
 export interface PaginationParams {
   limit?: number;
   offset?: number;
+}
+
+export interface AgentListQueryParams extends PaginationParams {
+  agent_id__contains?: string;
+  status__eq?: string;
+  last_seen__gte?: number;
+  last_seen__lte?: number;
+}
+
+export interface AgentWhitelistQueryParams extends PaginationParams {
+  agent_id__contains?: string;
+  description__contains?: string;
+}
+
+export interface ActiveAlertQueryParams extends PaginationParams {
+  agent_id__contains?: string;
+  severity__eq?: string;
+  rule_id__eq?: string;
+  metric_name__eq?: string;
+}
+
+export interface AlertRuleQueryParams extends PaginationParams {
+  name__contains?: string;
+  rule_type__eq?: string;
+  metric__contains?: string;
+  severity__eq?: string;
+  enabled__eq?: boolean;
+}
+
+export interface DictionaryTypeQueryParams extends PaginationParams {
+  dict_type__contains?: string;
+}
+
+export interface DictionaryByTypeQueryParams extends PaginationParams {
+  enabled_only?: boolean;
+  key__contains?: string;
+  label__contains?: string;
+}
+
+export interface MetricCatalogQueryParams extends PaginationParams {
+  timestamp__gte?: string;
+  timestamp__lte?: string;
+}
+
+export interface CertStatusQueryParams extends PaginationParams {
+  domain__contains?: string;
+  is_valid__eq?: boolean;
+  days_until_expiry__lte?: number;
+}
+
+export interface NotificationChannelQueryParams extends PaginationParams {
+  name__contains?: string;
+  channel_type__eq?: string;
+  enabled__eq?: boolean;
+  min_severity__eq?: string;
+}
+
+export interface SilenceWindowQueryParams extends PaginationParams {
+  recurrence__eq?: string;
 }
 
 export interface ListResponse<T> {
@@ -289,8 +351,8 @@ export interface StorageInfo {
 }
 
 export interface ChangePasswordRequest {
-  current_password: string;
-  new_password: string;
+  encrypted_current_password: string;
+  encrypted_new_password: string;
 }
 
 export interface CertificateChainInfo {
@@ -318,7 +380,6 @@ export interface CertCheckResult {
   checked_at: string;
   created_at: string;
   updated_at: string;
-  certificate_id?: string | null;
 }
 
 export interface CertDomain {
@@ -379,7 +440,7 @@ export interface CreateChannelRequest {
   recipients?: string[];
 }
 
-export interface UpdateChannelConfigRequest {
+export interface UpdateNotificationChannelRequest {
   name?: string | null;
   description?: string | null;
   min_severity?: string | null;
@@ -387,6 +448,8 @@ export interface UpdateChannelConfigRequest {
   config_json?: string | null;
   recipients?: string[] | null;
 }
+
+export type UpdateChannelConfigRequest = UpdateNotificationChannelRequest;
 
 export interface NotificationLogItem {
   id: string;
