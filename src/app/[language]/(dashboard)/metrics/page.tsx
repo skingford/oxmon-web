@@ -415,12 +415,32 @@ function MetricsPageContent() {
   }
 
   useEffect(() => {
+    if (timeRange === "custom") {
+      if (!customFrom || !customTo) {
+        return
+      }
+
+      const fromTime = new Date(customFrom).getTime()
+      const toTime = new Date(customTo).getTime()
+
+      if (Number.isNaN(fromTime) || Number.isNaN(toTime) || fromTime > toTime) {
+        return
+      }
+    }
+
     const loadFilterOptions = async () => {
       await executeFilterOptions(
         async () => {
+          const bounds = getTimeBounds(timeRange, customFrom, customTo)
           const [agentList, metricList] = await Promise.all([
-            api.getMetricAgents(),
-            api.getMetricNames(),
+            api.getMetricAgents({
+              timestamp__gte: bounds.from,
+              timestamp__lte: bounds.to,
+            }),
+            api.getMetricNames({
+              timestamp__gte: bounds.from,
+              timestamp__lte: bounds.to,
+            }),
           ])
           let metricLabelItems: Array<{ dict_key: string; dict_label: string }> = []
 
@@ -438,13 +458,21 @@ function MetricsPageContent() {
         },
         {
           onSuccess: (result) => {
-            if (result.agents.length > 0 && !result.agents.includes(selectedAgent)) {
-              setSelectedAgent(result.agents[0])
-            }
+            setSelectedAgent((current) => {
+              if (result.agents.length === 0) {
+                return ""
+              }
 
-            if (result.metricNames.length > 0 && !result.metricNames.includes(selectedMetric)) {
-              setSelectedMetric(result.metricNames[0])
-            }
+              return result.agents.includes(current) ? current : result.agents[0]
+            })
+
+            setSelectedMetric((current) => {
+              if (result.metricNames.length === 0) {
+                return ""
+              }
+
+              return result.metricNames.includes(current) ? current : result.metricNames[0]
+            })
           },
           onError: (error) => {
             toast.error(getApiErrorMessage(error, t("metrics.toastFilterOptionsError")))
@@ -454,7 +482,7 @@ function MetricsPageContent() {
     }
 
     loadFilterOptions()
-  }, [executeFilterOptions])
+  }, [executeFilterOptions, timeRange, customFrom, customTo])
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams.toString())
