@@ -219,6 +219,12 @@ export interface SilenceWindowQueryParams extends PaginationParams {
   recurrence__eq?: string;
 }
 
+export interface SystemConfigQueryParams extends PaginationParams {
+  config_type?: string;
+  config_key?: string;
+  enabled?: boolean;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;
@@ -308,6 +314,7 @@ export interface RuntimeConfig {
   notification_aggregation_window_secs: number;
   alert_rules_count: number;
   notification_channels_count: number;
+  language: string;
 }
 
 export interface SystemConfigResponse {

@@ -43,6 +43,7 @@ import {
   MetricSummaryResponse,
   CreateChannelRequest,
   NotificationChannelQueryParams,
+  SystemConfigQueryParams,
   UpdateChannelConfigRequest,
   SetRecipientsRequest,
   SilenceWindow,
@@ -63,6 +64,7 @@ import {
   getAuthToken,
   normalizeAuthToken,
 } from "@/lib/auth-token"
+import { clearGlobalConfigCache } from "@/lib/global-config-cache"
 import { resolveAppLocale, stripLocalePrefix, withLocalePrefix } from "@/components/app-locale"
 import { createAgentApiModule } from "@/lib/api/modules/agent"
 
@@ -489,6 +491,7 @@ async function request<T>(endpoint: string, config: RequestConfig = {}): Promise
     if (response.status === 401 && requiresAuth) {
       if (typeof window !== "undefined") {
         clearAuthToken()
+        clearGlobalConfigCache()
 
         const currentPathname = window.location.pathname
         const locale = resolveAppLocale(currentPathname)
@@ -744,15 +747,21 @@ export const api = {
   triggerCleanup: () =>
     request("/v1/system/storage/cleanup", { method: "POST", allowEmptyResponse: true }),
 
-  listSystemConfigs: (params?: PaginationParams) => {
-    if (params) {
-      return request<unknown>(`/v1/system/configs${buildQueryString(params)}`).then((payload) =>
+  listSystemConfigs: (params?: SystemConfigQueryParams) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(`/v1/system/configs${buildQueryString(params || {})}`).then((payload) =>
         extractListPayload(payload) as SystemConfigResponse[]
       )
     }
 
+    const queryParams = {
+      config_type: params?.config_type,
+      config_key: params?.config_key,
+      enabled: params?.enabled,
+    }
+
     return requestAllPages<SystemConfigResponse>((page) =>
-      request<unknown>(`/v1/system/configs${buildQueryString(page)}`).then((payload) =>
+      request<unknown>(`/v1/system/configs${buildQueryString({ ...queryParams, ...page })}`).then((payload) =>
         extractListPayload(payload) as SystemConfigResponse[]
       )
     )

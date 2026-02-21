@@ -14,6 +14,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { getAuthToken, clearAuthToken } from "@/lib/auth-token"
+import { clearGlobalConfigCache } from "@/lib/global-config-cache"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -60,6 +61,7 @@ export function AppHeaderUserMenu() {
 
   const handleLogout = () => {
     clearAuthToken()
+    clearGlobalConfigCache()
     window.location.replace(withLocalePrefix("/login", locale))
   }
 

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { clearAuthToken } from "@/lib/auth-token"
+import { clearGlobalConfigCache, writeGlobalConfigCache } from "@/lib/global-config-cache"
 import { encryptPasswordWithPublicKey } from "@/lib/password-encryption"
 import {
   CreateSystemConfigRequest,
@@ -29,9 +30,19 @@ import {
   Pencil,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -100,6 +111,10 @@ export default function SystemPage() {
       setConfig(configData)
       setStorage(storageData)
       setSystemConfigs(systemConfigRows)
+      writeGlobalConfigCache({
+        runtimeConfig: configData,
+        systemConfigs: systemConfigRows,
+      })
     } catch (error) {
       toast.error(getApiErrorMessage(error, t("toastFetchError")))
     } finally {
@@ -151,6 +166,7 @@ export default function SystemPage() {
       })
       toast.success(t("toastPasswordSuccess"))
       clearAuthToken()
+      clearGlobalConfigCache()
       setIsPasswordDialogOpen(false)
       setPasswordForm({ current_password: "", new_password: "" })
       window.setTimeout(() => {
@@ -192,6 +208,18 @@ export default function SystemPage() {
       minute: "2-digit",
       second: "2-digit",
     })
+  }
+
+  const formatConfigJsonPreview = (value: unknown) => {
+    if (typeof value === "string") {
+      return value
+    }
+
+    try {
+      return JSON.stringify(value ?? {})
+    } catch {
+      return "{}"
+    }
   }
 
   const systemConfigStats = useMemo(() => {
@@ -366,9 +394,7 @@ export default function SystemPage() {
 
     try {
       await api.updateSystemConfig(item.id, { enabled })
-      setSystemConfigs((previous) =>
-        previous.map((row) => (row.id === item.id ? { ...row, enabled } : row))
-      )
+      await fetchData(true)
       toast.success(
         enabled
           ? t("systemConfigToastEnableSuccess")
@@ -605,6 +631,178 @@ export default function SystemPage() {
                   <Settings className="mr-2 h-4 w-4" />
                   {t("btnCleanup")}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="md:col-span-2"
+        >
+          <Card>
+            <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1.5">
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  {t("systemConfigTitle")}
+                </CardTitle>
+                <CardDescription>{t("systemConfigDescription")}</CardDescription>
+              </div>
+              <Button onClick={openCreateSystemConfigDialog}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t("systemConfigButtonCreate")}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                <span>{t("systemConfigStatsTotal", { count: systemConfigStats.total })}</span>
+                <span>{t("systemConfigStatsEnabled", { count: systemConfigStats.enabled })}</span>
+                <span>{t("systemConfigStatsDisabled", { count: systemConfigStats.disabled })}</span>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-[1fr_200px_200px_auto]">
+                <Input
+                  value={systemConfigSearchKeyword}
+                  onChange={(event) => setSystemConfigSearchKeyword(event.target.value)}
+                  placeholder={t("systemConfigSearchPlaceholder")}
+                />
+
+                <Select value={systemConfigTypeFilter} onValueChange={setSystemConfigTypeFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={t("systemConfigFilterType")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("systemConfigFilterTypeAll")}</SelectItem>
+                    {availableSystemConfigTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={systemConfigStatusFilter}
+                  onValueChange={(value) => setSystemConfigStatusFilter(value as SystemConfigStatusFilter)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={t("systemConfigFilterStatus")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("systemConfigFilterStatusAll")}</SelectItem>
+                    <SelectItem value="enabled">{t("systemConfigFilterStatusEnabled")}</SelectItem>
+                    <SelectItem value="disabled">{t("systemConfigFilterStatusDisabled")}</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  onClick={handleResetSystemConfigFilters}
+                  disabled={!hasActiveSystemConfigFilters}
+                >
+                  <FilterX className="mr-2 h-4 w-4" />
+                  {t("systemConfigClearFilters")}
+                </Button>
+              </div>
+
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("systemConfigColDisplayName")}</TableHead>
+                      <TableHead>{t("systemConfigColKeyType")}</TableHead>
+                      <TableHead>{t("systemConfigColProvider")}</TableHead>
+                      <TableHead>{t("systemConfigColConfigJson")}</TableHead>
+                      <TableHead>{t("systemConfigColStatus")}</TableHead>
+                      <TableHead>{t("systemConfigColUpdatedAt")}</TableHead>
+                      <TableHead className="text-right">{t("dictionaryTableColActions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSystemConfigs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                          {t("systemConfigEmpty")}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredSystemConfigs.map((item) => {
+                        const jsonPreview = formatConfigJsonPreview(item.config_json)
+                        const toggling = togglingSystemConfigId === item.id
+
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <p className="font-medium">{item.display_name}</p>
+                                {item.description ? (
+                                  <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <p className="font-mono text-xs">{item.config_key}</p>
+                                <p className="text-xs text-muted-foreground">{item.config_type}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>{item.provider || "-"}</TableCell>
+                            <TableCell className="max-w-[260px]">
+                              <p className="truncate font-mono text-xs" title={jsonPreview}>
+                                {jsonPreview}
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={item.enabled ? "success" : "secondary"}>
+                                  {item.enabled
+                                    ? t("systemConfigFilterStatusEnabled")
+                                    : t("systemConfigFilterStatusDisabled")}
+                                </Badge>
+                                <Switch
+                                  checked={item.enabled}
+                                  disabled={toggling}
+                                  aria-label={`${t("systemConfigFieldEnabled")} ${item.display_name}`}
+                                  onCheckedChange={(checked) =>
+                                    handleToggleSystemConfigEnabled(item, checked)
+                                  }
+                                />
+                                {toggling ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {formatDateTime(item.updated_at)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditSystemConfigDialog(item)}
+                                  title={t("systemConfigActionEdit")}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => setSystemConfigDeleteTarget(item)}
+                                  title={t("systemConfigActionDelete")}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
