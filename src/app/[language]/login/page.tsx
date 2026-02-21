@@ -87,7 +87,10 @@ export default function LoginPage() {
         console.error("Failed to initialize global config cache", configError)
       }
 
-      toast.success(t("login.toastLoginSuccess"))
+      toast.success(t("login.toastLoginSuccess"), {
+        position: "top-center",
+        duration: 2200,
+      })
       redirected = true
       router.replace(dashboardPath)
     } catch (error) {

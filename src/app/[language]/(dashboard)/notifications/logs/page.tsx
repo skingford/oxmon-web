@@ -285,7 +285,7 @@ export default function NotificationLogsPage() {
             <div className="space-y-2">
               <Label htmlFor="status">{t("notifications.logsFieldStatus")}</Label>
               <Select value={filters.status} onValueChange={(value) => updateFilter("status", value)}>
-                <SelectTrigger id="status">
+                <SelectTrigger id="status" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -326,6 +326,7 @@ export default function NotificationLogsPage() {
                 type="datetime-local"
                 value={filters.startTime}
                 onChange={(event) => updateFilter("startTime", event.target.value)}
+                className="logs-filter-datetime"
               />
             </div>
             <div className="space-y-2">
@@ -335,6 +336,7 @@ export default function NotificationLogsPage() {
                 type="datetime-local"
                 value={filters.endTime}
                 onChange={(event) => updateFilter("endTime", event.target.value)}
+                className="logs-filter-datetime"
               />
             </div>
           </div>
