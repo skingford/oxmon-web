@@ -261,7 +261,6 @@ export default function SystemPage() {
           item.display_name,
           item.config_key,
           item.config_type,
-          item.provider || "",
           item.description || "",
         ]
           .join(" ")
@@ -274,6 +273,17 @@ export default function SystemPage() {
         return rightTime - leftTime
       })
   }, [systemConfigs, systemConfigSearchKeyword, systemConfigStatusFilter, systemConfigTypeFilter])
+
+  const systemConfigTypeOptions = useMemo(() => {
+    const optionSet = new Set<string>(["email", "sms", ...availableSystemConfigTypes])
+    const currentType = systemConfigForm.configType.trim()
+
+    if (currentType) {
+      optionSet.add(currentType)
+    }
+
+    return Array.from(optionSet).sort((a, b) => a.localeCompare(b))
+  }, [availableSystemConfigTypes, systemConfigForm.configType])
 
   const hasActiveSystemConfigFilters =
     Boolean(systemConfigSearchKeyword.trim()) ||
@@ -304,7 +314,6 @@ export default function SystemPage() {
     const displayName = systemConfigForm.displayName.trim()
     const configKey = systemConfigForm.configKey.trim()
     const configType = systemConfigForm.configType.trim().toLowerCase()
-    const provider = systemConfigForm.provider.trim()
     const description = systemConfigForm.description.trim()
     const configJsonInput = systemConfigForm.configJson.trim()
 
@@ -357,10 +366,6 @@ export default function SystemPage() {
           display_name: displayName,
           description: description || null,
           config_json: normalizedConfigJson,
-        }
-
-        if (provider) {
-          payload.provider = provider
         }
 
         await api.createSystemConfig(payload)
@@ -714,7 +719,6 @@ export default function SystemPage() {
                     <TableRow>
                       <TableHead>{t("systemConfigColDisplayName")}</TableHead>
                       <TableHead>{t("systemConfigColKeyType")}</TableHead>
-                      <TableHead>{t("systemConfigColProvider")}</TableHead>
                       <TableHead>{t("systemConfigColConfigJson")}</TableHead>
                       <TableHead>{t("systemConfigColStatus")}</TableHead>
                       <TableHead>{t("systemConfigColUpdatedAt")}</TableHead>
@@ -724,7 +728,7 @@ export default function SystemPage() {
                   <TableBody>
                     {filteredSystemConfigs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                           {t("systemConfigEmpty")}
                         </TableCell>
                       </TableRow>
@@ -749,7 +753,6 @@ export default function SystemPage() {
                                 <p className="text-xs text-muted-foreground">{item.config_type}</p>
                               </div>
                             </TableCell>
-                            <TableCell>{item.provider || "-"}</TableCell>
                             <TableCell className="max-w-[260px]">
                               <p className="truncate font-mono text-xs" title={jsonPreview}>
                                 {jsonPreview}
@@ -904,7 +907,7 @@ export default function SystemPage() {
               setForm={setSystemConfigForm}
               idPrefix="system-config"
               isEditing={Boolean(editingSystemConfig)}
-              providerReadOnly={Boolean(editingSystemConfig && !editingSystemConfig.provider)}
+              configTypeOptions={systemConfigTypeOptions}
               t={t}
             />
 

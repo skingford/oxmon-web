@@ -4,7 +4,6 @@ export function getInitialSystemConfigForm() {
   return {
     configKey: "",
     configType: "email",
-    provider: "",
     displayName: "",
     description: "",
     configJson: "{}",
@@ -16,7 +15,6 @@ export function getSystemConfigFormFromItem(item: SystemConfigResponse) {
   return {
     configKey: item.config_key,
     configType: item.config_type,
-    provider: item.provider || "",
     displayName: item.display_name,
     description: item.description || "",
     configJson:

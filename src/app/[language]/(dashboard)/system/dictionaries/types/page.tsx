@@ -15,7 +15,6 @@ import {
 } from "@/components/system/DictionaryTypeFormFields"
 import { getStatusAwareMessage } from "@/lib/api-error-utils"
 import { normalizeNullableText, parseOptionalSortOrder } from "@/lib/dictionary-utils"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
@@ -396,9 +395,9 @@ export default function SystemDictionaryTypesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("dictionaryTypeTableColType")}</TableHead>
+                <TableHead>{t("dictionaryTypeFieldLabel")}</TableHead>
+                <TableHead>{t("dictionaryFieldType")}</TableHead>
                 <TableHead>{t("dictionaryTypeTableColCount")}</TableHead>
-                <TableHead>{t("dictionaryTypeTableColCurrent")}</TableHead>
                 <TableHead className="text-right">{t("dictionaryTableColActions")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -426,16 +425,11 @@ export default function SystemDictionaryTypesPage() {
                       className={`cursor-pointer ${isCurrent ? "bg-muted/40" : ""}`}
                       onClick={() => setSelectedType(typeSummary.dict_type)}
                     >
-                      <TableCell>
-                        <div className="space-y-1">
-                          <p className="font-medium">{typeSummary.dict_type_label}</p>
-                          <p className="font-mono text-xs text-muted-foreground">{typeSummary.dict_type}</p>
-                        </div>
+                      <TableCell className="font-medium">{typeSummary.dict_type_label}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {typeSummary.dict_type}
                       </TableCell>
                       <TableCell>{typeSummary.count}</TableCell>
-                      <TableCell>
-                        {isCurrent ? <Badge variant="secondary">{t("dictionaryTypeCurrent")}</Badge> : "-"}
-                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button
