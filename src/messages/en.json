@@ -1056,6 +1056,21 @@
       "silenceExportOriginsShort": "Export"
     }
   },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "description": "Enter your credentials to access the monitoring console.",
+      "fieldUsername": "Username",
+      "fieldUsernamePlaceholder": "Enter username",
+      "fieldPassword": "Password",
+      "submit": "Sign in",
+      "submitLoading": "Signing in...",
+      "checkingSession": "Checking session...",
+      "toastLoginSuccess": "Login successful",
+      "toastInvalidCredentials": "Invalid username or password",
+      "toastLoginFailed": "Login failed, please try again later"
+    }
+  },
   "profile": {
     "title": "Profile",
     "description": "Manage your account information and access tokens",

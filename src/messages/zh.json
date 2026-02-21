@@ -1056,6 +1056,21 @@
       "silenceExportOriginsShort": "导出标记"
     }
   },
+  "auth": {
+    "login": {
+      "title": "登录",
+      "description": "输入账号密码以访问监控控制台。",
+      "fieldUsername": "用户名",
+      "fieldUsernamePlaceholder": "请输入用户名",
+      "fieldPassword": "密码",
+      "submit": "登录",
+      "submitLoading": "登录中...",
+      "checkingSession": "正在检查登录状态...",
+      "toastLoginSuccess": "登录成功",
+      "toastInvalidCredentials": "用户名或密码错误",
+      "toastLoginFailed": "登录失败，请稍后重试"
+    }
+  },
   "profile": {
     "title": "个人设置",
     "description": "管理您的账号信息和访问令牌",
