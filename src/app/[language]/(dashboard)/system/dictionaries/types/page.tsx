@@ -182,7 +182,7 @@ export default function SystemDictionaryTypesPage() {
 
     const sortOrder = parseOptionalSortOrder(createForm.sortOrder)
 
-    if (sortOrder === undefined) {
+    if (sortOrder === undefined || (sortOrder !== null && sortOrder < 0)) {
       toast.error(t("dictionaryToastSortOrderInvalid"))
       return
     }
@@ -244,7 +244,7 @@ export default function SystemDictionaryTypesPage() {
 
     const sortOrder = parseOptionalSortOrder(editForm.sortOrder)
 
-    if (sortOrder === undefined) {
+    if (sortOrder === undefined || (sortOrder !== null && sortOrder < 0)) {
       toast.error(t("dictionaryToastSortOrderInvalid"))
       return
     }

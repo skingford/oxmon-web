@@ -80,12 +80,24 @@ export function DictionaryTypeFormFields({
           <Label htmlFor={`${idPrefix}-sort`}>{labels.sortOrder}</Label>
           <Input
             id={`${idPrefix}-sort`}
+            type="number"
+            inputMode="numeric"
+            step={1}
+            min={0}
             value={form.sortOrder}
             onChange={(event) =>
-              setForm((previous) => ({
-                ...previous,
-                sortOrder: event.target.value,
-              }))
+              setForm((previous) => {
+                const nextValue = event.target.value
+
+                if (!/^\d*$/.test(nextValue)) {
+                  return previous
+                }
+
+                return {
+                  ...previous,
+                  sortOrder: nextValue,
+                }
+              })
             }
             placeholder={sortPlaceholder}
           />
