@@ -11,6 +11,11 @@ import {
   ChannelOverview,
   DictionaryByTypeQueryParams,
   DictionaryTypeQueryParams,
+  CloudAccountQueryParams,
+  CloudAccountResponse,
+  CloudInstanceQueryParams,
+  CloudInstanceResponse,
+  CreateCloudAccountRequest,
   NotificationLogItem,
   NotificationLogListResponse,
   NotificationLogSummaryResponse,
@@ -27,7 +32,10 @@ import {
   PaginationParams,
   RuntimeConfig,
   SystemConfigResponse,
+  TestConnectionResponse,
   CreateSystemConfigRequest,
+  TriggerCollectionResponse,
+  UpdateCloudAccountRequest,
   UpdateSystemConfigRequest,
   StorageInfo,
   ChangePasswordRequest,
@@ -736,6 +744,62 @@ export const api = {
 
   getChannelById: (id: string) =>
     request<ChannelOverview>(`/v1/notifications/channels/${id}`),
+
+  // Cloud
+  listCloudAccounts: (params?: CloudAccountQueryParams) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(`/v1/cloud/accounts${buildQueryString(params || {})}`).then(
+        (payload) => extractListPayload(payload) as CloudAccountResponse[]
+      )
+    }
+
+    const queryParams = {
+      enabled: params?.enabled,
+    }
+
+    return requestAllPages<CloudAccountResponse>((page) =>
+      request<unknown>(`/v1/cloud/accounts${buildQueryString({ ...queryParams, ...page })}`).then(
+        (payload) => extractListPayload(payload) as CloudAccountResponse[]
+      )
+    )
+  },
+
+  getCloudAccountById: (id: string) =>
+    request<CloudAccountResponse>(`/v1/cloud/accounts/${id}`),
+
+  createCloudAccount: (data: CreateCloudAccountRequest) =>
+    request<CloudAccountResponse>("/v1/cloud/accounts", { method: "POST", body: data }),
+
+  updateCloudAccount: (id: string, data: UpdateCloudAccountRequest) =>
+    request<CloudAccountResponse>(`/v1/cloud/accounts/${id}`, { method: "PUT", body: data }),
+
+  deleteCloudAccount: (id: string) =>
+    request<IdResponse>(`/v1/cloud/accounts/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+
+  testCloudAccountConnection: (id: string) =>
+    request<TestConnectionResponse>(`/v1/cloud/accounts/${id}/test`, { method: "POST" }),
+
+  triggerCloudAccountCollection: (id: string) =>
+    request<TriggerCollectionResponse>(`/v1/cloud/accounts/${id}/collect`, { method: "POST" }),
+
+  listCloudInstances: (params?: CloudInstanceQueryParams) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(`/v1/cloud/instances${buildQueryString(params || {})}`).then(
+        (payload) => extractListPayload(payload) as CloudInstanceResponse[]
+      )
+    }
+
+    const queryParams = {
+      provider: params?.provider,
+      region: params?.region,
+    }
+
+    return requestAllPages<CloudInstanceResponse>((page) =>
+      request<unknown>(`/v1/cloud/instances${buildQueryString({ ...queryParams, ...page })}`).then(
+        (payload) => extractListPayload(payload) as CloudInstanceResponse[]
+      )
+    )
+  },
 
   // System
   getSystemConfig: () =>

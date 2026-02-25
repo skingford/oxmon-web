@@ -76,6 +76,14 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "itemSilenceWindows",
     descriptionKey: "silenceWindowsDescription",
   },
+  "/cloud": {
+    titleKey: "itemCloudAccounts",
+    descriptionKey: "cloudAccountsDescription",
+  },
+  "/cloud/instances": {
+    titleKey: "itemCloudInstances",
+    descriptionKey: "cloudInstancesDescription",
+  },
   "/system": {
     titleKey: "itemSystem",
     descriptionKey: "systemDescription",

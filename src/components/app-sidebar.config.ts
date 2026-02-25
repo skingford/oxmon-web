@@ -7,6 +7,7 @@ import {
   List,
   Server,
   Settings,
+  Cloud,
   User,
   type LucideIcon,
 } from "lucide-react"
@@ -140,6 +141,8 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/notifications": ["/v1/notifications/channels"],
   "/notifications/logs": ["/v1/notifications/logs"],
   "/notifications/silence": ["/v1/notifications/silence-windows"],
+  "/cloud": ["/v1/cloud/accounts"],
+  "/cloud/instances": ["/v1/cloud/instances"],
   "/system": ["/v1/system/config"],
   "/system/dictionaries": ["/v1/dictionaries"],
 }
@@ -243,6 +246,23 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
           {
             titleKey: "itemSilenceWindows",
             url: "/notifications/silence",
+            exact: true,
+          },
+        ],
+      },
+      {
+        titleKey: "itemCloud",
+        url: "/cloud",
+        icon: Cloud,
+        children: [
+          {
+            titleKey: "itemCloudAccounts",
+            url: "/cloud",
+            exact: true,
+          },
+          {
+            titleKey: "itemCloudInstances",
+            url: "/cloud/instances",
             exact: true,
           },
         ],

@@ -225,6 +225,15 @@ export interface SystemConfigQueryParams extends PaginationParams {
   enabled?: boolean;
 }
 
+export interface CloudAccountQueryParams extends PaginationParams {
+  enabled?: boolean;
+}
+
+export interface CloudInstanceQueryParams extends PaginationParams {
+  provider?: string;
+  region?: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;
@@ -601,4 +610,59 @@ export interface UpdateDictionaryRequest {
   enabled?: boolean | null;
   description?: string | null;
   extra_json?: string | null;
+}
+
+export interface CloudAccountResponse {
+  id: string;
+  config_key: string;
+  provider: string;
+  display_name: string;
+  description: string | null;
+  config: unknown;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CloudInstanceResponse {
+  id: string;
+  instance_id: string;
+  instance_name?: string | null;
+  provider: string;
+  account_config_key: string;
+  region: string;
+  public_ip?: string | null;
+  private_ip?: string | null;
+  os?: string | null;
+  status?: string | null;
+  last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCloudAccountRequest {
+  config_key: string;
+  provider: string;
+  display_name: string;
+  description?: string | null;
+  config: unknown;
+}
+
+export interface UpdateCloudAccountRequest {
+  display_name?: string | null;
+  description?: string | null;
+  config?: unknown;
+  enabled?: boolean | null;
+}
+
+export interface TestConnectionResponse {
+  success: boolean;
+  message: string;
+  instance_count?: number | null;
+}
+
+export interface TriggerCollectionResponse {
+  success: boolean;
+  message: string;
+  collected_count?: number | null;
 }
