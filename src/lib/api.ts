@@ -14,6 +14,7 @@ import {
   CloudAccountQueryParams,
   CloudAccountResponse,
   CloudInstanceQueryParams,
+  CloudInstanceDetailResponse,
   CloudInstanceResponse,
   CreateCloudAccountRequest,
   NotificationLogItem,
@@ -800,6 +801,9 @@ export const api = {
       )
     )
   },
+
+  getCloudInstanceDetail: (id: string) =>
+    request<CloudInstanceDetailResponse>(`/v1/cloud/instances/${id}`),
 
   // System
   getSystemConfig: () =>

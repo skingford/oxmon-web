@@ -1,0 +1,514 @@
+"use client"
+
+import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useParams } from "next/navigation"
+import { ArrowLeft, Copy, Loader2, RefreshCw } from "lucide-react"
+import { toast } from "sonner"
+import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { withLocalePrefix } from "@/components/app-locale"
+import { getAuthToken } from "@/lib/auth-token"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useRequestState } from "@/hooks/use-request-state"
+import type { CloudInstanceDetailResponse, MetricLatestValue } from "@/types/api"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Switch } from "@/components/ui/switch"
+
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/+$/, "")
+const OX_APP_ID = (process.env.NEXT_PUBLIC_OX_APP_ID || "").trim()
+
+function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
+  if (!value) {
+    return "-"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    hour12: false,
+  })
+}
+
+function formatRelativeTime(value: string | null | undefined, locale: "zh" | "en") {
+  if (!value) {
+    return "-"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "-"
+  }
+
+  const diffMs = Date.now() - date.getTime()
+  const absMs = Math.abs(diffMs)
+  const isPast = diffMs >= 0
+
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+
+  const makeText = (count: number, unit: "minute" | "hour" | "day") => {
+    if (locale === "zh") {
+      const unitText = unit === "minute" ? "分钟" : unit === "hour" ? "小时" : "天"
+      return isPast ? `${count} ${unitText}前` : `${count} ${unitText}后`
+    }
+
+    const unitText = unit === "minute" ? "minute" : unit === "hour" ? "hour" : "day"
+    const plural = count === 1 ? unitText : `${unitText}s`
+    return isPast ? `${count} ${plural} ago` : `in ${count} ${plural}`
+  }
+
+  if (absMs < minute) {
+    return locale === "zh" ? "刚刚" : "just now"
+  }
+
+  if (absMs < hour) {
+    return makeText(Math.floor(absMs / minute), "minute")
+  }
+
+  if (absMs < day) {
+    return makeText(Math.floor(absMs / hour), "hour")
+  }
+
+  return makeText(Math.floor(absMs / day), "day")
+}
+
+function formatNumber(value: number | null | undefined, digits = 2) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "-"
+  }
+
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: 0,
+  })
+}
+
+function formatBytesPerSecond(value: number) {
+  const units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"] as const
+  let nextValue = value
+  let unitIndex = 0
+
+  while (Math.abs(nextValue) >= 1024 && unitIndex < units.length - 1) {
+    nextValue /= 1024
+    unitIndex += 1
+  }
+
+  const digits = Math.abs(nextValue) >= 100 ? 0 : Math.abs(nextValue) >= 10 ? 1 : 2
+  return `${formatNumber(nextValue, digits)} ${units[unitIndex]}`
+}
+
+function formatMetricValue(metric: MetricLatestValue | null | undefined, metricKey: string) {
+  if (!metric) {
+    return "-"
+  }
+
+  if (/network_(in|out)_bytes/.test(metricKey)) {
+    return formatBytesPerSecond(metric.value)
+  }
+
+  const value = formatNumber(metric.value, 2)
+
+  if (/usage/.test(metricKey)) {
+    return `${value}%`
+  }
+
+  if (/disk_iops_/.test(metricKey)) {
+    return `${value} IOPS`
+  }
+
+  if (metricKey === "connections") {
+    return `${value}`
+  }
+
+  return value
+}
+
+function getMetricValueClass(metric: MetricLatestValue | null | undefined, metricKey: string) {
+  if (!metric) {
+    return "text-muted-foreground"
+  }
+
+  if (!/^(cpu_usage|memory_usage|disk_usage)$/.test(metricKey)) {
+    return "text-foreground"
+  }
+
+  const value = metric.value
+
+  if (!Number.isFinite(value)) {
+    return "text-muted-foreground"
+  }
+
+  if (value > 90) {
+    return "text-red-600"
+  }
+
+  if (value > 80) {
+    return "text-amber-600"
+  }
+
+  return "text-emerald-600"
+}
+
+function getUsagePercent(metric: MetricLatestValue | null | undefined, metricKey: string) {
+  if (!metric || !/^(cpu_usage|memory_usage|disk_usage)$/.test(metricKey)) {
+    return null
+  }
+
+  if (!Number.isFinite(metric.value)) {
+    return null
+  }
+
+  return Math.max(0, Math.min(100, metric.value))
+}
+
+function getUsageBarClass(percent: number) {
+  if (percent > 90) {
+    return "bg-red-500"
+  }
+
+  if (percent > 80) {
+    return "bg-amber-500"
+  }
+
+  return "bg-emerald-500"
+}
+
+function getStatusVariant(status: string | null | undefined): "default" | "secondary" | "outline" | "destructive" {
+  const normalized = (status || "").toLowerCase()
+
+  if (["running", "active", "online"].includes(normalized)) {
+    return "default"
+  }
+
+  if (["stopped", "terminated", "failed", "error"].includes(normalized)) {
+    return "destructive"
+  }
+
+  if (!normalized) {
+    return "outline"
+  }
+
+  return "secondary"
+}
+
+function resolveInstanceTitle(instance: CloudInstanceDetailResponse | null) {
+  if (!instance) {
+    return "-"
+  }
+
+  return instance.instance_name?.trim() || instance.instance_id
+}
+
+function FieldItem({
+  label,
+  value,
+  mono = false,
+  hint,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+  hint?: string
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={mono ? "font-mono text-sm" : "text-sm"}>{value || "-"}</p>
+      {hint && hint !== "-" ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
+  )
+}
+
+export default function CloudInstanceDetailPage() {
+  const params = useParams<{ id: string }>()
+  const instanceId = Array.isArray(params?.id) ? params.id[0] : params?.id || ""
+  const { t, locale } = useAppTranslations("pages")
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
+  const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null)
+  const {
+    data: instance,
+    loading,
+    refreshing,
+    error,
+    execute,
+  } = useRequestState<CloudInstanceDetailResponse | null>(null)
+
+  const fetchDetail = useCallback(async (silent = false) => {
+    if (!instanceId) {
+      return
+    }
+
+    await execute(
+      () => api.getCloudInstanceDetail(instanceId),
+      {
+        silent,
+        onSuccess: () => {
+          setLastRefreshAt(new Date().toISOString())
+        },
+        onError: (requestError) => {
+          if (requestError instanceof ApiRequestError && requestError.status === 404) {
+            return
+          }
+
+          toast.error(getApiErrorMessage(requestError, t("cloud.instances.detailToastFetchError")))
+        },
+      }
+    )
+  }, [execute, instanceId, t])
+
+  useEffect(() => {
+    fetchDetail()
+  }, [fetchDetail])
+
+  useEffect(() => {
+    if (!autoRefreshEnabled || !instanceId) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      void fetchDetail(true)
+    }, 15_000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [autoRefreshEnabled, fetchDetail, instanceId])
+
+  const metricCards = useMemo(() => {
+    if (!instance) {
+      return []
+    }
+
+    return [
+      { key: "cpu_usage", label: t("cloud.instances.detailMetricCpuUsage"), metric: instance.cpu_usage },
+      { key: "memory_usage", label: t("cloud.instances.detailMetricMemoryUsage"), metric: instance.memory_usage },
+      { key: "disk_usage", label: t("cloud.instances.detailMetricDiskUsage"), metric: instance.disk_usage },
+      { key: "network_in_bytes", label: t("cloud.instances.detailMetricNetworkIn"), metric: instance.network_in_bytes },
+      { key: "network_out_bytes", label: t("cloud.instances.detailMetricNetworkOut"), metric: instance.network_out_bytes },
+      { key: "disk_iops_read", label: t("cloud.instances.detailMetricDiskIopsRead"), metric: instance.disk_iops_read },
+      { key: "disk_iops_write", label: t("cloud.instances.detailMetricDiskIopsWrite"), metric: instance.disk_iops_write },
+      { key: "connections", label: t("cloud.instances.detailMetricConnections"), metric: instance.connections },
+    ]
+  }, [instance, t])
+
+  const handleCopyApiCurl = useCallback(async () => {
+    const path = `/v1/cloud/instances/${instanceId}`
+    const url = API_BASE_URL ? `${API_BASE_URL}${path}` : path
+    const authToken = getAuthToken() || "<YOUR_TOKEN>"
+    const appId = OX_APP_ID || "<YOUR_OX_APP_ID>"
+    const command = [
+      `curl -X GET '${url}'`,
+      `  -H 'ox-app-id: ${appId}'`,
+      `  -H 'Authorization: Bearer ${authToken}'`,
+    ].join(" \\\n")
+
+    try {
+      await navigator.clipboard.writeText(command)
+      toast.success(t("cloud.instances.detailToastCopyApiCurlSuccess"))
+    } catch {
+      toast.error(t("cloud.instances.detailToastCopyApiCurlError"))
+    }
+  }, [instanceId, t])
+
+  if (loading && !instance) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-3">
+          <Button asChild type="button" variant="outline">
+            <Link href={withLocalePrefix("/cloud/instances", locale)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {t("cloud.instances.detailBack")}
+            </Link>
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="flex h-40 items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+              {t("cloud.instances.detailLoading")}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!instance) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-3">
+          <Button asChild type="button" variant="outline">
+            <Link href={withLocalePrefix("/cloud/instances", locale)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {t("cloud.instances.detailBack")}
+            </Link>
+          </Button>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("cloud.instances.detailNotFoundTitle")}</CardTitle>
+            <CardDescription>
+              {t("cloud.instances.detailNotFoundDescription", { id: instanceId || "-" })}
+            </CardDescription>
+          </CardHeader>
+          {error ? (
+            <CardContent>
+              <p className="text-xs text-muted-foreground">{error}</p>
+            </CardContent>
+          ) : null}
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Button asChild type="button" variant="outline" size="sm">
+              <Link href={withLocalePrefix("/cloud/instances", locale)}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                {t("cloud.instances.detailBack")}
+              </Link>
+            </Button>
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">{resolveInstanceTitle(instance)}</h2>
+          <p className="text-sm text-muted-foreground">{t("cloud.instances.detailDescription")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="mr-1 flex items-center gap-2 rounded-md border px-2 py-1">
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${
+                autoRefreshEnabled ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/40"
+              }`}
+              aria-hidden="true"
+            />
+            <Switch
+              checked={autoRefreshEnabled}
+              onCheckedChange={setAutoRefreshEnabled}
+              aria-label={t("cloud.instances.detailAutoRefresh")}
+            />
+            <span className="text-xs text-muted-foreground">
+              {autoRefreshEnabled
+                ? t("cloud.instances.detailAutoRefreshEnabled")
+                : t("cloud.instances.detailAutoRefresh")}
+            </span>
+          </div>
+          <div className="mr-1 rounded-md border px-2 py-1 text-xs text-muted-foreground">
+            {t("cloud.instances.detailLastRefreshLabel")}: {formatDateTime(lastRefreshAt, locale)}
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={handleCopyApiCurl}>
+            <Copy className="mr-1 h-4 w-4" />
+            {t("cloud.instances.detailCopyApiCurl")}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => fetchDetail(true)} disabled={refreshing}>
+            {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            {t("cloud.instances.detailRefreshButton")}
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("cloud.instances.detailSectionBasic")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FieldItem label={t("cloud.instances.detailFieldId")} value={instance.id} mono />
+          <FieldItem label={t("cloud.instances.detailFieldInstanceId")} value={instance.instance_id} mono />
+          <FieldItem label={t("cloud.instances.detailFieldName")} value={instance.instance_name || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldProvider")} value={instance.provider} />
+          <FieldItem label={t("cloud.instances.detailFieldAccount")} value={instance.account_config_key} mono />
+          <FieldItem label={t("cloud.instances.detailFieldRegion")} value={instance.region} />
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">{t("cloud.instances.detailFieldStatus")}</p>
+            <Badge variant={getStatusVariant(instance.status)}>{instance.status || t("cloud.instances.statusUnknown")}</Badge>
+          </div>
+          <FieldItem label={t("cloud.instances.detailFieldOs")} value={instance.os || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldPublicIp")} value={instance.public_ip || "-"} mono />
+          <FieldItem label={t("cloud.instances.detailFieldPrivateIp")} value={instance.private_ip || "-"} mono />
+          <FieldItem
+            label={t("cloud.instances.detailFieldLastSeen")}
+            value={formatDateTime(instance.last_seen_at, locale)}
+            hint={formatRelativeTime(instance.last_seen_at, locale)}
+          />
+          <FieldItem
+            label={t("cloud.instances.detailFieldLastCollected")}
+            value={formatDateTime(instance.last_collected_at, locale)}
+            hint={formatRelativeTime(instance.last_collected_at, locale)}
+          />
+          <FieldItem label={t("cloud.instances.detailFieldCreatedAt")} value={formatDateTime(instance.created_at, locale)} />
+          <FieldItem label={t("cloud.instances.detailFieldUpdatedAt")} value={formatDateTime(instance.updated_at, locale)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("cloud.instances.detailSectionSpecs")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FieldItem label={t("cloud.instances.detailFieldInstanceType")} value={instance.instance_type || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldCpuCores")} value={formatNumber(instance.cpu_cores, 0)} />
+          <FieldItem label={t("cloud.instances.detailFieldMemoryGb")} value={formatNumber(instance.memory_gb)} />
+          <FieldItem label={t("cloud.instances.detailFieldDiskGb")} value={formatNumber(instance.disk_gb)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("cloud.instances.detailSectionMetrics")}</CardTitle>
+          <CardDescription>{t("cloud.instances.detailFieldLastCollected")}: {formatDateTime(instance.last_collected_at, locale)}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {metricCards.map((item) => (
+            <div key={item.key} className="rounded-lg border p-3">
+              {(() => {
+                const usagePercent = getUsagePercent(item.metric, item.key)
+
+                return (
+                  <>
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+                    <p className={`mt-1 text-lg font-semibold ${getMetricValueClass(item.metric, item.key)}`}>
+                      {item.metric ? formatMetricValue(item.metric, item.key) : t("cloud.instances.detailMetricNoData")}
+                    </p>
+                    {usagePercent !== null ? (
+                      <div className="mt-2">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={`h-full rounded-full transition-all ${getUsageBarClass(usagePercent)}`}
+                            style={{ width: `${usagePercent}%` }}
+                            aria-hidden="true"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.metric
+                        ? t("cloud.instances.detailMetricCollectedAt", {
+                          time: formatDateTime(item.metric.collected_at, locale),
+                        })
+                        : "-"}
+                    </p>
+                    {item.metric ? (
+                      <p className="text-xs text-muted-foreground">
+                        {formatRelativeTime(item.metric.collected_at, locale)}
+                      </p>
+                    ) : null}
+                  </>
+                )
+              })()}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

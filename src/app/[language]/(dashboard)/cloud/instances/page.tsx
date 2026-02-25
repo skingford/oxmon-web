@@ -1,11 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Loader2, RefreshCw, Search } from "lucide-react"
 import { toast } from "sonner"
 import { api, getApiErrorMessage } from "@/lib/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
+import { withLocalePrefix } from "@/components/app-locale"
 import type { CloudInstanceResponse } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -284,7 +286,12 @@ export default function CloudInstancesPage() {
                     <TableRow key={instance.id}>
                       <TableCell>
                         <div className="space-y-1">
-                          <div className="font-medium">{resolveInstanceName(instance)}</div>
+                          <Link
+                            href={withLocalePrefix(`/cloud/instances/${instance.id}`, locale)}
+                            className="font-medium hover:underline"
+                          >
+                            {resolveInstanceName(instance)}
+                          </Link>
                           <div className="font-mono text-xs text-muted-foreground">{instance.instance_id}</div>
                         </div>
                       </TableCell>
@@ -305,7 +312,16 @@ export default function CloudInstancesPage() {
                           {instance.status || t("cloud.instances.statusUnknown")}
                         </Badge>
                       </TableCell>
-                      <TableCell>{formatDateTime(instance.last_seen_at, locale)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{formatDateTime(instance.last_seen_at, locale)}</span>
+                          <Button asChild type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                            <Link href={withLocalePrefix(`/cloud/instances/${instance.id}`, locale)}>
+                              {t("cloud.instances.actionViewDetails")}
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}

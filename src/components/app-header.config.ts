@@ -123,6 +123,13 @@ const headerMetaByPrefix: Array<{
       descriptionKey: "agentDetailDescription",
     },
   },
+  {
+    prefix: "/cloud/instances/",
+    meta: {
+      titleKey: "itemCloudInstances",
+      descriptionKey: "cloudInstanceDetailDescription",
+    },
+  },
 ]
 
 function resolveAppHeaderMeta(

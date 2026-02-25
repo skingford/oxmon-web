@@ -1,8 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { getAuthToken } from "@/lib/auth-token"
 import { formatCertificateDateTime } from "@/lib/certificates/formats"
 import { CertificateChainInfo, CertificateDetails, CertSummary, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -27,8 +28,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import {
+  Copy,
   ChevronLeft,
   ChevronRight,
   ChevronRight as ArrowRight,
@@ -41,12 +44,24 @@ import {
 import { toast } from "sonner"
 
 const PAGE_LIMIT = 20
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/+$/, "")
+const OX_APP_ID = (process.env.NEXT_PUBLIC_OX_APP_ID || "").trim()
 
 type CertificatesQueryState = {
   certsPage: ListResponse<CertificateDetails>
   summary: CertSummary | null
 }
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
+
+function isValidNonNegativeIntegerText(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return true
+  }
+
+  return /^\d+$/.test(trimmed)
+}
 
 function formatDate(value: string | null, locale: "zh" | "en") {
   if (!value) {
@@ -138,6 +153,9 @@ export default function CertificatesPage() {
   const [issuerKeyword, setIssuerKeyword] = useState(issuerParamValue)
   const [ipKeyword, setIpKeyword] = useState(ipParamValue)
   const [expiryDays, setExpiryDays] = useState(expiryParamValue)
+  const [issuerKeywordDraft, setIssuerKeywordDraft] = useState(issuerParamValue)
+  const [ipKeywordDraft, setIpKeywordDraft] = useState(ipParamValue)
+  const [expiryDaysDraft, setExpiryDaysDraft] = useState(expiryParamValue)
   const [offset, setOffset] = useState(initialOffset)
 
   const [chainDialogOpen, setChainDialogOpen] = useState(false)
@@ -228,6 +246,9 @@ export default function CertificatesPage() {
     setIssuerKeyword((previous) => (previous === nextIssuer ? previous : nextIssuer))
     setIpKeyword((previous) => (previous === nextIp ? previous : nextIp))
     setExpiryDays((previous) => (previous === nextExpiry ? previous : nextExpiry))
+    setIssuerKeywordDraft((previous) => (previous === nextIssuer ? previous : nextIssuer))
+    setIpKeywordDraft((previous) => (previous === nextIp ? previous : nextIp))
+    setExpiryDaysDraft((previous) => (previous === nextExpiry ? previous : nextExpiry))
     setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
   }, [searchParams])
 
@@ -289,25 +310,39 @@ export default function CertificatesPage() {
   const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
   const canGoPrev = offset > 0
   const canGoNext = offset + certs.length < certsPage.total
+  const hasAppliedApiFilters = Boolean(
+    issuerKeyword.trim() || ipKeyword.trim() || expiryDays.trim()
+  )
+  const hasLocalDomainFilter = Boolean(domainKeyword.trim())
+  const hasPendingApiFilterChanges =
+    issuerKeywordDraft.trim() !== issuerKeyword.trim() ||
+    ipKeywordDraft.trim() !== ipKeyword.trim() ||
+    expiryDaysDraft.trim() !== expiryDays.trim()
+  const isExpiryDaysDraftValid = isValidNonNegativeIntegerText(expiryDaysDraft)
 
   const handleDomainKeywordChange = (value: string) => {
     setDomainKeyword(value)
     setOffset((previous) => (previous === 0 ? previous : 0))
   }
 
-  const handleIssuerKeywordChange = (value: string) => {
-    setIssuerKeyword(value)
-    setOffset((previous) => (previous === 0 ? previous : 0))
-  }
+  const handleApplyApiFilters = useCallback(() => {
+    if (!isExpiryDaysDraftValid) {
+      return
+    }
 
-  const handleIpKeywordChange = (value: string) => {
-    setIpKeyword(value)
-    setOffset((previous) => (previous === 0 ? previous : 0))
-  }
+    setIssuerKeyword(issuerKeywordDraft)
+    setIpKeyword(ipKeywordDraft)
+    setExpiryDays(expiryDaysDraft)
+    setOffset(0)
+  }, [expiryDaysDraft, ipKeywordDraft, isExpiryDaysDraftValid, issuerKeywordDraft])
 
-  const handleExpiryDaysChange = (value: string) => {
-    setExpiryDays(value)
-    setOffset((previous) => (previous === 0 ? previous : 0))
+  const handleApiFilterKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") {
+      return
+    }
+
+    event.preventDefault()
+    handleApplyApiFilters()
   }
 
   const handleClearFilters = () => {
@@ -315,6 +350,9 @@ export default function CertificatesPage() {
     setIssuerKeyword("")
     setIpKeyword("")
     setExpiryDays("")
+    setIssuerKeywordDraft("")
+    setIpKeywordDraft("")
+    setExpiryDaysDraft("")
     setOffset(0)
   }
 
@@ -340,6 +378,42 @@ export default function CertificatesPage() {
     })
 
     router.push(`${withLocalePrefix("/certificates/domains", locale)}?${nextParams.toString()}`)
+  }
+
+  const handleCopyApiCurl = async () => {
+    const query = new URLSearchParams()
+
+    if (issuerKeyword.trim()) {
+      query.set("issuer__contains", issuerKeyword.trim())
+    }
+
+    if (ipKeyword.trim()) {
+      query.set("ip_address__contains", ipKeyword.trim())
+    }
+
+    if (expiryLimit !== undefined) {
+      query.set("not_after__lte", String(expiryLimit))
+    }
+
+    const path = "/v1/certificates"
+    const url = API_BASE_URL
+      ? `${API_BASE_URL}${path}${query.toString() ? `?${query.toString()}` : ""}`
+      : `${path}${query.toString() ? `?${query.toString()}` : ""}`
+
+    const authToken = getAuthToken() || "<YOUR_TOKEN>"
+    const appId = OX_APP_ID || "<YOUR_OX_APP_ID>"
+    const command = [
+      `curl -X GET '${url}'`,
+      `  -H 'ox-app-id: ${appId}'`,
+      `  -H 'Authorization: Bearer ${authToken}'`,
+    ].join(" \\\n")
+
+    try {
+      await navigator.clipboard.writeText(command)
+      toast.success(t("certificates.overview.toastCopyApiCurlSuccess"))
+    } catch {
+      toast.error(t("certificates.overview.toastCopyApiCurlError"))
+    }
   }
 
   return (
@@ -389,41 +463,144 @@ export default function CertificatesPage() {
           <CardTitle>{t("certificates.overview.filtersTitle")}</CardTitle>
           <CardDescription>{t("certificates.overview.filtersDescription")}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <FilterToolbar
-            className="gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"
-            search={{
-              value: domainKeyword,
-              onValueChange: handleDomainKeywordChange,
-              placeholder: t("certificates.overview.filterDomainPlaceholder"),
-              inputClassName: "h-10",
-            }}
-          >
-            <Input
-              value={issuerKeyword}
-              onChange={(event) => handleIssuerKeywordChange(event.target.value)}
-              placeholder={t("certificates.overview.filterIssuerPlaceholder")}
-              className="h-10"
-            />
-            <Input
-              value={ipKeyword}
-              onChange={(event) => handleIpKeywordChange(event.target.value)}
-              placeholder={t("certificates.overview.filterIpPlaceholder")}
-              className="h-10"
-            />
-            <div className="flex gap-2">
-              <Input
-                value={expiryDays}
-                onChange={(event) => handleExpiryDaysChange(event.target.value)}
-                placeholder={t("certificates.overview.filterExpiryDaysPlaceholder")}
-                inputMode="numeric"
-                className="h-10"
-              />
-              <Button type="button" variant="outline" onClick={handleClearFilters} className="h-10">
-                {t("certificates.overview.clearFilters")}
-              </Button>
+        <CardContent className="space-y-3">
+          <details className="rounded-lg border border-dashed p-3 text-sm">
+            <summary className="cursor-pointer font-medium">
+              {t("certificates.overview.openapiMappingTitle")}
+            </summary>
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <p>{t("certificates.overview.openapiMappingDomainLocal")}</p>
+              <p>{t("certificates.overview.openapiMappingIssuer")}</p>
+              <p>{t("certificates.overview.openapiMappingIp")}</p>
+              <p>{t("certificates.overview.openapiMappingExpiry")}</p>
             </div>
-          </FilterToolbar>
+          </details>
+          <div className="grid gap-3 lg:grid-cols-[1.1fr_1.9fr]">
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t("certificates.overview.filterDomainLabel")}</p>
+                <p className="text-xs text-muted-foreground">{t("certificates.overview.filterLocalHint")}</p>
+              </div>
+              <FilterToolbar
+                className="md:grid-cols-1 xl:grid-cols-1"
+                search={{
+                  value: domainKeyword,
+                  onValueChange: handleDomainKeywordChange,
+                  placeholder: t("certificates.overview.filterDomainPlaceholder"),
+                  inputClassName: "h-10",
+                }}
+              />
+            </div>
+
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t("certificates.overview.apiFiltersTitle")}</p>
+                <p className="text-xs text-muted-foreground">{t("certificates.overview.filterApiHint")}</p>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cert-overview-issuer">{t("certificates.overview.filterIssuerLabel")}</Label>
+                  <Input
+                    id="cert-overview-issuer"
+                    value={issuerKeywordDraft}
+                    onChange={(event) => setIssuerKeywordDraft(event.target.value)}
+                    onKeyDown={handleApiFilterKeyDown}
+                    placeholder={t("certificates.overview.filterIssuerPlaceholder")}
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cert-overview-ip">{t("certificates.overview.filterIpLabel")}</Label>
+                  <Input
+                    id="cert-overview-ip"
+                    value={ipKeywordDraft}
+                    onChange={(event) => setIpKeywordDraft(event.target.value)}
+                    onKeyDown={handleApiFilterKeyDown}
+                    placeholder={t("certificates.overview.filterIpPlaceholder")}
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cert-overview-expiry-days">{t("certificates.overview.filterExpiryDaysLabel")}</Label>
+                  <div className="space-y-1">
+                    <Input
+                      id="cert-overview-expiry-days"
+                      value={expiryDaysDraft}
+                      onChange={(event) => setExpiryDaysDraft(event.target.value)}
+                      onKeyDown={handleApiFilterKeyDown}
+                      placeholder={t("certificates.overview.filterExpiryDaysPlaceholder")}
+                      inputMode="numeric"
+                      aria-invalid={!isExpiryDaysDraftValid}
+                      className="h-10"
+                    />
+                    {!isExpiryDaysDraftValid ? (
+                      <p className="text-xs text-destructive">
+                        {t("certificates.overview.filterExpiryDaysInvalid")}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleApplyApiFilters}
+                    className="h-10"
+                    disabled={!hasPendingApiFilterChanges || !isExpiryDaysDraftValid}
+                  >
+                    {t("certificates.overview.applyFilters")}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleClearFilters} className="h-10">
+                    {t("certificates.overview.clearFilters")}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{t("certificates.overview.appliedLocalFiltersLabel")}</span>
+            {hasLocalDomainFilter ? (
+              <Badge variant="secondary">
+                {t("certificates.overview.appliedDomain", { value: domainKeyword.trim() })}
+              </Badge>
+            ) : (
+              <span>{t("certificates.overview.appliedLocalFiltersEmpty")}</span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{t("certificates.overview.appliedApiFiltersLabel")}</span>
+            {hasAppliedApiFilters ? (
+              <>
+                {issuerKeyword.trim() ? (
+                  <Badge variant="secondary">
+                    {t("certificates.overview.appliedIssuer", { value: issuerKeyword.trim() })}
+                  </Badge>
+                ) : null}
+                {ipKeyword.trim() ? (
+                  <Badge variant="secondary">
+                    {t("certificates.overview.appliedIp", { value: ipKeyword.trim() })}
+                  </Badge>
+                ) : null}
+                {expiryDays.trim() ? (
+                  <Badge variant="secondary">
+                    {t("certificates.overview.appliedExpiryDays", { value: expiryDays.trim() })}
+                  </Badge>
+                ) : null}
+              </>
+            ) : (
+              <span>{t("certificates.overview.appliedApiFiltersEmpty")}</span>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleCopyApiCurl}
+            >
+              <Copy className="mr-1 h-3.5 w-3.5" />
+              {t("certificates.overview.copyApiCurl")}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -433,6 +610,25 @@ export default function CertificatesPage() {
           <CardDescription>{t("certificates.overview.tableDescription", { limit: PAGE_LIMIT })}</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {t("certificates.overview.tableResultSummary", {
+                filtered: filteredCerts.length,
+                page: certs.length,
+                total: certsPage.total,
+              })}
+            </span>
+            {hasLocalDomainFilter ? (
+              <Badge variant="outline">
+                {t("certificates.overview.tableResultSummaryLocalFiltered")}
+              </Badge>
+            ) : null}
+            {hasPendingApiFilterChanges ? (
+              <Badge variant="outline">
+                {t("certificates.overview.tableResultSummaryPendingApiFilters")}
+              </Badge>
+            ) : null}
+          </div>
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader>

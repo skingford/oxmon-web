@@ -1,12 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { getAuthToken } from "@/lib/auth-token"
 import { formatCertificateDateTime } from "@/lib/certificates/formats"
 import { CertCheckResult, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
-import { useCertificateStatusQueryState } from "@/hooks/use-certificate-status-query-state"
 import { useRequestState } from "@/hooks/use-request-state"
 import {
   Table,
@@ -20,7 +20,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
+  Copy,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -31,7 +35,19 @@ import {
 import { toast } from "sonner"
 
 const PAGE_LIMIT = 20
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/+$/, "")
+const OX_APP_ID = (process.env.NEXT_PUBLIC_OX_APP_ID || "").trim()
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
+
+function isValidNonNegativeIntegerText(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return true
+  }
+
+  return /^\d+$/.test(trimmed)
+}
 
 function getStatusMeta(
   status: CertCheckResult,
@@ -57,18 +73,23 @@ export default function CertificateStatusPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const domainParamValue = searchParams.get("domain") || ""
+  const isValidParamValue = searchParams.get("is_valid") || "all"
+  const expiryParamValue = searchParams.get("expiry") || ""
+  const rawOffset = Number(searchParams.get("offset") || "0")
+  const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
 
-  const {
-    search,
-    offset,
-    setOffset,
-    handleSearchChange,
-    handleClearSearch,
-  } = useCertificateStatusQueryState({
-    pathname,
-    searchParams,
-    replace: (href, options) => router.replace(href, options),
-  })
+  const [domainKeyword, setDomainKeyword] = useState(domainParamValue)
+  const [isValidFilter, setIsValidFilter] = useState<"all" | "true" | "false">(
+    isValidParamValue === "true" || isValidParamValue === "false" ? isValidParamValue : "all"
+  )
+  const [expiryDays, setExpiryDays] = useState(expiryParamValue)
+  const [domainKeywordDraft, setDomainKeywordDraft] = useState(domainParamValue)
+  const [isValidFilterDraft, setIsValidFilterDraft] = useState<"all" | "true" | "false">(
+    isValidParamValue === "true" || isValidParamValue === "false" ? isValidParamValue : "all"
+  )
+  const [expiryDaysDraft, setExpiryDaysDraft] = useState(expiryParamValue)
+  const [offset, setOffset] = useState(initialOffset)
   const [checkingAll, setCheckingAll] = useState(false)
 
   const {
@@ -84,10 +105,30 @@ export default function CertificateStatusPage() {
   })
   const statuses = statusesPage.items
 
+  const expiryDaysLimit = useMemo(() => {
+    const value = Number(expiryDays)
+
+    if (!Number.isFinite(value) || value < 0) {
+      return undefined
+    }
+
+    return Math.floor(value)
+  }, [expiryDays])
+
   const fetchStatus = useCallback(
     async (silent = false) => {
       await execute(
-        () => api.getCertStatusAll({ limit: PAGE_LIMIT, offset }),
+        () =>
+          api.getCertStatusAll({
+            limit: PAGE_LIMIT,
+            offset,
+            domain__contains: domainKeyword.trim() || undefined,
+            is_valid__eq:
+              isValidFilter === "all"
+                ? undefined
+                : isValidFilter === "true",
+            days_until_expiry__lte: expiryDaysLimit,
+          }),
         {
           silent,
           onError: (error) => {
@@ -96,22 +137,12 @@ export default function CertificateStatusPage() {
         }
       )
     },
-    [execute, offset, t]
+    [domainKeyword, execute, expiryDaysLimit, isValidFilter, offset, t]
   )
 
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
-
-  const filteredStatuses = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-
-    if (!keyword) {
-      return statuses
-    }
-
-    return statuses.filter((item) => item.domain.toLowerCase().includes(keyword))
-  }, [search, statuses])
 
   const stats = useMemo(() => {
     return statuses.reduce(
@@ -142,6 +173,100 @@ export default function CertificateStatusPage() {
   const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
   const canGoPrev = offset > 0
   const canGoNext = offset + statuses.length < statusesPage.total
+  const hasAppliedApiFilters = Boolean(
+    domainKeyword.trim() || isValidFilter !== "all" || expiryDays.trim()
+  )
+  const hasPendingApiFilterChanges =
+    domainKeywordDraft.trim() !== domainKeyword.trim() ||
+    isValidFilterDraft !== isValidFilter ||
+    expiryDaysDraft.trim() !== expiryDays.trim()
+  const isExpiryDaysDraftValid = isValidNonNegativeIntegerText(expiryDaysDraft)
+
+  useEffect(() => {
+    const nextDomain = searchParams.get("domain") || ""
+    const nextIsValid = searchParams.get("is_valid") || "all"
+    const nextExpiry = searchParams.get("expiry") || ""
+    const nextRawOffset = Number(searchParams.get("offset") || "0")
+    const nextOffset = Number.isFinite(nextRawOffset) && nextRawOffset > 0 ? Math.floor(nextRawOffset) : 0
+
+    const normalizedIsValid =
+      nextIsValid === "true" || nextIsValid === "false" ? nextIsValid : "all"
+
+    setDomainKeyword((previous) => (previous === nextDomain ? previous : nextDomain))
+    setIsValidFilter((previous) => (previous === normalizedIsValid ? previous : normalizedIsValid))
+    setExpiryDays((previous) => (previous === nextExpiry ? previous : nextExpiry))
+    setDomainKeywordDraft((previous) => (previous === nextDomain ? previous : nextDomain))
+    setIsValidFilterDraft((previous) => (previous === normalizedIsValid ? previous : normalizedIsValid))
+    setExpiryDaysDraft((previous) => (previous === nextExpiry ? previous : nextExpiry))
+    setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (domainKeyword.trim()) {
+      nextParams.set("domain", domainKeyword)
+    } else {
+      nextParams.delete("domain")
+    }
+
+    if (isValidFilter !== "all") {
+      nextParams.set("is_valid", isValidFilter)
+    } else {
+      nextParams.delete("is_valid")
+    }
+
+    if (expiryDays.trim()) {
+      nextParams.set("expiry", expiryDays)
+    } else {
+      nextParams.delete("expiry")
+    }
+
+    if (offset > 0) {
+      nextParams.set("offset", String(offset))
+    } else {
+      nextParams.delete("offset")
+    }
+
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery === currentQuery) {
+      return
+    }
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }, [domainKeyword, expiryDays, isValidFilter, offset, pathname, router, searchParams])
+
+  const handleApplyFilters = useCallback(() => {
+    if (!isExpiryDaysDraftValid) {
+      return
+    }
+
+    setDomainKeyword(domainKeywordDraft)
+    setIsValidFilter(isValidFilterDraft)
+    setExpiryDays(expiryDaysDraft)
+    setOffset(0)
+  }, [domainKeywordDraft, expiryDaysDraft, isExpiryDaysDraftValid, isValidFilterDraft])
+
+  const handleFilterKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") {
+      return
+    }
+
+    event.preventDefault()
+    handleApplyFilters()
+  }
+
+  const handleClearFilters = () => {
+    setDomainKeyword("")
+    setIsValidFilter("all")
+    setExpiryDays("")
+    setDomainKeywordDraft("")
+    setIsValidFilterDraft("all")
+    setExpiryDaysDraft("")
+    setOffset(0)
+  }
 
   const handleCheckAllDomains = async () => {
     setCheckingAll(true)
@@ -154,6 +279,42 @@ export default function CertificateStatusPage() {
       toast.error(getApiErrorMessage(error, t("certificates.status.toastCheckAllError")))
     } finally {
       setCheckingAll(false)
+    }
+  }
+
+  const handleCopyApiCurl = async () => {
+    const query = new URLSearchParams()
+
+    if (domainKeyword.trim()) {
+      query.set("domain__contains", domainKeyword.trim())
+    }
+
+    if (isValidFilter !== "all") {
+      query.set("is_valid__eq", String(isValidFilter === "true"))
+    }
+
+    if (expiryDaysLimit !== undefined) {
+      query.set("days_until_expiry__lte", String(expiryDaysLimit))
+    }
+
+    const path = "/v1/certs/status"
+    const url = API_BASE_URL
+      ? `${API_BASE_URL}${path}${query.toString() ? `?${query.toString()}` : ""}`
+      : `${path}${query.toString() ? `?${query.toString()}` : ""}`
+
+    const authToken = getAuthToken() || "<YOUR_TOKEN>"
+    const appId = OX_APP_ID || "<YOUR_OX_APP_ID>"
+    const command = [
+      `curl -X GET '${url}'`,
+      `  -H 'ox-app-id: ${appId}'`,
+      `  -H 'Authorization: Bearer ${authToken}'`,
+    ].join(" \\\n")
+
+    try {
+      await navigator.clipboard.writeText(command)
+      toast.success(t("certificates.status.toastCopyApiCurlSuccess"))
+    } catch {
+      toast.error(t("certificates.status.toastCopyApiCurlError"))
     }
   }
 
@@ -214,26 +375,135 @@ export default function CertificateStatusPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>{t("certificates.status.filtersTitle")}</CardTitle>
+          <CardDescription>{t("certificates.status.filtersDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <details className="rounded-lg border border-dashed p-3 text-sm">
+            <summary className="cursor-pointer font-medium">
+              {t("certificates.status.openapiMappingTitle")}
+            </summary>
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <p>{t("certificates.status.openapiMappingDomain")}</p>
+              <p>{t("certificates.status.openapiMappingValidity")}</p>
+              <p>{t("certificates.status.openapiMappingExpiry")}</p>
+            </div>
+          </details>
+          <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
+            <p>{t("certificates.status.filterApiHint")}</p>
+            <p>{t("certificates.status.filterLayoutHint")}</p>
+          </div>
+          <FilterToolbar
+            className="gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"
+            search={{
+              value: domainKeywordDraft,
+              onValueChange: setDomainKeywordDraft,
+              onKeyDown: handleFilterKeyDown,
+              label: t("certificates.status.filterDomainLabel"),
+              placeholder: t("certificates.status.filterDomainPlaceholder"),
+              inputClassName: "h-10",
+            }}
+          >
+            <div className="space-y-2">
+              <Label>{t("certificates.status.filterValidityLabel")}</Label>
+              <Select
+                value={isValidFilterDraft}
+                onValueChange={(value) => setIsValidFilterDraft(value as "all" | "true" | "false")}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder={t("certificates.status.filterValidityAll")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("certificates.status.filterValidityAll")}</SelectItem>
+                  <SelectItem value="true">{t("certificates.status.filterValidityTrue")}</SelectItem>
+                  <SelectItem value="false">{t("certificates.status.filterValidityFalse")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cert-status-expiry-days">{t("certificates.status.filterExpiryDaysLabel")}</Label>
+              <div className="space-y-1">
+                <Input
+                  id="cert-status-expiry-days"
+                  value={expiryDaysDraft}
+                  onChange={(event) => setExpiryDaysDraft(event.target.value)}
+                  onKeyDown={handleFilterKeyDown}
+                  placeholder={t("certificates.status.filterExpiryDaysPlaceholder")}
+                  inputMode="numeric"
+                  aria-invalid={!isExpiryDaysDraftValid}
+                  className="h-10"
+                />
+                {!isExpiryDaysDraftValid ? (
+                  <p className="text-xs text-destructive">
+                    {t("certificates.status.filterExpiryDaysInvalid")}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex items-end gap-2">
+              <Button
+                type="button"
+                onClick={handleApplyFilters}
+                disabled={!hasPendingApiFilterChanges || !isExpiryDaysDraftValid}
+                className="h-10"
+              >
+                {t("certificates.status.applyFilters")}
+              </Button>
+              <Button type="button" variant="outline" onClick={handleClearFilters} className="h-10">
+                {t("certificates.status.clearFilters")}
+              </Button>
+            </div>
+          </FilterToolbar>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{t("certificates.status.appliedFiltersLabel")}</span>
+            {hasAppliedApiFilters ? (
+              <>
+                {domainKeyword.trim() ? (
+                  <Badge variant="secondary">{t("certificates.status.appliedDomain", { value: domainKeyword.trim() })}</Badge>
+                ) : null}
+                {isValidFilter !== "all" ? (
+                  <Badge variant="secondary">
+                    {isValidFilter === "true"
+                      ? t("certificates.status.appliedValidityTrue")
+                      : t("certificates.status.appliedValidityFalse")}
+                  </Badge>
+                ) : null}
+                {expiryDays.trim() ? (
+                  <Badge variant="secondary">{t("certificates.status.appliedExpiryDays", { value: expiryDays.trim() })}</Badge>
+                ) : null}
+              </>
+            ) : (
+              <span>{t("certificates.status.appliedFiltersEmpty")}</span>
+            )}
+            {hasPendingApiFilterChanges ? (
+              <Badge variant="outline">{t("certificates.status.pendingFilterChanges")}</Badge>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleCopyApiCurl}
+            >
+              <Copy className="mr-1 h-3.5 w-3.5" />
+              {t("certificates.status.copyApiCurl")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <CardTitle>{t("certificates.status.tableTitle")}</CardTitle>
               <CardDescription>{t("certificates.status.tableDescription", { limit: PAGE_LIMIT })}</CardDescription>
             </div>
-            <div className="flex w-full items-center gap-2 md:w-auto">
-              <div className="w-full md:w-80">
-                <FilterToolbar
-                  className="md:grid-cols-1 xl:grid-cols-1"
-                  search={{
-                    value: search,
-                    onValueChange: handleSearchChange,
-                    placeholder: t("certificates.status.searchPlaceholder"),
-                    inputClassName: "h-10",
-                  }}
-                />
-              </div>
-              <Button type="button" variant="outline" onClick={handleClearSearch}>
-                {t("certificates.status.clearSearch")}
-              </Button>
+            <div className="text-xs text-muted-foreground">
+              {t("certificates.status.tableResultSummary", {
+                page: statuses.length,
+                total: statusesPage.total,
+              })}
             </div>
           </div>
         </CardHeader>
@@ -260,25 +530,23 @@ export default function CertificateStatusPage() {
                       {t("certificates.status.tableLoading")}
                     </TableCell>
                   </TableRow>
-                ) : filteredStatuses.length === 0 ? (
+                ) : statuses.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                       <div className="space-y-1">
                         <p>
-                          {statuses.length === 0
-                            ? t("certificates.status.tableEmpty")
-                            : t("certificates.status.tableEmptyFiltered")}
+                          {t("certificates.status.tableEmpty")}
                         </p>
                         <p className="text-xs text-muted-foreground/80">
-                          {statuses.length === 0
-                            ? t("certificates.status.tableEmptyHint")
-                            : t("certificates.status.tableEmptyFilteredHint")}
+                          {hasAppliedApiFilters
+                            ? t("certificates.status.tableEmptyFilteredHint")
+                            : t("certificates.status.tableEmptyHint")}
                         </p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStatuses.map((status) => {
+                  statuses.map((status) => {
                     const statusMeta = getStatusMeta(status, t)
                     const StatusIcon = statusMeta.icon
 

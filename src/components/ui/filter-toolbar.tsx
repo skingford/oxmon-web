@@ -9,6 +9,7 @@ import { Search } from "lucide-react"
 type FilterToolbarSearchProps = {
   value: string
   onValueChange: (value: string) => void
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
   placeholder: string
   label?: string
   fieldClassName?: string
@@ -35,6 +36,7 @@ export function FilterToolbar({ search, className, children }: FilterToolbarProp
           <Input
             value={search.value}
             onChange={(event) => search.onValueChange(event.target.value)}
+            onKeyDown={search.onKeyDown}
             placeholder={search.placeholder}
             className={cn(
               hasLabel ? "h-10 pl-9" : "pl-9",

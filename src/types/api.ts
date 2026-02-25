@@ -638,6 +638,28 @@ export interface CloudInstanceResponse {
   last_seen_at: string;
   created_at: string;
   updated_at: string;
+  instance_type?: string | null;
+  cpu_cores?: number | null;
+  memory_gb?: number | null;
+  disk_gb?: number | null;
+}
+
+export interface MetricLatestValue {
+  metric_name: string;
+  value: number;
+  collected_at: string;
+}
+
+export interface CloudInstanceDetailResponse extends CloudInstanceResponse {
+  cpu_usage?: MetricLatestValue | null;
+  memory_usage?: MetricLatestValue | null;
+  disk_usage?: MetricLatestValue | null;
+  network_in_bytes?: MetricLatestValue | null;
+  network_out_bytes?: MetricLatestValue | null;
+  disk_iops_read?: MetricLatestValue | null;
+  disk_iops_write?: MetricLatestValue | null;
+  connections?: MetricLatestValue | null;
+  last_collected_at?: string | null;
 }
 
 export interface CreateCloudAccountRequest {
