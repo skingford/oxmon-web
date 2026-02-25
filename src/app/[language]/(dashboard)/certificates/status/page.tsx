@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { formatCertificateDateTime } from "@/lib/certificates/formats"
 import { CertCheckResult, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useCertificateStatusQueryState } from "@/hooks/use-certificate-status-query-state"
 import { useRequestState } from "@/hooks/use-request-state"
 import {
   Table,
@@ -31,27 +33,6 @@ import { toast } from "sonner"
 const PAGE_LIMIT = 20
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
-function formatDateTime(value: string | null, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
 function getStatusMeta(
   status: CertCheckResult,
   t: TranslateFn
@@ -77,12 +58,17 @@ export default function CertificateStatusPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const searchParamValue = searchParams.get("search") || ""
-  const rawOffset = Number(searchParams.get("offset") || "0")
-  const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
-
-  const [search, setSearch] = useState(searchParamValue)
-  const [offset, setOffset] = useState(initialOffset)
+  const {
+    search,
+    offset,
+    setOffset,
+    handleSearchChange,
+    handleClearSearch,
+  } = useCertificateStatusQueryState({
+    pathname,
+    searchParams,
+    replace: (href, options) => router.replace(href, options),
+  })
   const [checkingAll, setCheckingAll] = useState(false)
 
   const {
@@ -116,54 +102,6 @@ export default function CertificateStatusPage() {
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
-
-  useEffect(() => {
-    const nextSearch = searchParams.get("search") || ""
-    const nextRawOffset = Number(searchParams.get("offset") || "0")
-    const nextOffset = Number.isFinite(nextRawOffset) && nextRawOffset > 0
-      ? Math.floor(nextRawOffset)
-      : 0
-
-    setSearch((previous) => (previous === nextSearch ? previous : nextSearch))
-    setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
-  }, [searchParams])
-
-  useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams.toString())
-
-    if (search.trim()) {
-      nextParams.set("search", search)
-    } else {
-      nextParams.delete("search")
-    }
-
-    if (offset > 0) {
-      nextParams.set("offset", String(offset))
-    } else {
-      nextParams.delete("offset")
-    }
-
-    const nextQuery = nextParams.toString()
-    const currentQuery = searchParams.toString()
-
-    if (nextQuery === currentQuery) {
-      return
-    }
-
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
-      scroll: false,
-    })
-  }, [offset, pathname, router, search, searchParams])
-
-  const handleSearchChange = (value: string) => {
-    setSearch(value)
-    setOffset((previous) => (previous === 0 ? previous : 0))
-  }
-
-  const handleClearSearch = () => {
-    setSearch("")
-    setOffset(0)
-  }
 
   const filteredStatuses = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -370,7 +308,7 @@ export default function CertificateStatusPage() {
                             : t("certificates.status.expiryUnknown")}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {formatDateTime(status.checked_at, locale)}
+                          {formatCertificateDateTime(status.checked_at, locale)}
                         </TableCell>
                         <TableCell className="max-w-60 truncate text-muted-foreground" title={status.error || ""}>
                           {status.error || t("certificates.status.errorNone")}

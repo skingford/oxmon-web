@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { formatCertificateDateTime } from "@/lib/certificates/formats"
 import { CertificateChainInfo, CertificateDetails } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useAppLocale } from "@/hooks/use-app-locale"
+import { useCertificateMonitoringConfig } from "@/hooks/use-certificate-monitoring-config"
 import { withLocalePrefix } from "@/components/app-locale"
+import { MonitoringDomainConfigDialog } from "@/components/pages/certificates/monitoring-domain-config-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
   ArrowLeft,
+  Pencil,
   ExternalLink,
   Loader2,
   RefreshCw,
@@ -26,27 +30,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
-
-function formatDateTime(value: string | null, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
 
 function getDaysUntilExpiry(notAfter: string) {
   const expiryTime = new Date(notAfter).getTime()
@@ -130,6 +113,7 @@ export default function CertificateDetailPage() {
 
       setCertificate(certData)
       setChainInfo(chainData)
+      await fetchLinkedDomain(certData.domain)
     } catch (error) {
       toast.error(getApiErrorMessage(error, t("certificates.detail.toastFetchError")))
       router.push(withLocalePrefix("/certificates", appLocale))
@@ -142,6 +126,38 @@ export default function CertificateDetailPage() {
   useEffect(() => {
     fetchData()
   }, [certificateId])
+
+  const {
+    linkedDomain,
+    domainLookupLoading,
+    fetchLinkedDomain,
+    createDomainOpen,
+    setCreateDomainOpen,
+    editDomainOpen,
+    setEditDomainOpen,
+    creatingDomain,
+    savingDomain,
+    editPort,
+    setEditPort,
+    editInterval,
+    setEditInterval,
+    editNote,
+    setEditNote,
+    editEnabled,
+    setEditEnabled,
+    createCheckAfterSave,
+    editCheckAfterSave,
+    handleCreateCheckAfterSaveChange,
+    handleEditCheckAfterSaveChange,
+    handleOpenEditDomain,
+    handleOpenCreateDomain,
+    handleCreateDomainConfig,
+    handleSaveDomainConfig,
+  } = useCertificateMonitoringConfig({
+    certificateDomain: certificate?.domain ?? null,
+    t,
+    onRefreshCertificateDetail: () => fetchData(true),
+  })
 
   const handleQuickCheck = () => {
     if (!certificate) return
@@ -287,17 +303,17 @@ export default function CertificateDetailPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldNotBefore")}</p>
-              <p className="text-sm">{formatDateTime(certificate.not_before, locale)}</p>
+              <p className="text-sm">{formatCertificateDateTime(certificate.not_before, locale)}</p>
             </div>
             <Separator />
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldNotAfter")}</p>
-              <p className="text-sm">{formatDateTime(certificate.not_after, locale)}</p>
+              <p className="text-sm">{formatCertificateDateTime(certificate.not_after, locale)}</p>
             </div>
             <Separator />
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldLastChecked")}</p>
-              <p className="text-sm">{formatDateTime(certificate.last_checked, locale)}</p>
+              <p className="text-sm">{formatCertificateDateTime(certificate.last_checked, locale)}</p>
             </div>
           </CardContent>
         </Card>
@@ -357,7 +373,7 @@ export default function CertificateDetailPage() {
                   <p className="text-sm font-medium text-muted-foreground">
                     {t("certificates.detail.chainLastChecked")}
                   </p>
-                  <p className="text-sm">{formatDateTime(chainInfo.last_checked, locale)}</p>
+                  <p className="text-sm">{formatCertificateDateTime(chainInfo.last_checked, locale)}</p>
                 </div>
                 {chainInfo.chain_error && (
                   <>
@@ -378,6 +394,93 @@ export default function CertificateDetailPage() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("certificates.detail.monitoringTitle")}</CardTitle>
+          <CardDescription>{t("certificates.detail.monitoringDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {domainLookupLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t("certificates.detail.monitoringLoading")}
+            </div>
+          ) : linkedDomain ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">{t("certificates.domains.fieldDomain")}</p>
+                  <p className="text-sm font-mono">{linkedDomain.domain}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.monitoringFieldStatus")}</p>
+                  <Badge
+                    className={linkedDomain.enabled
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                      : "border-muted bg-muted text-muted-foreground"}
+                  >
+                    {linkedDomain.enabled
+                      ? t("certificates.domains.statusEnabled")
+                      : t("certificates.detail.monitoringStatusDisabled")}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">{t("certificates.domains.fieldPort")}</p>
+                  <p className="text-sm">{linkedDomain.port}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">{t("certificates.domains.fieldInterval")}</p>
+                  <p className="text-sm">
+                    {linkedDomain.check_interval_secs === null
+                      ? t("certificates.domains.intervalDefault")
+                      : t("certificates.domains.intervalSeconds", { seconds: linkedDomain.check_interval_secs })}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">{t("certificates.domains.fieldNote")}</p>
+                <p className="text-sm">{linkedDomain.note || t("certificates.domains.noteEmpty")}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={handleOpenEditDomain}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {t("certificates.detail.btnEditMonitoring")}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => fetchLinkedDomain(linkedDomain.domain)}
+                  disabled={domainLookupLoading}
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${domainLookupLoading ? "animate-spin" : ""}`} />
+                  {t("certificates.detail.btnRefreshMonitoring")}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{t("certificates.detail.monitoringNotFound")}</p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  handleOpenCreateDomain()
+                }}
+              >
+                {t("certificates.detail.btnCreateMonitoring")}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const nextParams = new URLSearchParams({ domain: certificate.domain })
+                  router.push(`${withLocalePrefix("/certificates/domains", appLocale)}?${nextParams.toString()}`)
+                }}
+              >
+                {t("certificates.detail.btnGoToMonitoring")}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* 操作按钮 */}
       <Card>
         <CardHeader>
@@ -391,6 +494,82 @@ export default function CertificateDetailPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <MonitoringDomainConfigDialog
+        open={editDomainOpen}
+        onOpenChange={setEditDomainOpen}
+        title={t("certificates.detail.editMonitoringDialogTitle")}
+        description={t("certificates.detail.editMonitoringDialogDescription")}
+        port={editPort}
+        onPortChange={setEditPort}
+        interval={editInterval}
+        onIntervalChange={setEditInterval}
+        note={editNote}
+        onNoteChange={setEditNote}
+        enabled={editEnabled}
+        onEnabledChange={setEditEnabled}
+        enabledStatusLabel={t("certificates.domains.statusEnabled")}
+        disabledStatusLabel={t("certificates.detail.monitoringStatusDisabled")}
+        checkAfterSave={editCheckAfterSave}
+        onCheckAfterSaveChange={handleEditCheckAfterSaveChange}
+        checkAfterSaveLabel={t("certificates.detail.checkAfterSaveLabel")}
+        checkAfterSaveHint={t("certificates.detail.checkAfterSaveHint")}
+        submitting={savingDomain}
+        onSubmit={handleSaveDomainConfig}
+        submitLabel={t("certificates.detail.btnSaveMonitoring")}
+        submittingLabel={t("certificates.detail.btnSavingMonitoring")}
+        cancelLabel={t("certificates.domains.cancelButton")}
+        labels={{
+          domain: t("certificates.domains.fieldDomain"),
+          port: t("certificates.domains.fieldPort"),
+          portPlaceholder: t("certificates.domains.fieldPortPlaceholder"),
+          interval: t("certificates.domains.fieldInterval"),
+          intervalPlaceholder: t("certificates.domains.fieldIntervalPlaceholder"),
+          note: t("certificates.domains.fieldNote"),
+          notePlaceholder: t("certificates.domains.fieldNotePlaceholder"),
+          monitoringStatus: t("certificates.detail.monitoringFieldStatus"),
+        }}
+        idPrefix="cert-domain-edit"
+      />
+
+      <MonitoringDomainConfigDialog
+        open={createDomainOpen}
+        onOpenChange={setCreateDomainOpen}
+        title={t("certificates.detail.createMonitoringDialogTitle")}
+        description={t("certificates.detail.createMonitoringDialogDescription")}
+        domain={certificate.domain}
+        showDomainReadonly
+        port={editPort}
+        onPortChange={setEditPort}
+        interval={editInterval}
+        onIntervalChange={setEditInterval}
+        note={editNote}
+        onNoteChange={setEditNote}
+        enabled={editEnabled}
+        onEnabledChange={setEditEnabled}
+        enabledStatusLabel={t("certificates.domains.statusEnabled")}
+        disabledStatusLabel={t("certificates.detail.monitoringStatusDisabled")}
+        checkAfterSave={createCheckAfterSave}
+        onCheckAfterSaveChange={handleCreateCheckAfterSaveChange}
+        checkAfterSaveLabel={t("certificates.detail.checkAfterSaveLabel")}
+        checkAfterSaveHint={t("certificates.detail.checkAfterCreateHint")}
+        submitting={creatingDomain}
+        onSubmit={handleCreateDomainConfig}
+        submitLabel={t("certificates.detail.btnCreateMonitoring")}
+        submittingLabel={t("certificates.detail.btnCreatingMonitoring")}
+        cancelLabel={t("certificates.domains.cancelButton")}
+        labels={{
+          domain: t("certificates.domains.fieldDomain"),
+          port: t("certificates.domains.fieldPort"),
+          portPlaceholder: t("certificates.domains.fieldPortPlaceholder"),
+          interval: t("certificates.domains.fieldInterval"),
+          intervalPlaceholder: t("certificates.domains.fieldIntervalPlaceholder"),
+          note: t("certificates.domains.fieldNote"),
+          notePlaceholder: t("certificates.domains.fieldNotePlaceholder"),
+          monitoringStatus: t("certificates.detail.monitoringFieldStatus"),
+        }}
+        idPrefix="cert-domain-create"
+      />
     </div>
   )
 }

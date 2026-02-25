@@ -3,114 +3,31 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { formatCertificateDateTime, parseOptionalNonNegativeInt } from "@/lib/certificates/formats"
 import { pickCountKey } from "@/lib/i18n-count"
 import { CertCheckResult, CertDomain, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useCertificateAutoCreateDraft } from "@/hooks/use-certificate-auto-create-draft"
+import { useCertificateDomainsAutoCheckFlow } from "@/hooks/use-certificate-domains-auto-check-flow"
+import { useCertificateDomainsQueryState } from "@/hooks/use-certificate-domains-query-state"
 import { useRequestState } from "@/hooks/use-request-state"
-import { Badge } from "@/components/ui/badge"
+import { DomainAutoCreateDialog } from "@/components/pages/certificates/domain-auto-create-dialog"
+import { DomainBatchCreateDialog } from "@/components/pages/certificates/domain-batch-create-dialog"
+import { DomainCreateDialog } from "@/components/pages/certificates/domain-create-dialog"
+import { DomainDeleteDialog } from "@/components/pages/certificates/domain-delete-dialog"
+import { DomainFiltersCard } from "@/components/pages/certificates/domain-filters-card"
+import { DomainHeaderActions } from "@/components/pages/certificates/domain-header-actions"
+import { DomainHistoryDialog } from "@/components/pages/certificates/domain-history-dialog"
+import { DomainStatsCards } from "@/components/pages/certificates/domain-stats-cards"
+import { DomainTableCard } from "@/components/pages/certificates/domain-table-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Switch } from "@/components/ui/switch"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  History,
   Loader2,
-  Plus,
-  RefreshCw,
-  ShieldCheck,
-  Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 
 const PAGE_LIMIT = 20
-const AUTO_CREATE_ADVANCED_STORAGE_KEY = "certificates:auto-create-advanced:v1"
-type TranslateFn = (path: string, values?: Record<string, string | number>) => string
-
-function formatDateTime(value: string | null, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
-function parseOptionalNonNegativeInt(value: string) {
-  if (!value.trim()) {
-    return null
-  }
-
-  const numberValue = Number(value)
-
-  if (!Number.isFinite(numberValue) || numberValue < 0) {
-    return undefined
-  }
-
-  return Math.floor(numberValue)
-}
-
-function getDomainStatusMeta(
-  enabled: boolean,
-  t: TranslateFn
-) {
-  if (enabled) {
-    return {
-      className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
-      label: t("certificates.domains.statusEnabled"),
-    }
-  }
-
-  return {
-    className: "border-muted bg-muted text-muted-foreground",
-    label: t("certificates.domains.statusDisabled"),
-  }
-}
 
 export default function DomainsPage() {
   const { t, locale } = useAppTranslations("pages")
@@ -119,14 +36,20 @@ export default function DomainsPage() {
   const searchParams = useSearchParams()
 
   const domainParamValue = searchParams.get("domain") || ""
-  const statusParamValue = searchParams.get("status") || "all"
   const autoCheckParamValue = searchParams.get("autoCheck")
-  const rawOffset = Number(searchParams.get("offset") || "0")
-  const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
-
-  const [domainKeyword, setDomainKeyword] = useState(domainParamValue)
-  const [statusFilter, setStatusFilter] = useState(statusParamValue === "enabled" || statusParamValue === "disabled" ? statusParamValue : "all")
-  const [offset, setOffset] = useState(initialOffset)
+  const {
+    domainKeyword,
+    statusFilter,
+    offset,
+    setOffset,
+    handleDomainKeywordChange,
+    handleStatusFilterChange,
+    handleResetFilters,
+  } = useCertificateDomainsQueryState({
+    pathname,
+    searchParams,
+    replace: (href, options) => router.replace(href, options),
+  })
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [batchDialogOpen, setBatchDialogOpen] = useState(false)
@@ -149,20 +72,22 @@ export default function DomainsPage() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyDomain, setHistoryDomain] = useState<CertDomain | null>(null)
   const [historyItems, setHistoryItems] = useState<CertCheckResult[]>([])
-  const [autoCheckHandled, setAutoCheckHandled] = useState(false)
   const [autoCreateDomain, setAutoCreateDomain] = useState<string | null>(null)
-  const [autoCreatePort, setAutoCreatePort] = useState("")
-  const [autoCreateCheckInterval, setAutoCreateCheckInterval] = useState("")
-  const [autoCreateNote, setAutoCreateNote] = useState("")
   const [autoCreateAdvancedOpen, setAutoCreateAdvancedOpen] = useState(false)
   const [clearAdvancedDialogOpen, setClearAdvancedDialogOpen] = useState(false)
   const [autoCreating, setAutoCreating] = useState(false)
 
-  const autoCreateAdvancedFilledCount = [autoCreatePort, autoCreateCheckInterval, autoCreateNote].reduce(
-    (count, value) => (value.trim() ? count + 1 : count),
-    0
-  )
-  const autoCreateHasAdvancedDraft = autoCreateAdvancedFilledCount > 0
+  const {
+    port: autoCreatePort,
+    setPort: setAutoCreatePort,
+    checkInterval: autoCreateCheckInterval,
+    setCheckInterval: setAutoCreateCheckInterval,
+    note: autoCreateNote,
+    setNote: setAutoCreateNote,
+    advancedFilledCount: autoCreateAdvancedFilledCount,
+    hasAdvancedDraft: autoCreateHasAdvancedDraft,
+    resetAdvancedDraft,
+  } = useCertificateAutoCreateDraft()
   const autoCreateAdvancedResetCount = Math.max(1, autoCreateAdvancedFilledCount)
   const autoCreateAdvancedResetTitleKey = pickCountKey(
     "certificates.domains.autoCreateAdvancedResetDialogTitleOne",
@@ -192,9 +117,7 @@ export default function DomainsPage() {
     setAutoCreateDomain(null)
 
     if (!preserveAdvanced) {
-      setAutoCreatePort("")
-      setAutoCreateCheckInterval("")
-      setAutoCreateNote("")
+      resetAdvancedDraft()
     }
 
     setAutoCreateAdvancedOpen(false)
@@ -204,9 +127,7 @@ export default function DomainsPage() {
   const clearAutoCreateAdvancedDraft = () => {
     const clearedCount = autoCreateAdvancedFilledCount
 
-    setAutoCreatePort("")
-    setAutoCreateCheckInterval("")
-    setAutoCreateNote("")
+    resetAdvancedDraft()
     setAutoCreateAdvancedOpen(false)
     setClearAdvancedDialogOpen(false)
 
@@ -260,66 +181,6 @@ export default function DomainsPage() {
   }, [fetchDomains])
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return
-    }
-
-    try {
-      const raw = window.sessionStorage.getItem(AUTO_CREATE_ADVANCED_STORAGE_KEY)
-
-      if (!raw) {
-        return
-      }
-
-      const parsed = JSON.parse(raw) as {
-        port?: unknown
-        checkInterval?: unknown
-        note?: unknown
-      }
-
-      if (typeof parsed.port === "string") {
-        setAutoCreatePort(parsed.port)
-      }
-
-      if (typeof parsed.checkInterval === "string") {
-        setAutoCreateCheckInterval(parsed.checkInterval)
-      }
-
-      if (typeof parsed.note === "string") {
-        setAutoCreateNote(parsed.note)
-      }
-    } catch {
-      window.sessionStorage.removeItem(AUTO_CREATE_ADVANCED_STORAGE_KEY)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return
-    }
-
-    if (!autoCreateHasAdvancedDraft) {
-      window.sessionStorage.removeItem(AUTO_CREATE_ADVANCED_STORAGE_KEY)
-      return
-    }
-
-    window.sessionStorage.setItem(
-      AUTO_CREATE_ADVANCED_STORAGE_KEY,
-      JSON.stringify({
-        port: autoCreatePort,
-        checkInterval: autoCreateCheckInterval,
-        note: autoCreateNote,
-      })
-    )
-  }, [autoCreateCheckInterval, autoCreateHasAdvancedDraft, autoCreateNote, autoCreatePort])
-
-  useEffect(() => {
-    if (autoCheckParamValue === "1") {
-      setAutoCheckHandled(false)
-    }
-  }, [autoCheckParamValue, domainParamValue])
-
-  useEffect(() => {
     if (!autoCreateDomain) {
       return
     }
@@ -329,106 +190,9 @@ export default function DomainsPage() {
     }
   }, [autoCreateDomain, autoCreateHasAdvancedDraft])
 
-  useEffect(() => {
-    if (autoCheckHandled || autoCheckParamValue !== "1" || loading) {
-      return
-    }
-
-    const matchedDomain = domainParamValue.trim().toLowerCase()
-
-    if (!matchedDomain) {
-      setAutoCheckHandled(true)
-      return
-    }
-
-    const target = domains.find((item) => item.domain.toLowerCase() === matchedDomain)
-
-    if (!target) {
-      setAutoCheckHandled(true)
-      setAutoCreateDomain(domainParamValue.trim())
-      setAutoCreateAdvancedOpen(false)
-      return
-    }
-
-    setAutoCheckHandled(true)
-    void handleCheckDomain(target)
-  }, [
-    autoCheckHandled,
-    autoCheckParamValue,
-    loading,
-    domains,
-    domainParamValue,
-    t,
-  ])
-
-  useEffect(() => {
-    const nextDomain = searchParams.get("domain") || ""
-    const nextStatusRaw = searchParams.get("status") || "all"
-    const nextStatus = nextStatusRaw === "enabled" || nextStatusRaw === "disabled"
-      ? nextStatusRaw
-      : "all"
-    const nextRawOffset = Number(searchParams.get("offset") || "0")
-    const nextOffset = Number.isFinite(nextRawOffset) && nextRawOffset > 0
-      ? Math.floor(nextRawOffset)
-      : 0
-
-    setDomainKeyword((previous) => (previous === nextDomain ? previous : nextDomain))
-    setStatusFilter((previous) => (previous === nextStatus ? previous : nextStatus))
-    setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
-  }, [searchParams])
-
-  useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams.toString())
-
-    if (domainKeyword.trim()) {
-      nextParams.set("domain", domainKeyword)
-    } else {
-      nextParams.delete("domain")
-    }
-
-    if (statusFilter !== "all") {
-      nextParams.set("status", statusFilter)
-    } else {
-      nextParams.delete("status")
-    }
-
-    if (offset > 0) {
-      nextParams.set("offset", String(offset))
-    } else {
-      nextParams.delete("offset")
-    }
-
-    const nextQuery = nextParams.toString()
-    const currentQuery = searchParams.toString()
-
-    if (nextQuery === currentQuery) {
-      return
-    }
-
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
-      scroll: false,
-    })
-  }, [domainKeyword, offset, pathname, router, searchParams, statusFilter])
-
   const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
   const canGoPrev = offset > 0
   const canGoNext = offset + domains.length < domainsPage.total
-
-  const handleDomainKeywordChange = (value: string) => {
-    setDomainKeyword(value)
-    setOffset((previous) => (previous === 0 ? previous : 0))
-  }
-
-  const handleStatusFilterChange = (value: "all" | "enabled" | "disabled") => {
-    setStatusFilter(value)
-    setOffset((previous) => (previous === 0 ? previous : 0))
-  }
-
-  const handleResetFilters = () => {
-    setDomainKeyword("")
-    setStatusFilter("all")
-    setOffset(0)
-  }
 
   const handleCreateDomain = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -549,6 +313,16 @@ export default function DomainsPage() {
       setCheckingId(null)
     }
   }
+
+  useCertificateDomainsAutoCheckFlow({
+    autoCheckParamValue,
+    domainParamValue,
+    loading,
+    domains,
+    onCheckDomain: handleCheckDomain,
+    onAutoCreateDomain: setAutoCreateDomain,
+    onAutoCreateDialogInit: () => setAutoCreateAdvancedOpen(false),
+  })
 
   const handleCheckAllDomains = async () => {
     setCheckingAll(true)
@@ -708,6 +482,82 @@ export default function DomainsPage() {
     )
   }, [domains])
 
+  const createDialogText = {
+    trigger: t("certificates.domains.addButton"),
+    title: t("certificates.domains.addDialogTitle"),
+    description: t("certificates.domains.addDialogDescription"),
+    domainLabel: t("certificates.domains.fieldDomain"),
+    domainPlaceholder: t("certificates.domains.fieldDomainPlaceholder"),
+    portLabel: t("certificates.domains.fieldPort"),
+    portPlaceholder: t("certificates.domains.fieldPortPlaceholder"),
+    intervalLabel: t("certificates.domains.fieldInterval"),
+    intervalPlaceholder: t("certificates.domains.fieldIntervalPlaceholder"),
+    noteLabel: t("certificates.domains.fieldNote"),
+    notePlaceholder: t("certificates.domains.fieldNotePlaceholder"),
+    cancel: t("certificates.domains.cancelButton"),
+    submit: t("certificates.domains.addSubmit"),
+    submitting: t("certificates.domains.addSubmitting"),
+  }
+
+  const batchCreateDialogText = {
+    trigger: t("certificates.domains.batchButton"),
+    title: t("certificates.domains.batchDialogTitle"),
+    description: t("certificates.domains.batchDialogDescription"),
+    fieldLabel: t("certificates.domains.batchFieldLabel"),
+    placeholder: t("certificates.domains.batchPlaceholder"),
+    cancel: t("certificates.domains.cancelButton"),
+    submit: t("certificates.domains.batchSubmit"),
+  }
+
+  const deleteDialogText = {
+    title: t("certificates.domains.deleteDialogTitle"),
+    description: t("certificates.domains.deleteDialogDescription", {
+      domain: deleteDialogDomain?.domain || "-",
+    }),
+    cancel: t("certificates.domains.cancelButton"),
+    confirm: t("certificates.domains.actionDelete"),
+  }
+
+  const autoCreateDialogText = {
+    title: t("certificates.domains.autoCreateDialogTitle"),
+    description: t("certificates.domains.autoCreateDialogDescription", {
+      domain: autoCreateDomain || "-",
+    }),
+    advancedToggle: t("certificates.domains.autoCreateAdvancedToggle"),
+    advancedHint: t("certificates.domains.autoCreateAdvancedHint"),
+    advancedReset: t("certificates.domains.autoCreateAdvancedReset"),
+    fieldPort: t("certificates.domains.fieldPort"),
+    fieldPortPlaceholder: t("certificates.domains.fieldPortPlaceholder"),
+    fieldInterval: t("certificates.domains.fieldInterval"),
+    fieldIntervalPlaceholder: t("certificates.domains.fieldIntervalPlaceholder"),
+    fieldNote: t("certificates.domains.fieldNote"),
+    fieldNotePlaceholder: t("certificates.domains.fieldNotePlaceholder"),
+    cancel: t("certificates.domains.cancelButton"),
+    submit: t("certificates.domains.autoCreateSubmit"),
+    submitting: t("certificates.domains.autoCreateSubmitting"),
+    clearDialogTitle: t(autoCreateAdvancedResetTitleKey, {
+      count: autoCreateAdvancedResetCount,
+    }),
+    clearDialogDescription: t("certificates.domains.autoCreateAdvancedResetDialogDescription", {
+      count: autoCreateAdvancedResetCount,
+    }),
+    clearDialogConfirm: t(autoCreateAdvancedResetConfirmKey, {
+      count: autoCreateAdvancedResetCount,
+    }),
+  }
+
+  const historyDialogText = {
+    title: t("certificates.domains.historyDialogTitle", {
+      domain: historyDomain?.domain || "-",
+    }),
+    description: t("certificates.domains.historyDialogDescription"),
+    loading: t("certificates.domains.historyLoading"),
+    empty: t("certificates.domains.historyEmpty"),
+    statusValid: t("certificates.domains.historyStatusValid"),
+    statusInvalid: t("certificates.domains.historyStatusInvalid"),
+    noError: t("certificates.domains.historyNoError"),
+  }
+
   return (
     <div className="min-w-0 space-y-6 p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -716,479 +566,121 @@ export default function DomainsPage() {
           <p className="text-sm text-muted-foreground">{t("certificates.domains.description")}</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleCheckAllDomains}
-            disabled={checkingAll}
-          >
-            {checkingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-            {t("certificates.domains.checkAllButton")}
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={() => fetchDomains(true)}
-            disabled={loading || refreshing}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {t("certificates.domains.refreshButton")}
-          </Button>
-
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                {t("certificates.domains.addButton")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t("certificates.domains.addDialogTitle")}</DialogTitle>
-                <DialogDescription>{t("certificates.domains.addDialogDescription")}</DialogDescription>
-              </DialogHeader>
-
-              <form onSubmit={handleCreateDomain} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="domain-name">{t("certificates.domains.fieldDomain")}</Label>
-                  <Input
-                    id="domain-name"
-                    value={newDomain}
-                    onChange={(event) => setNewDomain(event.target.value)}
-                    placeholder={t("certificates.domains.fieldDomainPlaceholder")}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="domain-port">{t("certificates.domains.fieldPort")}</Label>
-                    <Input
-                      id="domain-port"
-                      value={newPort}
-                      onChange={(event) => setNewPort(event.target.value)}
-                      placeholder={t("certificates.domains.fieldPortPlaceholder")}
-                      inputMode="numeric"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="domain-interval">{t("certificates.domains.fieldInterval")}</Label>
-                    <Input
-                      id="domain-interval"
-                      value={newCheckInterval}
-                      onChange={(event) => setNewCheckInterval(event.target.value)}
-                      placeholder={t("certificates.domains.fieldIntervalPlaceholder")}
-                      inputMode="numeric"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="domain-note">{t("certificates.domains.fieldNote")}</Label>
-                  <Input
-                    id="domain-note"
-                    value={newNote}
-                    onChange={(event) => setNewNote(event.target.value)}
-                    placeholder={t("certificates.domains.fieldNotePlaceholder")}
-                  />
-                </div>
-
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                    {t("certificates.domains.cancelButton")}
-                  </Button>
-                  <Button type="submit" disabled={creating}>
-                    {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {creating ? t("certificates.domains.addSubmitting") : t("certificates.domains.addSubmit")}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">{t("certificates.domains.batchButton")}</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t("certificates.domains.batchDialogTitle")}</DialogTitle>
-                <DialogDescription>{t("certificates.domains.batchDialogDescription")}</DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-2">
-                <Label htmlFor="batch-domains">{t("certificates.domains.batchFieldLabel")}</Label>
-                <Textarea
-                  id="batch-domains"
-                  value={batchDomains}
-                  onChange={(event) => setBatchDomains(event.target.value)}
-                  placeholder={t("certificates.domains.batchPlaceholder")}
-                  rows={8}
-                />
-              </div>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setBatchDialogOpen(false)}>
-                  {t("certificates.domains.cancelButton")}
-                </Button>
-                <Button type="button" onClick={handleBatchCreate} disabled={batchCreating}>
-                  {batchCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {t("certificates.domains.batchSubmit")}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("certificates.domains.statTotal")}</CardDescription>
-            <CardTitle className="text-3xl">{stats.total}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("certificates.domains.statEnabled")}</CardDescription>
-            <CardTitle className="text-3xl text-emerald-600">{stats.enabled}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("certificates.domains.statDisabled")}</CardDescription>
-            <CardTitle className="text-3xl text-muted-foreground">{stats.disabled}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("certificates.domains.filtersTitle")}</CardTitle>
-          <CardDescription>{t("certificates.domains.filtersDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FilterToolbar
-            className="gap-3 md:grid-cols-2 xl:grid-cols-2"
-            search={{
-              value: domainKeyword,
-              onValueChange: handleDomainKeywordChange,
-              placeholder: t("certificates.domains.filterDomainPlaceholder"),
-              inputClassName: "h-10",
+        <DomainHeaderActions
+          checkingAll={checkingAll}
+          loading={loading}
+          refreshing={refreshing}
+          onCheckAllDomains={handleCheckAllDomains}
+          onRefreshDomains={() => {
+            void fetchDomains(true)
+          }}
+          checkAllLabel={t("certificates.domains.checkAllButton")}
+          refreshLabel={t("certificates.domains.refreshButton")}
+        >
+          <DomainCreateDialog
+            open={createDialogOpen}
+            onOpenChange={setCreateDialogOpen}
+            onSubmit={handleCreateDomain}
+            creating={creating}
+            values={{
+              domain: newDomain,
+              port: newPort,
+              interval: newCheckInterval,
+              note: newNote,
             }}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant={statusFilter === "all" ? "default" : "outline"}
-                onClick={() => handleStatusFilterChange("all")}
-                className="h-10"
-              >
-                {t("certificates.domains.filterStatusAll")}
-              </Button>
-              <Button
-                type="button"
-                variant={statusFilter === "enabled" ? "default" : "outline"}
-                onClick={() => handleStatusFilterChange("enabled")}
-                className="h-10"
-              >
-                {t("certificates.domains.filterStatusEnabled")}
-              </Button>
-              <Button
-                type="button"
-                variant={statusFilter === "disabled" ? "default" : "outline"}
-                onClick={() => handleStatusFilterChange("disabled")}
-                className="h-10"
-              >
-                {t("certificates.domains.filterStatusDisabled")}
-              </Button>
-              <Button type="button" variant="outline" onClick={handleResetFilters} className="h-10">
-                {t("certificates.domains.clearFilters")}
-              </Button>
-            </div>
-          </FilterToolbar>
-        </CardContent>
-      </Card>
+            onChange={{
+              domain: setNewDomain,
+              port: setNewPort,
+              interval: setNewCheckInterval,
+              note: setNewNote,
+            }}
+            text={createDialogText}
+          />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("certificates.domains.tableTitle")}</CardTitle>
-          <CardDescription>{t("certificates.domains.tableDescription", { limit: PAGE_LIMIT })}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-hidden rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("certificates.domains.tableColDomain")}</TableHead>
-                  <TableHead>{t("certificates.domains.tableColPort")}</TableHead>
-                  <TableHead>{t("certificates.domains.tableColStatus")}</TableHead>
-                  <TableHead>{t("certificates.domains.tableColInterval")}</TableHead>
-                  <TableHead>{t("certificates.domains.tableColLastChecked")}</TableHead>
-                  <TableHead>{t("certificates.domains.tableColNote")}</TableHead>
-                  <TableHead className="text-right">{t("certificates.domains.tableColActions")}</TableHead>
-                </TableRow>
-              </TableHeader>
+          <DomainBatchCreateDialog
+            open={batchDialogOpen}
+            onOpenChange={setBatchDialogOpen}
+            value={batchDomains}
+            onValueChange={setBatchDomains}
+            onSubmit={handleBatchCreate}
+            submitting={batchCreating}
+            text={batchCreateDialogText}
+          />
+        </DomainHeaderActions>
+      </div>
 
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
-                      <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                      {t("certificates.domains.tableLoading")}
-                    </TableCell>
-                  </TableRow>
-                ) : domains.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                      <div className="space-y-2">
-                        <p>{t("certificates.domains.tableEmpty")}</p>
-                        <p className="text-xs text-muted-foreground/80">
-                          {t("certificates.domains.tableEmptyHint")}
-                        </p>
-                        <Button type="button" size="sm" onClick={() => setCreateDialogOpen(true)}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          {t("certificates.domains.addButton")}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  domains.map((domain) => {
-                    const statusMeta = getDomainStatusMeta(domain.enabled, t)
-                    const checking = checkingId === domain.id
-                    const updating = updatingId === domain.id
-                    const deleting = deletingId === domain.id
+      <DomainStatsCards t={t} stats={stats} />
 
-                    return (
-                      <TableRow key={domain.id} className="hover:bg-muted/40">
-                        <TableCell className="font-medium">{domain.domain}</TableCell>
-                        <TableCell className="text-muted-foreground">{domain.port}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Badge className={statusMeta.className}>{statusMeta.label}</Badge>
-                            <Switch
-                              checked={domain.enabled}
-                              disabled={updating}
-                              onCheckedChange={(checked) => handleToggleEnabled(domain, checked)}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {domain.check_interval_secs
-                            ? t("certificates.domains.intervalSeconds", { seconds: domain.check_interval_secs })
-                            : t("certificates.domains.intervalDefault")}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDateTime(domain.last_checked_at, locale)}
-                        </TableCell>
-                        <TableCell className="max-w-[220px] truncate text-muted-foreground" title={domain.note || ""}>
-                          {domain.note || t("certificates.domains.noteEmpty")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={checking}
-                              onClick={() => handleCheckDomain(domain)}
-                            >
-                              {checking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                              {t("certificates.domains.actionCheck")}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openHistoryDialog(domain)}
-                              title={t("certificates.domains.actionHistory")}
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              onClick={() => setDeleteDialogDomain(domain)}
-                              disabled={deleting}
-                              title={t("certificates.domains.actionDelete")}
-                            >
-                              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+      <DomainFiltersCard
+        t={t}
+        domainKeyword={domainKeyword}
+        statusFilter={statusFilter}
+        onDomainKeywordChange={handleDomainKeywordChange}
+        onStatusFilterChange={handleStatusFilterChange}
+        onResetFilters={handleResetFilters}
+      />
 
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <span className="mr-2 text-xs text-muted-foreground">
-              {t("certificates.domains.paginationPage", { page: pageNumber })}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canGoPrev || loading}
-              onClick={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              {t("certificates.domains.paginationPrev")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canGoNext || loading}
-              onClick={() => setOffset((previous) => previous + PAGE_LIMIT)}
-            >
-              {t("certificates.domains.paginationNext")}
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <DomainTableCard
+        t={t}
+        locale={locale}
+        pageLimit={PAGE_LIMIT}
+        loading={loading}
+        domains={domains}
+        pageNumber={pageNumber}
+        canGoPrev={canGoPrev}
+        canGoNext={canGoNext}
+        checkingId={checkingId}
+        updatingId={updatingId}
+        deletingId={deletingId}
+        onOpenCreateDialog={() => setCreateDialogOpen(true)}
+        onToggleEnabled={handleToggleEnabled}
+        onCheckDomain={(domain) => {
+          void handleCheckDomain(domain)
+        }}
+        onOpenHistory={openHistoryDialog}
+        onDeleteDomain={setDeleteDialogDomain}
+        onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
+        onNextPage={() => setOffset((previous) => previous + PAGE_LIMIT)}
+      />
 
-      <Dialog open={Boolean(deleteDialogDomain)} onOpenChange={(open) => !open && setDeleteDialogDomain(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("certificates.domains.deleteDialogTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("certificates.domains.deleteDialogDescription", {
-                domain: deleteDialogDomain?.domain || "-",
-              })}
-            </DialogDescription>
-          </DialogHeader>
+      <DomainDeleteDialog
+        open={Boolean(deleteDialogDomain)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDialogDomain(null)
+          }
+        }}
+        deleting={Boolean(deletingId)}
+        onConfirm={handleDeleteDomain}
+        text={deleteDialogText}
+      />
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteDialogDomain(null)}>
-              {t("certificates.domains.cancelButton")}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDeleteDomain}
-              disabled={Boolean(deletingId)}
-            >
-              {Boolean(deletingId) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t("certificates.domains.actionDelete")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DomainAutoCreateDialog
+        open={Boolean(autoCreateDomain)}
+        onOpenChange={(open) => !open && resetAutoCreateDraft()}
+        autoCreating={autoCreating}
+        advancedOpen={autoCreateAdvancedOpen}
+        onAdvancedOpenChange={setAutoCreateAdvancedOpen}
+        clearAdvancedDialogOpen={clearAdvancedDialogOpen}
+        onClearAdvancedDialogOpenChange={setClearAdvancedDialogOpen}
+        autoCreateHasAdvancedDraft={autoCreateHasAdvancedDraft}
+        values={{
+          port: autoCreatePort,
+          interval: autoCreateCheckInterval,
+          note: autoCreateNote,
+        }}
+        onChange={{
+          port: setAutoCreatePort,
+          interval: setAutoCreateCheckInterval,
+          note: setAutoCreateNote,
+        }}
+        onResetAdvanced={clearAutoCreateAdvancedDraft}
+        onCancel={() => resetAutoCreateDraft()}
+        onSubmit={handleAutoCreateAndCheck}
+        text={autoCreateDialogText}
+      />
 
-      <Dialog open={Boolean(autoCreateDomain)} onOpenChange={(open) => !open && resetAutoCreateDraft()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("certificates.domains.autoCreateDialogTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("certificates.domains.autoCreateDialogDescription", {
-                domain: autoCreateDomain || "-",
-              })}
-            </DialogDescription>
-          </DialogHeader>
-
-          <Collapsible open={autoCreateAdvancedOpen} onOpenChange={setAutoCreateAdvancedOpen}>
-            <CollapsibleTrigger asChild>
-              <Button type="button" variant="outline" className="w-full justify-between" disabled={autoCreating}>
-                {t("certificates.domains.autoCreateAdvancedToggle")}
-                <ChevronDown className={`h-4 w-4 transition-transform ${autoCreateAdvancedOpen ? "rotate-180" : ""}`} />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-3 pt-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                  {t("certificates.domains.autoCreateAdvancedHint")}
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setClearAdvancedDialogOpen(true)}
-                  disabled={autoCreating || !autoCreateHasAdvancedDraft}
-                >
-                  {t("certificates.domains.autoCreateAdvancedReset")}
-                </Button>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="auto-create-port">{t("certificates.domains.fieldPort")}</Label>
-                  <Input
-                    id="auto-create-port"
-                    value={autoCreatePort}
-                    onChange={(event) => setAutoCreatePort(event.target.value)}
-                    placeholder={t("certificates.domains.fieldPortPlaceholder")}
-                    inputMode="numeric"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="auto-create-interval">{t("certificates.domains.fieldInterval")}</Label>
-                  <Input
-                    id="auto-create-interval"
-                    value={autoCreateCheckInterval}
-                    onChange={(event) => setAutoCreateCheckInterval(event.target.value)}
-                    placeholder={t("certificates.domains.fieldIntervalPlaceholder")}
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="auto-create-note">{t("certificates.domains.fieldNote")}</Label>
-                <Input
-                  id="auto-create-note"
-                  value={autoCreateNote}
-                  onChange={(event) => setAutoCreateNote(event.target.value)}
-                  placeholder={t("certificates.domains.fieldNotePlaceholder")}
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
-          <AlertDialog open={clearAdvancedDialogOpen} onOpenChange={setClearAdvancedDialogOpen}>
-            <AlertDialogContent size="sm">
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {t(autoCreateAdvancedResetTitleKey, {
-                    count: autoCreateAdvancedResetCount,
-                  })}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {t("certificates.domains.autoCreateAdvancedResetDialogDescription", {
-                    count: autoCreateAdvancedResetCount,
-                  })}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t("certificates.domains.cancelButton")}</AlertDialogCancel>
-                <AlertDialogAction variant="destructive" onClick={clearAutoCreateAdvancedDraft}>
-                  {t(autoCreateAdvancedResetConfirmKey, {
-                    count: autoCreateAdvancedResetCount,
-                  })}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => resetAutoCreateDraft()}
-              disabled={autoCreating}
-            >
-              {t("certificates.domains.cancelButton")}
-            </Button>
-            <Button type="button" onClick={handleAutoCreateAndCheck} disabled={autoCreating}>
-              {autoCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {autoCreating
-                ? t("certificates.domains.autoCreateSubmitting")
-                : t("certificates.domains.autoCreateSubmit")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
+      <DomainHistoryDialog
         open={historyDialogOpen}
         onOpenChange={(open) => {
           setHistoryDialogOpen(open)
@@ -1198,53 +690,12 @@ export default function DomainsPage() {
             setHistoryItems([])
           }
         }}
-      >
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {t("certificates.domains.historyDialogTitle", {
-                domain: historyDomain?.domain || "-",
-              })}
-            </DialogTitle>
-            <DialogDescription>{t("certificates.domains.historyDialogDescription")}</DialogDescription>
-          </DialogHeader>
-
-          {historyLoading ? (
-            <div className="py-8 text-center text-muted-foreground">
-              <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-              {t("certificates.domains.historyLoading")}
-            </div>
-          ) : historyItems.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
-              {t("certificates.domains.historyEmpty")}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {historyItems.map((item) => (
-                <div key={item.id} className="rounded-md border p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <Badge
-                      className={item.is_valid && item.chain_valid
-                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
-                        : "border-red-500/30 bg-red-500/10 text-red-600"}
-                    >
-                      {item.is_valid && item.chain_valid
-                        ? t("certificates.domains.historyStatusValid")
-                        : t("certificates.domains.historyStatusInvalid")}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDateTime(item.checked_at, locale)}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {item.error || t("certificates.domains.historyNoError")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+        historyItems={historyItems}
+        historyLoading={historyLoading}
+        formatDateTime={formatCertificateDateTime}
+        locale={locale}
+        text={historyDialogText}
+      />
     </div>
   )
 }

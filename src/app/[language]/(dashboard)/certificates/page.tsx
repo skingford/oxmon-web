@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { formatCertificateDateTime } from "@/lib/certificates/formats"
 import { CertificateChainInfo, CertificateDetails, CertSummary, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
@@ -46,27 +47,6 @@ type CertificatesQueryState = {
   summary: CertSummary | null
 }
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
-
-function formatDateTime(value: string | null, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
 
 function formatDate(value: string | null, locale: "zh" | "en") {
   if (!value) {
@@ -614,7 +594,7 @@ export default function CertificatesPage() {
               </div>
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-muted-foreground">{t("certificates.overview.chainFieldCheckedAt")}</span>
-                <span className="text-sm">{formatDateTime(chainInfo.last_checked, locale)}</span>
+                <span className="text-sm">{formatCertificateDateTime(chainInfo.last_checked, locale)}</span>
               </div>
               <div className="space-y-1">
                 <span className="text-sm text-muted-foreground">{t("certificates.overview.chainFieldError")}</span>
