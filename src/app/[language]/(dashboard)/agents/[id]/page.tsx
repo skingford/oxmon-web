@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { ApiRequestError, api } from "@/lib/api"
 import { AgentDetail, LatestMetric } from "@/types/api"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -33,7 +33,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertCircle, ArrowLeft, Gauge, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError, toastDeleted, toastSaved } from "@/lib/toast"
 
 function toFiniteNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -399,7 +399,7 @@ export default function AgentDetailPage() {
         return
       }
 
-      toast.error(getApiErrorMessage(error, t("agentDetail.toastFetchError")))
+      toastApiError(error, t("agentDetail.toastFetchError"))
     }
   }, [agentRef, t])
 
@@ -485,7 +485,7 @@ export default function AgentDetailPage() {
               return
             }
 
-            toast.error(getApiErrorMessage(error, t("agentDetail.toastFetchError")))
+            toastApiError(error, t("agentDetail.toastFetchError"))
           },
         }
       )
@@ -548,7 +548,7 @@ export default function AgentDetailPage() {
       )
       setIsEditDialogOpen(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("agentDetail.toastFetchError")))
+      toastApiError(error, t("agentDetail.toastFetchError"))
     } finally {
       setPreparingEdit(false)
     }
@@ -576,12 +576,12 @@ export default function AgentDetailPage() {
         description: editDescription.trim() ? editDescription.trim() : null,
         collection_interval_secs: normalizedInterval,
       })
-      toast.success(t("agentDetail.toastUpdateSuccess"))
+      toastSaved(t("agentDetail.toastUpdateSuccess"))
       setIsEditDialogOpen(false)
       await fetchAgentDetail()
       await fetchLatestMetrics(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("agentDetail.toastUpdateError")))
+      toastApiError(error, t("agentDetail.toastUpdateError"))
     } finally {
       setUpdating(false)
     }
@@ -595,10 +595,10 @@ export default function AgentDetailPage() {
     setDeleting(true)
     try {
       await api.deleteAgent(agentRef)
-      toast.success(t("agentDetail.toastDeleteSuccess"))
+      toastDeleted(t("agentDetail.toastDeleteSuccess"))
       router.replace(agentsPath)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("agentDetail.toastDeleteError")))
+      toastApiError(error, t("agentDetail.toastDeleteError"))
     } finally {
       setDeleting(false)
     }

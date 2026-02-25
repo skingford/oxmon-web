@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { ApiRequestError, api } from "@/lib/api"
 import { parseOptionalNonNegativeInt } from "@/lib/certificates/formats"
 import { CertDomain } from "@/types/api"
-import { toast } from "sonner"
+import { toast, toastActionSuccess, toastApiError, toastSaved } from "@/lib/toast"
 
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
@@ -74,7 +74,7 @@ export function useCertificateMonitoringConfig({
       const result = await api.checkSingleDomain(domainId)
 
       if (result.is_valid && result.chain_valid) {
-        toast.success(t("certificates.domains.toastCheckSuccess"))
+        toastActionSuccess(t("certificates.domains.toastCheckSuccess"))
       } else {
         toast.error(
           t("certificates.domains.toastCheckFailed", {
@@ -83,7 +83,7 @@ export function useCertificateMonitoringConfig({
         )
       }
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("certificates.domains.toastCheckError")))
+      toastApiError(error, t("certificates.domains.toastCheckError"))
     }
   }
 
@@ -181,7 +181,7 @@ export function useCertificateMonitoringConfig({
       if (error instanceof ApiRequestError && error.status === 409) {
         toast.error(t("certificates.domains.toastCreateConflict"))
       } else {
-        toast.error(getApiErrorMessage(error, t("certificates.domains.toastCreateError")))
+        toastApiError(error, t("certificates.domains.toastCreateError"))
       }
     } finally {
       setCreatingDomain(false)
@@ -211,7 +211,7 @@ export function useCertificateMonitoringConfig({
         note: editNote.trim() ? editNote.trim() : null,
       })
 
-      toast.success(t("certificates.detail.toastUpdateMonitoringSuccess"))
+      toastSaved(t("certificates.detail.toastUpdateMonitoringSuccess"))
       setEditDomainOpen(false)
 
       if (editEnabled && editCheckAfterSave) {
@@ -221,7 +221,7 @@ export function useCertificateMonitoringConfig({
       await fetchLinkedDomain(linkedDomain.domain)
       await onRefreshCertificateDetail()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("certificates.domains.toastUpdateError")))
+      toastApiError(error, t("certificates.domains.toastUpdateError"))
     } finally {
       setSavingDomain(false)
     }

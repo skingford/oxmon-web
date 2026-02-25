@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { ApiRequestError, api } from "@/lib/api"
 import { getAuthToken, isAuthTokenValid, setAuthToken } from "@/lib/auth-token"
 import { refreshGlobalConfigCache } from "@/lib/global-config-cache"
 import { encryptPasswordWithPublicKey } from "@/lib/password-encryption"
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAppTranslations } from "@/hooks/use-app-translations"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 import { Loader2 } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
@@ -99,7 +99,7 @@ export default function LoginPage() {
       if (error instanceof ApiRequestError && error.status === 401) {
         toast.error(t("login.toastInvalidCredentials"))
       } else {
-        toast.error(getApiErrorMessage(error, t("login.toastLoginFailed")))
+        toastApiError(error, t("login.toastLoginFailed"))
       }
     } finally {
       if (!redirected) {

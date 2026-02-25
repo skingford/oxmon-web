@@ -1,7 +1,7 @@
 "use client"
 
 import { FormEvent, useCallback, useMemo, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import {
   CreateDictionaryTypeRequest,
   DictionaryTypeSummary,
@@ -13,7 +13,7 @@ import {
   DictionaryTypeFormFields,
   DictionaryTypeFormState,
 } from "@/components/system/DictionaryTypeFormFields"
-import { getStatusAwareMessage } from "@/lib/api-error-utils"
+
 import { normalizeNullableText, parseOptionalSortOrder } from "@/lib/dictionary-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -48,7 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError, toastCreated, toastDeleted, toastSaved, toastStatusError } from "@/lib/toast"
 
 type DictionaryTypeSortMode =
   | "count_desc"
@@ -96,7 +96,7 @@ export default function SystemDictionaryTypesPage() {
 
   const handleTypeFetchError = useCallback(
     (error: unknown) => {
-      toast.error(getApiErrorMessage(error, t("dictionaryToastFetchTypesError")))
+      toastApiError(error, t("dictionaryToastFetchTypesError"))
     },
     [t]
   )
@@ -205,7 +205,7 @@ export default function SystemDictionaryTypesPage() {
 
     try {
       await api.createDictionaryType(payload)
-      toast.success(t("dictionaryTypeToastCreateSuccess"))
+      toastCreated(t("dictionaryTypeToastCreateSuccess"))
       setIsCreateDialogOpen(false)
       setCreateForm(getInitialDictionaryTypeForm())
 
@@ -218,11 +218,9 @@ export default function SystemDictionaryTypesPage() {
         setSelectedType(targetType)
       }
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("dictionaryTypeToastCreateError"), {
-          409: t("dictionaryTypeToastCreateConflict"),
-        })
-      )
+      toastStatusError(error, t("dictionaryTypeToastCreateError"), {
+        409: t("dictionaryTypeToastCreateConflict"),
+      })
     } finally {
       setCreateSubmitting(false)
     }
@@ -266,7 +264,7 @@ export default function SystemDictionaryTypesPage() {
 
     try {
       await api.updateDictionaryType(editingType.dict_type, payload)
-      toast.success(t("dictionaryTypeToastUpdateSuccess"))
+      toastSaved(t("dictionaryTypeToastUpdateSuccess"))
       setIsEditDialogOpen(false)
       setEditingType(null)
 
@@ -279,11 +277,9 @@ export default function SystemDictionaryTypesPage() {
         setSelectedType(targetType)
       }
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("dictionaryTypeToastUpdateError"), {
-          404: t("dictionaryTypeToastUpdateNotFound"),
-        })
-      )
+      toastStatusError(error, t("dictionaryTypeToastUpdateError"), {
+        404: t("dictionaryTypeToastUpdateNotFound"),
+      })
     } finally {
       setEditSubmitting(false)
     }
@@ -305,7 +301,7 @@ export default function SystemDictionaryTypesPage() {
 
     try {
       await api.deleteDictionaryType(dictType)
-      toast.success(t("dictionaryTypeToastDeleteSuccess"))
+      toastDeleted(t("dictionaryTypeToastDeleteSuccess"))
       setDeleteTarget(null)
 
       const latestTypes = await fetchDictionaryTypes(true)
@@ -318,12 +314,10 @@ export default function SystemDictionaryTypesPage() {
 
       setSelectedType(targetType)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("dictionaryTypeToastDeleteError"), {
-          404: t("dictionaryTypeToastDeleteNotFound"),
-          409: t("dictionaryTypeToastDeleteConflict"),
-        })
-      )
+      toastStatusError(error, t("dictionaryTypeToastDeleteError"), {
+        404: t("dictionaryTypeToastDeleteNotFound"),
+        409: t("dictionaryTypeToastDeleteConflict"),
+      })
     } finally {
       setDeleteSubmitting(false)
     }

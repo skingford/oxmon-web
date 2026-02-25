@@ -14,7 +14,7 @@ import {
   UpdateSystemConfigRequest,
 } from "@/types/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { toast } from "sonner"
+import { toast, toastActionSuccess, toastApiError, toastCreated, toastDeleted, toastSaved } from "@/lib/toast"
 import {
   BookText,
   FilterX,
@@ -116,7 +116,7 @@ export default function SystemPage() {
         systemConfigs: systemConfigRows,
       })
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("toastFetchError")))
+      toastApiError(error, t("toastFetchError"))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -131,12 +131,12 @@ export default function SystemPage() {
     setCleaning(true)
     try {
       await api.triggerCleanup()
-      toast.success(t("toastCleanupSuccess"))
+      toastActionSuccess(t("toastCleanupSuccess"))
       const storageData = await api.getStorageInfo()
       setStorage(storageData)
       setIsCleanupDialogOpen(false)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("toastCleanupError")))
+      toastApiError(error, t("toastCleanupError"))
     } finally {
       setCleaning(false)
     }
@@ -164,7 +164,7 @@ export default function SystemPage() {
         encrypted_current_password: encryptedCurrentPassword,
         encrypted_new_password: encryptedNewPassword,
       })
-      toast.success(t("toastPasswordSuccess"))
+      toastActionSuccess(t("toastPasswordSuccess"))
       clearAuthToken()
       clearGlobalConfigCache()
       setIsPasswordDialogOpen(false)
@@ -173,7 +173,7 @@ export default function SystemPage() {
         window.location.replace(withLocalePrefix("/login", locale))
       }, 300)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("toastPasswordError")))
+      toastApiError(error, t("toastPasswordError"))
     } finally {
       setChanging(false)
     }
@@ -358,7 +358,7 @@ export default function SystemPage() {
         }
 
         await api.updateSystemConfig(editingSystemConfig.id, payload)
-        toast.success(t("systemConfigToastUpdateSuccess"))
+        toastSaved(t("systemConfigToastUpdateSuccess"))
       } else {
         const payload: CreateSystemConfigRequest = {
           config_key: configKey,
@@ -369,7 +369,7 @@ export default function SystemPage() {
         }
 
         await api.createSystemConfig(payload)
-        toast.success(t("systemConfigToastCreateSuccess"))
+        toastCreated(t("systemConfigToastCreateSuccess"))
       }
 
       setIsSystemConfigDialogOpen(false)
@@ -406,7 +406,7 @@ export default function SystemPage() {
           : t("systemConfigToastDisableSuccess")
       )
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("systemConfigToastToggleError")))
+      toastApiError(error, t("systemConfigToastToggleError"))
     } finally {
       setTogglingSystemConfigId(null)
     }
@@ -421,11 +421,11 @@ export default function SystemPage() {
 
     try {
       await api.deleteSystemConfig(systemConfigDeleteTarget.id)
-      toast.success(t("systemConfigToastDeleteSuccess"))
+      toastDeleted(t("systemConfigToastDeleteSuccess"))
       setSystemConfigDeleteTarget(null)
       await fetchData(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("systemConfigToastDeleteError")))
+      toastApiError(error, t("systemConfigToastDeleteError"))
     } finally {
       setDeletingSystemConfigId(null)
     }

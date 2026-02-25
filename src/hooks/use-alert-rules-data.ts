@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { AlertRuleResponse } from "@/types/api"
-import { toast } from "sonner"
+import { toastApiError } from "@/lib/toast"
 
 type UseAlertRulesDataOptions = {
   t: AppNamespaceTranslator<"alerts">
@@ -29,7 +29,7 @@ export function useAlertRulesData({ t }: UseAlertRulesDataOptions) {
         const data = await api.getAlertRules()
         setRules(data)
       } catch (error) {
-        toast.error(getApiErrorMessage(error, t("rules.toastFetchError")))
+        toastApiError(error, t("rules.toastFetchError"))
       } finally {
         setLoading(false)
         setRefreshing(false)

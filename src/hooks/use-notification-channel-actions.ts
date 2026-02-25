@@ -1,12 +1,11 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
-import { getStatusAwareMessage } from "@/lib/api-error-utils"
+import { api } from "@/lib/api"
 import { normalizeRecipientsInput } from "@/lib/notifications/channel-utils"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import type { ChannelOverview } from "@/types/api"
-import { toast } from "sonner"
+import { toast, toastActionSuccess, toastApiError, toastDeleted, toastSaved, toastStatusError } from "@/lib/toast"
 
 type UseNotificationChannelActionsOptions = {
   t: AppNamespaceTranslator<"pages">
@@ -47,7 +46,7 @@ export function useNotificationChannelActions({
         const recipients = await api.getRecipients(channel.id)
         setRecipientsInput(recipients.join("\n"))
       } catch (error) {
-        toast.error(getApiErrorMessage(error, t("notifications.toastRecipientsFetchError")))
+        toastApiError(error, t("notifications.toastRecipientsFetchError"))
         setIsRecipientsDialogOpen(false)
         setRecipientsDialogChannel(null)
       } finally {
@@ -69,13 +68,13 @@ export function useNotificationChannelActions({
         recipients: normalizeRecipientsInput(recipientsInput),
       })
 
-      toast.success(t("notifications.toastRecipientsUpdateSuccess"))
+      toastSaved(t("notifications.toastRecipientsUpdateSuccess"))
       setIsRecipientsDialogOpen(false)
       setRecipientsDialogChannel(null)
       setRecipientsInput("")
       await fetchChannels(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("notifications.toastRecipientsUpdateError")))
+      toastApiError(error, t("notifications.toastRecipientsUpdateError"))
     } finally {
       setRecipientsSaving(false)
     }
@@ -98,7 +97,7 @@ export function useNotificationChannelActions({
 
         await fetchChannels(true)
       } catch (error) {
-        toast.error(getApiErrorMessage(error, t("notifications.toastToggleError")))
+        toastApiError(error, t("notifications.toastToggleError"))
       } finally {
         setTogglingId(null)
       }
@@ -112,9 +111,9 @@ export function useNotificationChannelActions({
 
       try {
         await api.testChannel(channel.id)
-        toast.success(t("notifications.toastTestSuccess"))
+        toastActionSuccess(t("notifications.toastTestSuccess"))
       } catch (error) {
-        toast.error(getApiErrorMessage(error, t("notifications.toastTestError")))
+        toastApiError(error, t("notifications.toastTestError"))
       } finally {
         setTestingId(null)
       }
@@ -141,15 +140,13 @@ export function useNotificationChannelActions({
 
     try {
       await api.deleteChannelConfig(deleteDialogChannel.id)
-      toast.success(t("notifications.toastDeleteSuccess"))
+      toastDeleted(t("notifications.toastDeleteSuccess"))
       setDeleteDialogChannel(null)
       await fetchChannels(true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("notifications.toastDeleteError"), {
-          404: t("notifications.toastDeleteNotFound"),
-        })
-      )
+      toastStatusError(error, t("notifications.toastDeleteError"), {
+        404: t("notifications.toastDeleteNotFound"),
+      })
     } finally {
       setDeletingId(null)
     }

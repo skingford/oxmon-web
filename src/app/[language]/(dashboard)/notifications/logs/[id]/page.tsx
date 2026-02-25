@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useCallback, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import type { NotificationLogItem } from "@/types/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { JsonTextarea } from "@/components/ui/json-textarea"
 import { ArrowLeft, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 
 type LogDetailState = {
   item: NotificationLogItem | null
@@ -56,7 +56,7 @@ export default function NotificationLogDetailPage() {
       },
       {
         onError: (error) => {
-          toast.error(getApiErrorMessage(error, t("notifications.logsDetailToastFetchError")))
+          toastApiError(error, t("notifications.logsDetailToastFetchError"))
         },
       }
     )

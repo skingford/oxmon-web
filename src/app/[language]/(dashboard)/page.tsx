@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { type DashboardOverview } from "@/types/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
@@ -22,7 +22,7 @@ import {
   ShieldCheck,
   ShieldX,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toastApiError } from "@/lib/toast"
 
 function formatUptime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) {
@@ -135,7 +135,7 @@ export default function DashboardPage() {
       const data = await api.getDashboardOverview()
       setOverview(data)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "加载仪表盘概览失败"))
+      toastApiError(error, "加载仪表盘概览失败")
     } finally {
       setLoading(false)
       setRefreshing(false)

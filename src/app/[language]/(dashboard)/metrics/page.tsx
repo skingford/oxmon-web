@@ -4,18 +4,19 @@ import { Suspense, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Area, AreaChart, Brush, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { Activity, ArrowDown, ArrowUp, ArrowUpDown, Filter, Loader2 } from "lucide-react"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { MetricDataPointResponse, MetricSummaryResponse } from "@/types/api"
 import { useRequestState } from "@/hooks/use-request-state"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useClientPagination } from "@/hooks/use-client-pagination"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { MetricsQueryToolbar, MetricsTimeRange } from "@/components/metrics/MetricsQueryToolbar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { TablePaginationControls } from "@/components/ui/table-pagination-controls"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "sonner"
+import { toast, toastActionSuccess, toastApiError, toastCopied } from "@/lib/toast"
 
 type TimeRange = MetricsTimeRange
 type TablePageSize = "20" | "50" | "100"
@@ -224,7 +225,6 @@ function MetricsPageContent() {
 
   const [autoQuery, setAutoQuery] = useState(true)
 
-  const [tablePage, setTablePage] = useState(1)
   const [tablePageSize, setTablePageSize] = useState<TablePageSize>("20")
   const [sortField, setSortField] = useState<SortField>("timestamp")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
@@ -239,7 +239,7 @@ function MetricsPageContent() {
 
     try {
       await navigator.clipboard.writeText(window.location.href)
-      toast.success(t("metrics.toastCopyLinkSuccess"))
+      toastCopied(t("metrics.toastCopyLinkSuccess"))
     } catch {
       toast.error(t("metrics.toastCopyLinkError"))
     }
@@ -252,7 +252,7 @@ function MetricsPageContent() {
     setTimeRange("24h")
     setCustomFrom("")
     setCustomTo("")
-    toast.success(t("metrics.toastResetFiltersSuccess"))
+    toastActionSuccess(t("metrics.toastResetFiltersSuccess"))
   }
 
   const handleTableSort = (field: SortField) => {
@@ -408,7 +408,7 @@ function MetricsPageContent() {
           }
         },
         onError: (error) => {
-          toast.error(getApiErrorMessage(error, t("metrics.toastMetricsFetchError")))
+          toastApiError(error, t("metrics.toastMetricsFetchError"))
         },
       }
     )
@@ -475,7 +475,7 @@ function MetricsPageContent() {
             })
           },
           onError: (error) => {
-            toast.error(getApiErrorMessage(error, t("metrics.toastFilterOptionsError")))
+            toastApiError(error, t("metrics.toastFilterOptionsError"))
           },
         }
       )
@@ -533,10 +533,6 @@ function MetricsPageContent() {
     }
   }, [autoQuery, fetchingOptions, hasQueryCondition, selectedAgent, selectedMetric, labelFilter, timeRange, customFrom, customTo])
 
-  useEffect(() => {
-    setTablePage(1)
-  }, [selectedAgent, selectedMetric, labelFilter, timeRange, customFrom, customTo, tablePageSize, sortField, sortDirection])
-
   const filteredDataPoints = useMemo(() => {
     if (!labelFilter.trim()) {
       return dataPoints
@@ -574,23 +570,12 @@ function MetricsPageContent() {
 
   const latestPoint = filteredDataPoints.length > 0 ? filteredDataPoints[filteredDataPoints.length - 1] : null
   const pageSize = Number(tablePageSize)
-  const totalRows = sortedTableData.length
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
-  const currentPage = Math.min(tablePage, totalPages)
-  const startIndex = totalRows === 0 ? 0 : (currentPage - 1) * pageSize + 1
-  const endIndex = totalRows === 0 ? 0 : Math.min(currentPage * pageSize, totalRows)
-
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * pageSize
-    const end = start + pageSize
-    return sortedTableData.slice(start, end)
-  }, [sortedTableData, currentPage, pageSize])
-
-  useEffect(() => {
-    if (tablePage > totalPages) {
-      setTablePage(totalPages)
-    }
-  }, [tablePage, totalPages])
+  const tablePaginationResetKey = `${selectedAgent}|${selectedMetric}|${labelFilter}|${timeRange}|${customFrom}|${customTo}|${tablePageSize}|${sortField}|${sortDirection}`
+  const tablePagination = useClientPagination({
+    items: sortedTableData,
+    pageSize,
+    resetKey: tablePaginationResetKey,
+  })
 
   const queryToolbarTexts = useMemo(
     () => ({
@@ -831,7 +816,7 @@ function MetricsPageContent() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedData.map((point, index) => (
+                    tablePagination.paginatedItems.map((point, index) => (
                       <TableRow key={point.id || `${point.timestamp}-${index}`}>
                         <TableCell>
                           <div className="flex flex-col">
@@ -862,48 +847,28 @@ function MetricsPageContent() {
                 </TableBody>
               </Table>
 
-              <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="text-sm text-muted-foreground">
-                  {t("metrics.tableSummary", { total: totalRows, start: startIndex, end: endIndex })}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Select value={tablePageSize} onValueChange={(value) => setTablePageSize(value as TablePageSize)}>
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder={t("metrics.pageSizePlaceholder")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="20">20 / page</SelectItem>
-                      <SelectItem value="50">50 / page</SelectItem>
-                      <SelectItem value="100">100 / page</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setTablePage((prev) => Math.max(1, prev - 1))}
-                    disabled={currentPage <= 1 || totalRows === 0}
-                  >
-                    {t("metrics.prevPage")}
-                  </Button>
-
-                  <div className="text-sm text-muted-foreground min-w-[90px] text-center">
-                    {t("metrics.pageIndicator", { current: currentPage, total: totalPages })}
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setTablePage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage >= totalPages || totalRows === 0}
-                  >
-                    {t("metrics.nextPage")}
-                  </Button>
-                </div>
-              </div>
+              <TablePaginationControls
+                className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+                summaryText={t("metrics.tableSummary", {
+                  total: tablePagination.totalRows,
+                  start: tablePagination.startIndex,
+                  end: tablePagination.endIndex,
+                })}
+                pageSize={pageSize}
+                pageSizeOptions={[20, 50, 100]}
+                onPageSizeChange={(value) => setTablePageSize(String(value) as TablePageSize)}
+                pageSizePlaceholder={t("metrics.pageSizePlaceholder")}
+                prevLabel={t("metrics.prevPage")}
+                nextLabel={t("metrics.nextPage")}
+                pageIndicatorText={t("metrics.pageIndicator", {
+                  current: tablePagination.currentPage,
+                  total: tablePagination.totalPages,
+                })}
+                onPrevPage={() => tablePagination.setPage((prev) => Math.max(1, prev - 1))}
+                onNextPage={() => tablePagination.setPage((prev) => Math.min(tablePagination.totalPages, prev + 1))}
+                prevDisabled={tablePagination.currentPage <= 1 || tablePagination.totalRows === 0}
+                nextDisabled={tablePagination.currentPage >= tablePagination.totalPages || tablePagination.totalRows === 0}
+              />
             </CardContent>
           </Card>
         </TabsContent>

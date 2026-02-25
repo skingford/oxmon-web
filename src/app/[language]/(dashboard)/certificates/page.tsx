@@ -2,11 +2,12 @@
 
 import { KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { api, getApiErrorMessage } from "@/lib/api"
-import { getAuthToken } from "@/lib/auth-token"
+import { api } from "@/lib/api"
+import { copyApiCurlCommand } from "@/lib/api-curl"
 import { formatCertificateDateTime } from "@/lib/certificates/formats"
 import { CertificateChainInfo, CertificateDetails, CertSummary, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
@@ -20,6 +21,9 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { Badge } from "@/components/ui/badge"
+import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { CopyCurlDropdown } from "@/components/ui/copy-curl-dropdown"
+import { HttpMethodBadge } from "@/components/ui/http-method-badge"
 import {
   Dialog,
   DialogContent,
@@ -32,8 +36,6 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import {
   Copy,
-  ChevronLeft,
-  ChevronRight,
   ChevronRight as ArrowRight,
   Loader2,
   RefreshCw,
@@ -41,11 +43,9 @@ import {
   ShieldCheck,
   ShieldX,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError, toastCopied } from "@/lib/toast"
 
 const PAGE_LIMIT = 20
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/+$/, "")
-const OX_APP_ID = (process.env.NEXT_PUBLIC_OX_APP_ID || "").trim()
 
 type CertificatesQueryState = {
   certsPage: ListResponse<CertificateDetails>
@@ -220,7 +220,7 @@ export default function CertificatesPage() {
         {
           silent,
           onError: (error) => {
-            toast.error(getApiErrorMessage(error, t("certificates.overview.toastFetchError")))
+            toastApiError(error, t("certificates.overview.toastFetchError"))
           },
         }
       )
@@ -307,9 +307,12 @@ export default function CertificatesPage() {
     return certs.filter((cert) => cert.domain.toLowerCase().includes(keyword))
   }, [certs, domainKeyword])
 
-  const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
-  const canGoPrev = offset > 0
-  const canGoNext = offset + certs.length < certsPage.total
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit: PAGE_LIMIT,
+    currentItemsCount: certs.length,
+    totalItems: certsPage.total,
+  })
   const hasAppliedApiFilters = Boolean(
     issuerKeyword.trim() || ipKeyword.trim() || expiryDays.trim()
   )
@@ -365,7 +368,7 @@ export default function CertificatesPage() {
       () => api.getCertificateChain(certificate.id),
       {
         onError: (error) => {
-          toast.error(getApiErrorMessage(error, t("certificates.overview.toastChainError")))
+          toastApiError(error, t("certificates.overview.toastChainError"))
         },
       }
     )
@@ -380,7 +383,7 @@ export default function CertificatesPage() {
     router.push(`${withLocalePrefix("/certificates/domains", locale)}?${nextParams.toString()}`)
   }
 
-  const handleCopyApiCurl = async () => {
+  const handleCopyApiCurl = async (insecure = false) => {
     const query = new URLSearchParams()
 
     if (issuerKeyword.trim()) {
@@ -395,22 +398,13 @@ export default function CertificatesPage() {
       query.set("not_after__lte", String(expiryLimit))
     }
 
-    const path = "/v1/certificates"
-    const url = API_BASE_URL
-      ? `${API_BASE_URL}${path}${query.toString() ? `?${query.toString()}` : ""}`
-      : `${path}${query.toString() ? `?${query.toString()}` : ""}`
-
-    const authToken = getAuthToken() || "<YOUR_TOKEN>"
-    const appId = OX_APP_ID || "<YOUR_OX_APP_ID>"
-    const command = [
-      `curl -X GET '${url}'`,
-      `  -H 'ox-app-id: ${appId}'`,
-      `  -H 'Authorization: Bearer ${authToken}'`,
-    ].join(" \\\n")
-
     try {
-      await navigator.clipboard.writeText(command)
-      toast.success(t("certificates.overview.toastCopyApiCurlSuccess"))
+      await copyApiCurlCommand({
+        path: "/v1/certificates",
+        query,
+        insecure,
+      })
+      toastCopied(t("certificates.overview.toastCopyApiCurlSuccess"))
     } catch {
       toast.error(t("certificates.overview.toastCopyApiCurlError"))
     }
@@ -590,16 +584,20 @@ export default function CertificatesPage() {
             ) : (
               <span>{t("certificates.overview.appliedApiFiltersEmpty")}</span>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={handleCopyApiCurl}
-            >
-              <Copy className="mr-1 h-3.5 w-3.5" />
-              {t("certificates.overview.copyApiCurl")}
-            </Button>
+            <CopyCurlDropdown
+              texts={{
+                title: t("certificates.overview.copyApiCurl"),
+                normal: t("certificates.overview.copyApiCurlNormal"),
+                insecure: t("certificates.overview.copyApiCurlInsecure"),
+              }}
+              onCopy={handleCopyApiCurl}
+              triggerLabel={t("certificates.overview.copyApiCurl")}
+              preferenceKeyId="certificates-overview-copy-curl"
+              triggerSuffix={<HttpMethodBadge method="GET" className="ml-1" />}
+              buttonClassName="h-7 px-2 text-xs"
+              tooltip={t("certificates.overview.copyApiCurlHint")}
+              insecureBadgeLabel={t("certificates.overview.copyApiCurlInsecureBadge")}
+            />
           </div>
         </CardContent>
       </Card>
@@ -722,29 +720,17 @@ export default function CertificatesPage() {
             </Table>
           </div>
 
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <span className="mr-2 text-xs text-muted-foreground">
-              {t("certificates.overview.paginationPage", { page: pageNumber })}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canGoPrev || loading}
-              onClick={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              {t("certificates.overview.paginationPrev")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canGoNext || loading}
-              onClick={() => setOffset((previous) => previous + PAGE_LIMIT)}
-            >
-              {t("certificates.overview.paginationNext")}
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
+          <ServerPaginationControls
+            className="mt-4 flex items-center justify-end gap-2"
+            pageSize={PAGE_LIMIT}
+            pageIndicatorText={t("certificates.overview.paginationPage", { page: pagination.currentPage })}
+            prevLabel={t("certificates.overview.paginationPrev")}
+            nextLabel={t("certificates.overview.paginationNext")}
+            onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
+            onNextPage={() => setOffset((previous) => previous + PAGE_LIMIT)}
+            prevDisabled={!pagination.canGoPrev || loading}
+            nextDisabled={!pagination.canGoNext || loading}
+          />
         </CardContent>
       </Card>
 

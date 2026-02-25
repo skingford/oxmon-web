@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { normalizeAlertRulePayload } from "@/lib/alerts/rule-form"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { AlertRuleResponse, CreateAlertRuleRequest } from "@/types/api"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 
 type UseAlertRulesActionsOptions = {
   t: AppNamespaceTranslator<"alerts">
@@ -52,7 +52,7 @@ export function useAlertRulesActions({
       onCloseDialog()
     } catch (error) {
       const errorMsg = editingRuleId ? t("rules.toastUpdateError") : t("rules.toastCreateError")
-      toast.error(getApiErrorMessage(error, errorMsg))
+      toastApiError(error, errorMsg)
     } finally {
       setSubmitting(false)
     }
@@ -70,7 +70,7 @@ export function useAlertRulesActions({
       await fetchRules(true)
       onDeleteDone()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("rules.toastDeleteError")))
+      toastApiError(error, t("rules.toastDeleteError"))
     } finally {
       setDeleting(false)
     }
@@ -83,7 +83,7 @@ export function useAlertRulesActions({
         toast.success(rule.enabled ? t("rules.toastDisabled") : t("rules.toastEnabled"))
         await fetchRules(true)
       } catch (error) {
-        toast.error(getApiErrorMessage(error, t("rules.toastToggleError")))
+        toastApiError(error, t("rules.toastToggleError"))
       }
     },
     [fetchRules, t]

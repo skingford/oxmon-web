@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { formatCertificateDateTime } from "@/lib/certificates/formats"
 import { CertificateChainInfo, CertificateDetails } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -28,7 +28,7 @@ import {
   Globe,
   Info,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
 function getDaysUntilExpiry(notAfter: string) {
@@ -115,7 +115,7 @@ export default function CertificateDetailPage() {
       setChainInfo(chainData)
       await fetchLinkedDomain(certData.domain)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("certificates.detail.toastFetchError")))
+      toastApiError(error, t("certificates.detail.toastFetchError"))
       router.push(withLocalePrefix("/certificates", appLocale))
     } finally {
       setLoading(false)

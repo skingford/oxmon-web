@@ -3,8 +3,7 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { api, getApiErrorMessage } from "@/lib/api"
-import { getStatusAwareMessage } from "@/lib/api-error-utils"
+import { api } from "@/lib/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -52,7 +51,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ArrowLeft, ChevronDown, ChevronUp, Loader2, MoreHorizontal, Pencil, Send, Trash2, Users, X } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastActionSuccess, toastApiError, toastDeleted, toastSaved, toastStatusError } from "@/lib/toast"
 
 type ChannelDetailState = {
   channel: {
@@ -137,7 +136,7 @@ export default function NotificationChannelDetailPage() {
       },
       {
         onError: (error) => {
-          toast.error(getApiErrorMessage(error, t("notifications.detailToastFetchError")))
+          toastApiError(error, t("notifications.detailToastFetchError"))
         },
       }
     )
@@ -262,11 +261,11 @@ export default function NotificationChannelDetailPage() {
         recipients,
         config_json: serializedConfigResult.configJson,
       })
-      toast.success(t("notifications.toastUpdateSuccess"))
+      toastSaved(t("notifications.toastUpdateSuccess"))
       setIsEditDialogOpen(false)
       await fetchChannelDetail()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("notifications.toastUpdateError")))
+      toastApiError(error, t("notifications.toastUpdateError"))
     } finally {
       setSavingChannel(false)
     }
@@ -279,11 +278,11 @@ export default function NotificationChannelDetailPage() {
       await api.setRecipients(channel.id, {
         recipients: normalizeRecipientsInput(recipientsInput),
       })
-      toast.success(t("notifications.toastRecipientsUpdateSuccess"))
+      toastSaved(t("notifications.toastRecipientsUpdateSuccess"))
       setIsRecipientsDialogOpen(false)
       await fetchChannelDetail()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("notifications.toastRecipientsUpdateError")))
+      toastApiError(error, t("notifications.toastRecipientsUpdateError"))
     } finally {
       setSavingRecipients(false)
     }
@@ -294,9 +293,9 @@ export default function NotificationChannelDetailPage() {
 
     try {
       await api.testChannel(channel.id)
-      toast.success(t("notifications.toastTestSuccess"))
+      toastActionSuccess(t("notifications.toastTestSuccess"))
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("notifications.toastTestError")))
+      toastApiError(error, t("notifications.toastTestError"))
     } finally {
       setTesting(false)
     }
@@ -307,14 +306,12 @@ export default function NotificationChannelDetailPage() {
 
     try {
       await api.deleteChannelConfig(channel.id)
-      toast.success(t("notifications.toastDeleteSuccess"))
+      toastDeleted(t("notifications.toastDeleteSuccess"))
       router.push(withLocalePrefix("/notifications", appLocale))
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("notifications.toastDeleteError"), {
-          404: t("notifications.toastDeleteNotFound"),
-        })
-      )
+      toastStatusError(error, t("notifications.toastDeleteError"), {
+        404: t("notifications.toastDeleteNotFound"),
+      })
     } finally {
       setDeleting(false)
     }

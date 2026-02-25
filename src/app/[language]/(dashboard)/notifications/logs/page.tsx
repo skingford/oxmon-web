@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import {
   NotificationLogItem,
   NotificationLogSummaryQueryParams,
@@ -10,6 +10,7 @@ import {
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useRequestState } from "@/hooks/use-request-state"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,8 +31,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
 import { Loader2, RefreshCw } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 
 type LogsQueryState = {
   items: NotificationLogItem[]
@@ -144,7 +146,7 @@ export default function NotificationLogsPage() {
         {
           silent,
           onError: (error) => {
-            toast.error(getApiErrorMessage(error, t("notifications.logsToastFetchError")))
+            toastApiError(error, t("notifications.logsToastFetchError"))
           },
         }
       )
@@ -156,10 +158,12 @@ export default function NotificationLogsPage() {
     fetchLogs()
   }, [fetchLogs])
 
-  const totalPages = Math.max(1, Math.ceil(data.total / PAGE_LIMIT))
-  const currentPage = Math.floor(offset / PAGE_LIMIT) + 1
-  const rangeStart = data.total === 0 ? 0 : offset + 1
-  const rangeEnd = Math.min(offset + data.items.length, data.total)
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit: PAGE_LIMIT,
+    currentItemsCount: data.items.length,
+    totalItems: data.total,
+  })
 
   const formatDateTime = (value: string) => {
     const parsed = Date.parse(value)
@@ -423,39 +427,26 @@ export default function NotificationLogsPage() {
             </Table>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              {t("notifications.logsPaginationSummary", {
-                total: data.total,
-                start: rangeStart,
-                end: rangeEnd,
-              })}
-            </p>
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-muted-foreground">
-                {t("notifications.logsPaginationPage", {
-                  page: currentPage,
-                  total: totalPages,
-                })}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
-                disabled={offset === 0 || loading}
-              >
-                {t("notifications.logsPaginationPrev")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOffset((previous) => previous + PAGE_LIMIT)}
-                disabled={offset + PAGE_LIMIT >= data.total || loading}
-              >
-                {t("notifications.logsPaginationNext")}
-              </Button>
-            </div>
-          </div>
+          <ServerPaginationControls
+            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            pageSize={PAGE_LIMIT}
+            showSummary
+            summaryText={t("notifications.logsPaginationSummary", {
+              total: data.total,
+              start: pagination.rangeStart,
+              end: pagination.rangeEnd,
+            })}
+            pageIndicatorText={t("notifications.logsPaginationPage", {
+              page: pagination.currentPage,
+              total: pagination.totalPages,
+            })}
+            prevLabel={t("notifications.logsPaginationPrev")}
+            nextLabel={t("notifications.logsPaginationNext")}
+            onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
+            onNextPage={() => setOffset((previous) => previous + PAGE_LIMIT)}
+            prevDisabled={!pagination.canGoPrev || loading}
+            nextDisabled={!pagination.canGoNext || loading}
+          />
         </CardContent>
       </Card>
     </div>

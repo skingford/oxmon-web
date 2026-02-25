@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   useAppTranslations,
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, CheckCheck, CheckCircle, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 
 function getSeverityBadgeClass(severity: string) {
   const normalized = severity.toLowerCase()
@@ -139,7 +139,7 @@ export default function AlertDetailPage() {
       const matched = await findAlertById(alertId)
       setAlertDetail(matched)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("active.detailFetchError")))
+      toastApiError(error, t("active.detailFetchError"))
     } finally {
       setLoading(false)
     }
@@ -177,7 +177,7 @@ export default function AlertDetailPage() {
       toast.success(t("active.toastAcknowledged"))
       await fetchAlert()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("active.toastAckError")))
+      toastApiError(error, t("active.toastAckError"))
     } finally {
       setActionInProgress(null)
     }
@@ -195,7 +195,7 @@ export default function AlertDetailPage() {
       toast.success(t("active.toastResolved"))
       await fetchAlert()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("active.toastResolveError")))
+      toastApiError(error, t("active.toastResolveError"))
     } finally {
       setActionInProgress(null)
     }

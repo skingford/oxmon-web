@@ -3,16 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { AgentResponse, ListResponse } from "@/types/api"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
 import { withLocalePrefix } from "@/components/app-locale"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
+import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
 import {
   Table,
   TableBody,
@@ -22,8 +24,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  ChevronLeft,
-  ChevronRight,
   ListChecks,
   Loader2,
   RefreshCw,
@@ -31,7 +31,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
@@ -132,7 +132,7 @@ export default function AgentsPage() {
         {
           silent,
           onError: (error) => {
-            toast.error(getApiErrorMessage(error, t("agents.toastFetchError")))
+            toastApiError(error, t("agents.toastFetchError"))
           },
         }
       )
@@ -215,9 +215,12 @@ export default function AgentsPage() {
     )
   }, [agents])
 
-  const pageNumber = Math.floor(offset / limit) + 1
-  const canGoPrev = offset > 0
-  const canGoNext = offset + agents.length < agentsPage.total
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit,
+    currentItemsCount: agents.length,
+    totalItems: agentsPage.total,
+  })
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -349,27 +352,17 @@ export default function AgentsPage() {
             </Table>
           </div>
 
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <span className="mr-2 text-xs text-muted-foreground">{t("agents.paginationPage", { page: pageNumber })}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canGoPrev || loading}
-              onClick={() => setOffset((prev) => Math.max(0, prev - limit))}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              {t("agents.paginationPrev")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canGoNext || loading}
-              onClick={() => setOffset((prev) => prev + limit)}
-            >
-              {t("agents.paginationNext")}
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
+          <ServerPaginationControls
+            className="mt-4 flex items-center justify-end gap-2"
+            pageSize={limit}
+            pageIndicatorText={t("agents.paginationPage", { page: pagination.currentPage })}
+            prevLabel={t("agents.paginationPrev")}
+            nextLabel={t("agents.paginationNext")}
+            onPrevPage={() => setOffset((prev) => Math.max(0, prev - limit))}
+            onNextPage={() => setOffset((prev) => prev + limit)}
+            prevDisabled={!pagination.canGoPrev || loading}
+            nextDisabled={!pagination.canGoNext || loading}
+          />
         </CardContent>
       </Card>
     </div>

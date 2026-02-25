@@ -1,7 +1,7 @@
 "use client"
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import {
   CreateDictionaryRequest,
   DictionaryItem,
@@ -14,7 +14,7 @@ import {
   DictionaryEntryFormLabels,
   DictionaryEntryFormState,
 } from "@/components/system/DictionaryEntryFormFields"
-import { getStatusAwareMessage } from "@/lib/api-error-utils"
+
 import { formatDateTime, normalizeNullableText, parseOptionalSortOrder } from "@/lib/dictionary-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -59,7 +59,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError, toastCreated, toastDeleted, toastSaved, toastStatusError } from "@/lib/toast"
 
 type DictionarySortMode =
   | "sort_order_asc"
@@ -124,7 +124,7 @@ export default function SystemDictionaryEntriesPage() {
 
   const handleTypeFetchError = useCallback(
     (error: unknown) => {
-      toast.error(getApiErrorMessage(error, t("dictionaryToastFetchTypesError")))
+      toastApiError(error, t("dictionaryToastFetchTypesError"))
     },
     [t]
   )
@@ -155,7 +155,7 @@ export default function SystemDictionaryEntriesPage() {
         setItems(data)
         return data
       } catch (error) {
-        toast.error(getApiErrorMessage(error, t("dictionaryToastFetchItemsError")))
+        toastApiError(error, t("dictionaryToastFetchItemsError"))
         setItems([])
         return []
       } finally {
@@ -393,7 +393,7 @@ export default function SystemDictionaryEntriesPage() {
 
     try {
       await api.createDictionary(payload)
-      toast.success(t("dictionaryToastCreateSuccess"))
+      toastCreated(t("dictionaryToastCreateSuccess"))
       setIsCreateDialogOpen(false)
       setCreateForm(getInitialDictionaryForm(dictType))
 
@@ -401,11 +401,9 @@ export default function SystemDictionaryEntriesPage() {
       setSelectedType(dictType)
       await fetchDictionaryItems(dictType, true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("dictionaryToastCreateError"), {
-          409: t("dictionaryToastCreateConflict"),
-        })
-      )
+      toastStatusError(error, t("dictionaryToastCreateError"), {
+        409: t("dictionaryToastCreateConflict"),
+      })
     } finally {
       setCreateSubmitting(false)
     }
@@ -462,16 +460,14 @@ export default function SystemDictionaryEntriesPage() {
 
     try {
       await api.updateDictionary(editingItem.id, payload)
-      toast.success(t("dictionaryToastUpdateSuccess"))
+      toastSaved(t("dictionaryToastUpdateSuccess"))
       setIsEditDialogOpen(false)
       setEditingItem(null)
       await fetchDictionaryItems(selectedType, true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("dictionaryToastUpdateError"), {
-          404: t("dictionaryToastUpdateNotFound"),
-        })
-      )
+      toastStatusError(error, t("dictionaryToastUpdateError"), {
+        404: t("dictionaryToastUpdateNotFound"),
+      })
     } finally {
       setEditSubmitting(false)
     }
@@ -493,13 +489,11 @@ export default function SystemDictionaryEntriesPage() {
         )
       )
 
-      toast.success(t("dictionaryToastUpdateSuccess"))
+      toastSaved(t("dictionaryToastUpdateSuccess"))
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("dictionaryToastUpdateError"), {
-          404: t("dictionaryToastUpdateNotFound"),
-        })
-      )
+      toastStatusError(error, t("dictionaryToastUpdateError"), {
+        404: t("dictionaryToastUpdateNotFound"),
+      })
     } finally {
       setTogglingEnabledId(null)
     }
@@ -522,17 +516,15 @@ export default function SystemDictionaryEntriesPage() {
 
     try {
       await api.deleteDictionary(targetId)
-      toast.success(t("dictionaryToastDeleteSuccess"))
+      toastDeleted(t("dictionaryToastDeleteSuccess"))
       setDeleteTarget(null)
       await fetchDictionaryItems(selectedType, true)
       await fetchDictionaryTypes(true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("dictionaryToastDeleteError"), {
-          403: t("dictionaryToastDeleteForbidden"),
-          404: t("dictionaryToastDeleteNotFound"),
-        })
-      )
+      toastStatusError(error, t("dictionaryToastDeleteError"), {
+        403: t("dictionaryToastDeleteForbidden"),
+        404: t("dictionaryToastDeleteNotFound"),
+      })
     } finally {
       setDeletingId(null)
     }

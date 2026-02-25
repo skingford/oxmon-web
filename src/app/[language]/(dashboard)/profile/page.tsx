@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "sonner"
+import { toast, toastCopied } from "@/lib/toast"
 import { User, Copy, Shield, LogOut, Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react"
 import { motion } from "framer-motion"
 import { withLocalePrefix } from "@/components/app-locale"
@@ -54,7 +54,7 @@ export default function ProfilePage() {
     if (token) {
       navigator.clipboard.writeText(token)
       setCopied(true)
-      toast.success(t("toastTokenCopied"))
+      toastCopied(t("toastTokenCopied"))
       setTimeout(() => setCopied(false), 2000)
     }
   }

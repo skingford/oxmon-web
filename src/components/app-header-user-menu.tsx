@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { toast } from "sonner"
+import { toast, toastCopied } from "@/lib/toast"
 import { getAuthToken, clearAuthToken } from "@/lib/auth-token"
 import { clearGlobalConfigCache } from "@/lib/global-config-cache"
 import { withLocalePrefix } from "@/components/app-locale"
@@ -49,7 +49,7 @@ export function AppHeaderUserMenu() {
     const token = getAuthToken()
     if (token) {
       navigator.clipboard.writeText(token)
-      toast.success(t("toastTokenCopied"))
+      toastCopied(t("toastTokenCopied"))
     } else {
       toast.error(t("toastNoToken"))
     }

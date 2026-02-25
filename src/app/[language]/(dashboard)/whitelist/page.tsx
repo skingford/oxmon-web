@@ -2,14 +2,16 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { AgentWhitelistDetail, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
+import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
 import {
   Dialog,
   DialogContent,
@@ -31,8 +33,6 @@ import {
 } from "@/components/ui/table"
 import {
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   KeyRound,
   Loader2,
@@ -43,7 +43,7 @@ import {
   WifiOff,
   HelpCircle,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError, toastCopied, toastSaved, toastStatusError } from "@/lib/toast"
 
 const PAGE_LIMIT = 20
 
@@ -157,18 +157,6 @@ export default function WhitelistPage() {
     description: "",
   })
 
-  const getStatusAwareMessage = (
-    error: unknown,
-    fallback: string,
-    statusMessages?: Partial<Record<number, string>>
-  ) => {
-    if (error instanceof ApiRequestError && statusMessages?.[error.status]) {
-      return statusMessages[error.status] as string
-    }
-
-    return getApiErrorMessage(error, fallback)
-  }
-
   const fetchAgents = useCallback(
     async (silent = false) => {
       await execute(
@@ -176,7 +164,7 @@ export default function WhitelistPage() {
         {
           silent,
           onError: (error) => {
-            toast.error(getApiErrorMessage(error, t("whitelist.toastFetchError")))
+            toastApiError(error, t("whitelist.toastFetchError"))
           },
         }
       )
@@ -260,11 +248,9 @@ export default function WhitelistPage() {
       toast.success(t("whitelist.toastAddSuccess"))
       await fetchAgents(true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("whitelist.toastAddError"), {
-          409: t("whitelist.toastAddConflict"),
-        })
-      )
+      toastStatusError(error, t("whitelist.toastAddError"), {
+        409: t("whitelist.toastAddConflict"),
+      })
     } finally {
       setAdding(false)
     }
@@ -289,15 +275,13 @@ export default function WhitelistPage() {
         description: editDescription.trim() ? editDescription.trim() : null,
       })
 
-      toast.success(t("whitelist.toastUpdateSuccess"))
+      toastSaved(t("whitelist.toastUpdateSuccess"))
       setEditingAgent(null)
       await fetchAgents(true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("whitelist.toastUpdateError"), {
-          404: t("whitelist.toastUpdateNotFound"),
-        })
-      )
+      toastStatusError(error, t("whitelist.toastUpdateError"), {
+        404: t("whitelist.toastUpdateNotFound"),
+      })
     } finally {
       setUpdating(false)
     }
@@ -327,11 +311,9 @@ export default function WhitelistPage() {
         await fetchAgents(true)
       }
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("whitelist.toastRemoveError"), {
-          404: t("whitelist.toastRemoveNotFound"),
-        })
-      )
+      toastStatusError(error, t("whitelist.toastRemoveError"), {
+        404: t("whitelist.toastRemoveNotFound"),
+      })
     } finally {
       setDeletingId(null)
     }
@@ -367,11 +349,9 @@ export default function WhitelistPage() {
       setRegenerateDialogAgent(null)
       await fetchAgents(true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("whitelist.toastRegenerateError"), {
-          404: t("whitelist.toastRegenerateNotFound"),
-        })
-      )
+      toastStatusError(error, t("whitelist.toastRegenerateError"), {
+        404: t("whitelist.toastRegenerateNotFound"),
+      })
     } finally {
       setRegeneratingId(null)
     }
@@ -384,7 +364,7 @@ export default function WhitelistPage() {
 
     try {
       await navigator.clipboard.writeText(tokenDialog.token)
-      toast.success(t("whitelist.toastTokenCopied"))
+      toastCopied(t("whitelist.toastTokenCopied"))
     } catch {
       toast.error(t("whitelist.toastTokenCopyFailed"))
     }
@@ -433,9 +413,12 @@ export default function WhitelistPage() {
     )
   }, [agents])
 
-  const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
-  const canGoPrev = offset > 0
-  const canGoNext = offset + agents.length < agentsPage.total
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit: PAGE_LIMIT,
+    currentItemsCount: agents.length,
+    totalItems: agentsPage.total,
+  })
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -656,29 +639,17 @@ export default function WhitelistPage() {
             </Table>
           </div>
 
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <span className="mr-2 text-xs text-muted-foreground">
-              {t("whitelist.paginationPage", { page: pageNumber })}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canGoPrev || loading}
-              onClick={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              {t("whitelist.paginationPrev")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canGoNext || loading}
-              onClick={() => setOffset((previous) => previous + PAGE_LIMIT)}
-            >
-              {t("whitelist.paginationNext")}
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
+          <ServerPaginationControls
+            className="mt-4 flex items-center justify-end gap-2"
+            pageSize={PAGE_LIMIT}
+            pageIndicatorText={t("whitelist.paginationPage", { page: pagination.currentPage })}
+            prevLabel={t("whitelist.paginationPrev")}
+            nextLabel={t("whitelist.paginationNext")}
+            onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
+            onNextPage={() => setOffset((previous) => previous + PAGE_LIMIT)}
+            prevDisabled={!pagination.canGoPrev || loading}
+            nextDisabled={!pagination.canGoNext || loading}
+          />
         </CardContent>
       </Card>
 

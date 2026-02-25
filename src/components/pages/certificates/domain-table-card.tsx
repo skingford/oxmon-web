@@ -5,9 +5,10 @@ import { CertDomain } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ChevronLeft, ChevronRight, History, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react"
+import { History, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react"
 
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
@@ -182,29 +183,17 @@ export function DomainTableCard({
           </Table>
         </div>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <span className="mr-2 text-xs text-muted-foreground">
-            {t("certificates.domains.paginationPage", { page: pageNumber })}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!canGoPrev || loading}
-            onClick={onPrevPage}
-          >
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            {t("certificates.domains.paginationPrev")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!canGoNext || loading}
-            onClick={onNextPage}
-          >
-            {t("certificates.domains.paginationNext")}
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </div>
+        <ServerPaginationControls
+          className="mt-4 flex items-center justify-end gap-2"
+          pageSize={pageLimit}
+          pageIndicatorText={t("certificates.domains.paginationPage", { page: pageNumber })}
+          prevLabel={t("certificates.domains.paginationPrev")}
+          nextLabel={t("certificates.domains.paginationNext")}
+          onPrevPage={onPrevPage}
+          onNextPage={onNextPage}
+          prevDisabled={!canGoPrev || loading}
+          nextDisabled={!canGoNext || loading}
+        />
       </CardContent>
     </Card>
   )

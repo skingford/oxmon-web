@@ -4,7 +4,7 @@ import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useAlertRulesActions } from "@/hooks/use-alert-rules-actions"
 import { useAlertRulesData } from "@/hooks/use-alert-rules-data"
 import { useAlertRulesDialogState } from "@/hooks/use-alert-rules-dialog-state"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { AlertRuleDeleteDialog } from "@/components/alerts/AlertRuleDeleteDialog"
 import { AlertRuleFormFields } from "@/components/alerts/AlertRuleFormFields"
 import { AlertRulesPageHeader } from "@/components/alerts/AlertRulesHeader"
@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 
 export default function AlertRulesPage() {
   const { t } = useAppTranslations("alerts")
@@ -62,7 +62,7 @@ export default function AlertRulesPage() {
       openEditDialog(detail)
       fetchMetricNames()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("rules.toastFetchError")))
+      toastApiError(error, t("rules.toastFetchError"))
     }
   }
 

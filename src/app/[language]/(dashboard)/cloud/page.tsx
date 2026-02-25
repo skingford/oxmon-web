@@ -1,15 +1,20 @@
 "use client"
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2, Play, Plus, RefreshCw, Search, TestTube2, Trash2 } from "lucide-react"
-import { toast } from "sonner"
+import { Loader2, Plus, RefreshCw } from "lucide-react"
+import { toast, toastApiError, toastCopied, toastCreated, toastDeleted, toastSaved } from "@/lib/toast"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { copyApiCurlCommand } from "@/lib/api-curl"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import type { CloudAccountResponse, CreateCloudAccountRequest, UpdateCloudAccountRequest } from "@/types/api"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CopyCurlDropdown, CopyCurlSubmenu } from "@/components/ui/copy-curl-dropdown"
+import { CloudAccountsFiltersCard } from "@/components/pages/cloud/cloud-accounts-filters-card"
+import { CloudAccountsStatsCards } from "@/components/pages/cloud/cloud-accounts-stats-cards"
+import { CloudAccountsTableCard } from "@/components/pages/cloud/cloud-accounts-table-card"
+import { HttpMethodBadge } from "@/components/ui/http-method-badge"
 import {
   Dialog,
   DialogContent,
@@ -21,9 +26,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { JsonTextarea } from "@/components/ui/json-textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import {
   AlertDialog,
@@ -124,7 +127,7 @@ export default function CloudAccountsPage() {
         {
           silent,
           onError: (error) => {
-            toast.error(getApiErrorMessage(error, t("cloud.accounts.toastFetchError")))
+            toastApiError(error, t("cloud.accounts.toastFetchError"))
           },
         }
       )
@@ -261,7 +264,7 @@ export default function CloudAccountsPage() {
         }
 
         await api.updateCloudAccount(editingAccount.id, payload)
-        toast.success(t("cloud.accounts.toastUpdateSuccess"))
+        toastSaved(t("cloud.accounts.toastUpdateSuccess"))
       } else {
         const payload: CreateCloudAccountRequest = {
           config_key: configKey,
@@ -272,7 +275,7 @@ export default function CloudAccountsPage() {
         }
 
         await api.createCloudAccount(payload)
-        toast.success(t("cloud.accounts.toastCreateSuccess"))
+        toastCreated(t("cloud.accounts.toastCreateSuccess"))
       }
 
       setDialogOpen(false)
@@ -304,7 +307,7 @@ export default function CloudAccountsPage() {
       )
       await fetchAccounts(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("cloud.accounts.toastToggleError")))
+      toastApiError(error, t("cloud.accounts.toastToggleError"))
     } finally {
       setTogglingId(null)
     }
@@ -319,7 +322,7 @@ export default function CloudAccountsPage() {
         : ""
       toast.success(`${result.message}${suffix}`)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("cloud.accounts.toastTestError")))
+      toastApiError(error, t("cloud.accounts.toastTestError"))
     } finally {
       setTestingId(null)
     }
@@ -335,11 +338,59 @@ export default function CloudAccountsPage() {
       toast.success(`${result.message}${suffix}`)
       await fetchAccounts(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("cloud.accounts.toastCollectError")))
+      toastApiError(error, t("cloud.accounts.toastCollectError"))
     } finally {
       setCollectingId(null)
     }
   }, [fetchAccounts, t])
+
+  const handleCopyTestCurl = useCallback(async (account: CloudAccountResponse, insecure = false) => {
+    try {
+      await copyApiCurlCommand({
+        path: `/v1/cloud/accounts/${account.id}/test`,
+        method: "POST",
+        insecure,
+      })
+      toastCopied(t("cloud.accounts.toastCopyTestCurlSuccess"))
+    } catch {
+      toast.error(t("cloud.accounts.toastCopyTestCurlError"))
+    }
+  }, [t])
+
+  const handleCopyCollectCurl = useCallback(async (account: CloudAccountResponse, insecure = false) => {
+    try {
+      await copyApiCurlCommand({
+        path: `/v1/cloud/accounts/${account.id}/collect`,
+        method: "POST",
+        insecure,
+      })
+      toastCopied(t("cloud.accounts.toastCopyCollectCurlSuccess"))
+    } catch {
+      toast.error(t("cloud.accounts.toastCopyCollectCurlError"))
+    }
+  }, [t])
+
+  const handleCopyUpdateCurl = useCallback(async (account: CloudAccountResponse, insecure = false) => {
+    try {
+      await copyApiCurlCommand({
+        path: `/v1/cloud/accounts/${account.id}`,
+        method: "PUT",
+        insecure,
+        redactBodySecrets: {
+          keepPaths: ["config.token"],
+        },
+        body: {
+          display_name: account.display_name,
+          description: account.description,
+          enabled: account.enabled,
+          config: account.config,
+        },
+      })
+      toastCopied(t("cloud.accounts.toastCopyUpdateCurlSuccess"))
+    } catch {
+      toast.error(t("cloud.accounts.toastCopyUpdateCurlError"))
+    }
+  }, [t])
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) {
@@ -349,15 +400,108 @@ export default function CloudAccountsPage() {
     setDeleting(true)
     try {
       await api.deleteCloudAccount(deleteTarget.id)
-      toast.success(t("cloud.accounts.toastDeleteSuccess"))
+      toastDeleted(t("cloud.accounts.toastDeleteSuccess"))
       setDeleteTarget(null)
       await fetchAccounts(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("cloud.accounts.toastDeleteError")))
+      toastApiError(error, t("cloud.accounts.toastDeleteError"))
     } finally {
       setDeleting(false)
     }
   }, [deleteTarget, fetchAccounts, t])
+
+  const handleCopyCreateCurlFromForm = useCallback(async (insecure = false) => {
+    const configKey = form.configKey.trim()
+    const provider = form.provider.trim()
+    const displayName = form.displayName.trim()
+    const description = form.description.trim()
+
+    if (!configKey) {
+      toast.error(t("cloud.accounts.toastConfigKeyRequired"))
+      return
+    }
+
+    if (!provider) {
+      toast.error(t("cloud.accounts.toastProviderRequired"))
+      return
+    }
+
+    if (!displayName) {
+      toast.error(t("cloud.accounts.toastDisplayNameRequired"))
+      return
+    }
+
+    let config: unknown
+    try {
+      config = parseJsonText(form.configText)
+    } catch {
+      toast.error(t("cloud.accounts.toastConfigInvalid"))
+      return
+    }
+
+    try {
+      await copyApiCurlCommand({
+        path: "/v1/cloud/accounts",
+        method: "POST",
+        insecure,
+        redactBodySecrets: {
+          keepPaths: ["config.token"],
+        },
+        body: {
+          config_key: configKey,
+          provider,
+          display_name: displayName,
+          description: description || null,
+          config,
+        },
+      })
+      toastCopied(t("cloud.accounts.toastCopyCreateCurlDraftSuccess"))
+    } catch {
+      toast.error(t("cloud.accounts.toastCopyCreateCurlError"))
+    }
+  }, [form, t])
+
+  const handleCopyUpdateCurlFromForm = useCallback(async (insecure = false) => {
+    if (!editingAccount) {
+      return
+    }
+
+    const displayName = form.displayName.trim()
+    const description = form.description.trim()
+
+    if (!displayName) {
+      toast.error(t("cloud.accounts.toastDisplayNameRequired"))
+      return
+    }
+
+    let config: unknown
+    try {
+      config = parseJsonText(form.configText)
+    } catch {
+      toast.error(t("cloud.accounts.toastConfigInvalid"))
+      return
+    }
+
+    try {
+      await copyApiCurlCommand({
+        path: `/v1/cloud/accounts/${editingAccount.id}`,
+        method: "PUT",
+        insecure,
+        redactBodySecrets: {
+          keepPaths: ["config.token"],
+        },
+        body: {
+          display_name: displayName,
+          description: description || null,
+          enabled: form.enabled,
+          config,
+        },
+      })
+      toastCopied(t("cloud.accounts.toastCopyUpdateCurlDraftSuccess"))
+    } catch {
+      toast.error(t("cloud.accounts.toastCopyUpdateCurlError"))
+    }
+  }, [editingAccount, form, t])
 
   return (
     <div className="space-y-6">
@@ -378,201 +522,82 @@ export default function CloudAccountsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("cloud.accounts.statTotal")}</CardDescription>
-            <CardTitle className="text-2xl">{stats.total}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("cloud.accounts.statEnabled")}</CardDescription>
-            <CardTitle className="text-2xl">{stats.enabled}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("cloud.accounts.statDisabled")}</CardDescription>
-            <CardTitle className="text-2xl">{stats.disabled}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("cloud.accounts.statProviders")}</CardDescription>
-            <CardTitle className="text-2xl">{stats.providers}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+      <CloudAccountsStatsCards
+        stats={stats}
+        texts={{
+          total: t("cloud.accounts.statTotal"),
+          enabled: t("cloud.accounts.statEnabled"),
+          disabled: t("cloud.accounts.statDisabled"),
+          providers: t("cloud.accounts.statProviders"),
+        }}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("cloud.accounts.filtersTitle")}</CardTitle>
-          <CardDescription>{t("cloud.accounts.filtersDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="cloud-account-search">{t("cloud.accounts.filterSearch")}</Label>
-            <div className="relative">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                id="cloud-account-search"
-                className="pl-9"
-                value={searchKeyword}
-                onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder={t("cloud.accounts.filterSearchPlaceholder")}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>{t("cloud.accounts.filterProvider")}</Label>
-            <Select value={providerFilter} onValueChange={setProviderFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("cloud.accounts.filterProviderAll")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("cloud.accounts.filterProviderAll")}</SelectItem>
-                {providerOptions.map((provider) => (
-                  <SelectItem key={provider} value={provider}>{provider}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>{t("cloud.accounts.filterStatus")}</Label>
-            <Select
-              value={enabledFilter}
-              onValueChange={(value) => setEnabledFilter(value as "all" | "enabled" | "disabled")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("cloud.accounts.filterStatusAll")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("cloud.accounts.filterStatusAll")}</SelectItem>
-                <SelectItem value="enabled">{t("cloud.accounts.filterStatusEnabled")}</SelectItem>
-                <SelectItem value="disabled">{t("cloud.accounts.filterStatusDisabled")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <CloudAccountsFiltersCard
+        searchKeyword={searchKeyword}
+        providerFilter={providerFilter}
+        enabledFilter={enabledFilter}
+        providerOptions={providerOptions}
+        onSearchKeywordChange={setSearchKeyword}
+        onProviderFilterChange={setProviderFilter}
+        onEnabledFilterChange={(value) => setEnabledFilter(value as "all" | "enabled" | "disabled")}
+        texts={{
+          title: t("cloud.accounts.filtersTitle"),
+          description: t("cloud.accounts.filtersDescription"),
+          filterSearch: t("cloud.accounts.filterSearch"),
+          filterSearchPlaceholder: t("cloud.accounts.filterSearchPlaceholder"),
+          filterProvider: t("cloud.accounts.filterProvider"),
+          filterProviderAll: t("cloud.accounts.filterProviderAll"),
+          filterStatus: t("cloud.accounts.filterStatus"),
+          filterStatusAll: t("cloud.accounts.filterStatusAll"),
+          filterStatusEnabled: t("cloud.accounts.filterStatusEnabled"),
+          filterStatusDisabled: t("cloud.accounts.filterStatusDisabled"),
+        }}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("cloud.accounts.tableTitle")}</CardTitle>
-          <CardDescription>{t("cloud.accounts.tableDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("cloud.accounts.tableColName")}</TableHead>
-                  <TableHead>{t("cloud.accounts.tableColConfigKey")}</TableHead>
-                  <TableHead>{t("cloud.accounts.tableColProvider")}</TableHead>
-                  <TableHead>{t("cloud.accounts.tableColStatus")}</TableHead>
-                  <TableHead>{t("cloud.accounts.tableColUpdatedAt")}</TableHead>
-                  <TableHead className="text-right">{t("cloud.accounts.tableColActions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-28 text-center text-muted-foreground">
-                      {t("cloud.accounts.tableLoading")}
-                    </TableCell>
-                  </TableRow>
-                ) : filteredAccounts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-28 text-center text-muted-foreground">
-                      {t("cloud.accounts.tableEmpty")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredAccounts.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium">{account.display_name}</div>
-                          {account.description ? (
-                            <div className="max-w-[320px] truncate text-xs text-muted-foreground">
-                              {account.description}
-                            </div>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{account.config_key}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{account.provider}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={account.enabled}
-                            disabled={togglingId === account.id}
-                            onCheckedChange={() => handleToggleEnabled(account)}
-                            aria-label={t("cloud.accounts.toggleEnabledLabel")}
-                          />
-                          <span className="text-sm text-muted-foreground">
-                            {account.enabled
-                              ? t("cloud.accounts.statusEnabled")
-                              : t("cloud.accounts.statusDisabled")}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatDateTime(account.updated_at, locale)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleTestConnection(account)}
-                            disabled={testingId === account.id}
-                          >
-                            {testingId === account.id ? (
-                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <TestTube2 className="mr-1 h-3.5 w-3.5" />
-                            )}
-                            {t("cloud.accounts.actionTest")}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleCollect(account)}
-                            disabled={collectingId === account.id}
-                          >
-                            {collectingId === account.id ? (
-                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Play className="mr-1 h-3.5 w-3.5" />
-                            )}
-                            {t("cloud.accounts.actionCollect")}
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => openEditDialog(account)}>
-                            {t("cloud.accounts.actionEdit")}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setDeleteTarget(account)}
-                          >
-                            <Trash2 className="mr-1 h-3.5 w-3.5" />
-                            {t("cloud.accounts.actionDelete")}
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <CloudAccountsTableCard
+        loading={loading}
+        locale={locale}
+        accounts={filteredAccounts}
+        testingId={testingId}
+        collectingId={collectingId}
+        togglingId={togglingId}
+        onToggleEnabled={handleToggleEnabled}
+        onTestConnection={handleTestConnection}
+        onCollect={handleCollect}
+        onCopyTestCurl={handleCopyTestCurl}
+        onCopyCollectCurl={handleCopyCollectCurl}
+        onCopyUpdateCurl={handleCopyUpdateCurl}
+        onEdit={openEditDialog}
+        onDelete={setDeleteTarget}
+        formatDateTime={formatDateTime}
+        texts={{
+          title: t("cloud.accounts.tableTitle"),
+          description: t("cloud.accounts.tableDescription"),
+          colName: t("cloud.accounts.tableColName"),
+          colConfigKey: t("cloud.accounts.tableColConfigKey"),
+          colProvider: t("cloud.accounts.tableColProvider"),
+          colStatus: t("cloud.accounts.tableColStatus"),
+          colUpdatedAt: t("cloud.accounts.tableColUpdatedAt"),
+          colActions: t("cloud.accounts.tableColActions"),
+          tableLoading: t("cloud.accounts.tableLoading"),
+          tableEmpty: t("cloud.accounts.tableEmpty"),
+          toggleEnabledLabel: t("cloud.accounts.toggleEnabledLabel"),
+          statusEnabled: t("cloud.accounts.statusEnabled"),
+          statusDisabled: t("cloud.accounts.statusDisabled"),
+          actionTest: t("cloud.accounts.actionTest"),
+          actionCollect: t("cloud.accounts.actionCollect"),
+          actionDebugCurl: t("cloud.accounts.actionDebugCurl"),
+          actionCopyTestCurl: t("cloud.accounts.actionCopyTestCurl"),
+          actionCopyCollectCurl: t("cloud.accounts.actionCopyCollectCurl"),
+          actionCopyUpdateCurl: t("cloud.accounts.actionCopyUpdateCurl"),
+          actionEdit: t("cloud.accounts.actionEdit"),
+          actionDelete: t("cloud.accounts.actionDelete"),
+          debugMenuLabel: t("cloud.accounts.debugMenuLabel"),
+          copyApiCurlNormal: t("cloud.accounts.copyApiCurlNormal"),
+          copyApiCurlInsecure: t("cloud.accounts.copyApiCurlInsecure"),
+          copyApiCurlInsecureBadge: t("cloud.accounts.copyApiCurlInsecureBadge"),
+        }}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
@@ -653,14 +678,53 @@ export default function CloudAccountsPage() {
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="gap-2 sm:justify-between">
               <Button type="button" variant="outline" onClick={closeDialog} disabled={formSubmitting}>
                 {t("cloud.accounts.dialogCancel")}
               </Button>
-              <Button type="submit" disabled={formSubmitting}>
-                {formSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {editingAccount ? t("cloud.accounts.dialogUpdateSubmit") : t("cloud.accounts.dialogCreateSubmit")}
-              </Button>
+              <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+                {!editingAccount ? (
+                  <CopyCurlDropdown
+                    texts={{
+                      title: t("cloud.accounts.dialogCopyCreateCurl"),
+                      normal: t("cloud.accounts.copyApiCurlNormal"),
+                      insecure: t("cloud.accounts.copyApiCurlInsecure"),
+                    }}
+                    onCopy={handleCopyCreateCurlFromForm}
+                    triggerLabel={t("cloud.accounts.dialogCopyCreateCurl")}
+                    preferenceKeyId="cloud-accounts-dialog-copy-create-curl"
+                    triggerSuffix={<HttpMethodBadge method="POST" className="ml-2" />}
+                    disabled={formSubmitting}
+                    tooltip={{
+                      title: t("cloud.accounts.dialogCopyCreateCurl"),
+                      description: t("cloud.accounts.copyApiCurlHintWrite"),
+                    }}
+                    insecureBadgeLabel={t("cloud.accounts.copyApiCurlInsecureBadge")}
+                  />
+                ) : (
+                  <CopyCurlDropdown
+                    texts={{
+                      title: t("cloud.accounts.dialogCopyUpdateCurl"),
+                      normal: t("cloud.accounts.copyApiCurlNormal"),
+                      insecure: t("cloud.accounts.copyApiCurlInsecure"),
+                    }}
+                    onCopy={handleCopyUpdateCurlFromForm}
+                    triggerLabel={t("cloud.accounts.dialogCopyUpdateCurl")}
+                    preferenceKeyId="cloud-accounts-dialog-copy-update-curl"
+                    triggerSuffix={<HttpMethodBadge method="PUT" className="ml-2" />}
+                    disabled={formSubmitting}
+                    tooltip={{
+                      title: t("cloud.accounts.dialogCopyUpdateCurl"),
+                      description: t("cloud.accounts.copyApiCurlHintWrite"),
+                    }}
+                    insecureBadgeLabel={t("cloud.accounts.copyApiCurlInsecureBadge")}
+                  />
+                )}
+                <Button type="submit" disabled={formSubmitting}>
+                  {formSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {editingAccount ? t("cloud.accounts.dialogUpdateSubmit") : t("cloud.accounts.dialogCreateSubmit")}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>

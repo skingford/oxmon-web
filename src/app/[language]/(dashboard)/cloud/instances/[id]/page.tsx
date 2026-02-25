@@ -3,21 +3,25 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Copy, Loader2, RefreshCw } from "lucide-react"
-import { toast } from "sonner"
-import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { toast, toastApiError, toastCopied } from "@/lib/toast"
+import { ApiRequestError, api } from "@/lib/api"
+import { copyApiCurlCommand } from "@/lib/api-curl"
 import { withLocalePrefix } from "@/components/app-locale"
-import { getAuthToken } from "@/lib/auth-token"
+import {
+  getCloudInstanceStatusBadgeVariant,
+  normalizeCloudInstanceStatus,
+  type CloudInstanceStatusKey,
+} from "@/components/pages/cloud/cloud-instance-list-utils"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import type { CloudInstanceDetailResponse, MetricLatestValue } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CopyCurlDropdown } from "@/components/ui/copy-curl-dropdown"
+import { HttpMethodBadge } from "@/components/ui/http-method-badge"
 import { Switch } from "@/components/ui/switch"
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim().replace(/\/+$/, "")
-const OX_APP_ID = (process.env.NEXT_PUBLIC_OX_APP_ID || "").trim()
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   if (!value) {
@@ -181,22 +185,24 @@ function getUsageBarClass(percent: number) {
   return "bg-emerald-500"
 }
 
-function getStatusVariant(status: string | null | undefined): "default" | "secondary" | "outline" | "destructive" {
-  const normalized = (status || "").toLowerCase()
-
-  if (["running", "active", "online"].includes(normalized)) {
-    return "default"
+function getStatusLabel(status: CloudInstanceStatusKey, t: ReturnType<typeof useAppTranslations>["t"]) {
+  if (status === "running") {
+    return t("cloud.instances.statusRunning")
   }
 
-  if (["stopped", "terminated", "failed", "error"].includes(normalized)) {
-    return "destructive"
+  if (status === "stopped") {
+    return t("cloud.instances.statusStopped")
   }
 
-  if (!normalized) {
-    return "outline"
+  if (status === "pending") {
+    return t("cloud.instances.statusPending")
   }
 
-  return "secondary"
+  if (status === "error") {
+    return t("cloud.instances.statusError")
+  }
+
+  return t("cloud.instances.statusUnknown")
 }
 
 function resolveInstanceTitle(instance: CloudInstanceDetailResponse | null) {
@@ -258,7 +264,7 @@ export default function CloudInstanceDetailPage() {
             return
           }
 
-          toast.error(getApiErrorMessage(requestError, t("cloud.instances.detailToastFetchError")))
+          toastApiError(requestError, t("cloud.instances.detailToastFetchError"))
         },
       }
     )
@@ -299,20 +305,13 @@ export default function CloudInstanceDetailPage() {
     ]
   }, [instance, t])
 
-  const handleCopyApiCurl = useCallback(async () => {
-    const path = `/v1/cloud/instances/${instanceId}`
-    const url = API_BASE_URL ? `${API_BASE_URL}${path}` : path
-    const authToken = getAuthToken() || "<YOUR_TOKEN>"
-    const appId = OX_APP_ID || "<YOUR_OX_APP_ID>"
-    const command = [
-      `curl -X GET '${url}'`,
-      `  -H 'ox-app-id: ${appId}'`,
-      `  -H 'Authorization: Bearer ${authToken}'`,
-    ].join(" \\\n")
-
+  const handleCopyApiCurl = useCallback(async (insecure = false) => {
     try {
-      await navigator.clipboard.writeText(command)
-      toast.success(t("cloud.instances.detailToastCopyApiCurlSuccess"))
+      await copyApiCurlCommand({
+        path: `/v1/cloud/instances/${instanceId}`,
+        insecure,
+      })
+      toastCopied(t("cloud.instances.detailToastCopyApiCurlSuccess"))
     } catch {
       toast.error(t("cloud.instances.detailToastCopyApiCurlError"))
     }
@@ -406,10 +405,19 @@ export default function CloudInstanceDetailPage() {
           <div className="mr-1 rounded-md border px-2 py-1 text-xs text-muted-foreground">
             {t("cloud.instances.detailLastRefreshLabel")}: {formatDateTime(lastRefreshAt, locale)}
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={handleCopyApiCurl}>
-            <Copy className="mr-1 h-4 w-4" />
-            {t("cloud.instances.detailCopyApiCurl")}
-          </Button>
+          <CopyCurlDropdown
+            texts={{
+              title: t("cloud.instances.detailCopyApiCurl"),
+              normal: t("cloud.instances.detailCopyApiCurlNormal"),
+              insecure: t("cloud.instances.detailCopyApiCurlInsecure"),
+            }}
+            onCopy={handleCopyApiCurl}
+            triggerLabel={t("cloud.instances.detailCopyApiCurl")}
+            preferenceKeyId="cloud-instance-detail-copy-curl"
+            triggerSuffix={<HttpMethodBadge method="GET" className="ml-1" />}
+            tooltip={t("cloud.instances.detailCopyApiCurlHint")}
+            insecureBadgeLabel={t("cloud.instances.detailCopyApiCurlInsecureBadge")}
+          />
           <Button type="button" variant="outline" onClick={() => fetchDetail(true)} disabled={refreshing}>
             {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {t("cloud.instances.detailRefreshButton")}
@@ -430,7 +438,9 @@ export default function CloudInstanceDetailPage() {
           <FieldItem label={t("cloud.instances.detailFieldRegion")} value={instance.region} />
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">{t("cloud.instances.detailFieldStatus")}</p>
-            <Badge variant={getStatusVariant(instance.status)}>{instance.status || t("cloud.instances.statusUnknown")}</Badge>
+            <Badge variant={getCloudInstanceStatusBadgeVariant(normalizeCloudInstanceStatus(instance.status))}>
+              {getStatusLabel(normalizeCloudInstanceStatus(instance.status), t)}
+            </Badge>
           </div>
           <FieldItem label={t("cloud.instances.detailFieldOs")} value={instance.os || "-"} />
           <FieldItem label={t("cloud.instances.detailFieldPublicIp")} value={instance.public_ip || "-"} mono />

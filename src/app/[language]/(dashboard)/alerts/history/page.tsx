@@ -1,17 +1,19 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { AlertEventResponse } from "@/types/api"
 import {
   useAppTranslations,
   type AppNamespaceTranslator,
 } from "@/hooks/use-app-translations"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { AlertHistoryFiltersCard } from "@/components/alerts/AlertHistoryFiltersCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
 import {
   Table,
   TableBody,
@@ -28,7 +30,7 @@ import {
   Info,
   XCircle,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 import { motion } from "framer-motion"
 
 type AlertHistoryParams = {
@@ -206,7 +208,7 @@ export default function AlertHistoryPage() {
       setAlerts(data.items)
       setAlertsTotal(data.total)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("history.toastFetchError")))
+      toastApiError(error, t("history.toastFetchError"))
     } finally {
       setLoading(false)
     }
@@ -246,8 +248,12 @@ export default function AlertHistoryPage() {
   const hasActiveFilters =
     filterAgentId || filterSeverity || filterStatus || filterTimeFrom || filterTimeTo
 
-  const canGoPrev = offset > 0
-  const canGoNext = offset + alerts.length < alertsTotal
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit,
+    currentItemsCount: alerts.length,
+    totalItems: alertsTotal,
+  })
 
   return (
     <div className="space-y-6">
@@ -359,31 +365,24 @@ export default function AlertHistoryPage() {
           </div>
 
           {!loading && alerts.length > 0 && (
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {t("history.paginationPage", { page: Math.floor(offset / limit) + 1 })}
-                {filteredAlerts.length !== alerts.length &&
-                  ` • ${t("history.paginationShown", { filtered: filteredAlerts.length, total: alerts.length })}`}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setOffset(Math.max(0, offset - limit))}
-                  disabled={!canGoPrev}
-                >
-                  {t("history.paginationPrevious")}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setOffset(offset + limit)}
-                  disabled={!canGoNext}
-                >
-                  {t("history.paginationNext")}
-                </Button>
-              </div>
-            </div>
+            <ServerPaginationControls
+              className="mt-4 flex items-center justify-between"
+              pageSize={limit}
+              showSummary
+              showPageIndicator={false}
+              summaryText={`${t("history.paginationPage", { page: Math.floor(offset / limit) + 1 })}${
+                filteredAlerts.length !== alerts.length
+                  ? ` • ${t("history.paginationShown", { filtered: filteredAlerts.length, total: alerts.length })}`
+                  : ""
+              }`}
+              pageIndicatorText=""
+              prevLabel={t("history.paginationPrevious")}
+              nextLabel={t("history.paginationNext")}
+              onPrevPage={() => setOffset(Math.max(0, offset - limit))}
+              onNextPage={() => setOffset(offset + limit)}
+              prevDisabled={!pagination.canGoPrev}
+              nextDisabled={!pagination.canGoNext}
+            />
           )}
         </CardContent>
       </Card>

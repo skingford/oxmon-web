@@ -1,25 +1,30 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Loader2, RefreshCw, Search } from "lucide-react"
-import { toast } from "sonner"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Loader2, RefreshCw } from "lucide-react"
+import { CloudInstancesFiltersCard } from "@/components/pages/cloud/cloud-instances-filters-card"
+import { CloudInstancesStatsCards } from "@/components/pages/cloud/cloud-instances-stats-cards"
+import { CloudInstancesTableCard } from "@/components/pages/cloud/cloud-instances-table-card"
+import {
+  normalizeCloudInstanceStatus,
+  uniqueSortedWithLocale,
+  type CloudInstanceStatusKey,
+} from "@/components/pages/cloud/cloud-instance-list-utils"
+import { Button } from "@/components/ui/button"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
-import { withLocalePrefix } from "@/components/app-locale"
-import type { CloudInstanceResponse } from "@/types/api"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
+import { api } from "@/lib/api"
+import { toastApiError } from "@/lib/toast"
+import type { CloudInstanceQueryParams, CloudInstanceResponse } from "@/types/api"
 
 type CloudInstancesState = {
   instances: CloudInstanceResponse[]
+  total: number
 }
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   if (!value) {
@@ -37,112 +42,231 @@ function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   })
 }
 
-function uniqueSorted(values: Array<string | null | undefined>) {
-  return Array.from(new Set(values.map((item) => item?.trim()).filter((item): item is string => Boolean(item))))
-    .sort((a, b) => a.localeCompare(b))
-}
-
-function resolveInstanceName(instance: CloudInstanceResponse) {
-  return instance.instance_name?.trim() || instance.instance_id
-}
-
-function resolveStatusVariant(status: string | null | undefined): "default" | "secondary" | "outline" | "destructive" {
-  const normalized = (status || "").toLowerCase()
-
-  if (["running", "active", "online"].includes(normalized)) {
-    return "default"
+function resolveStatusText(status: CloudInstanceStatusKey, t: ReturnType<typeof useAppTranslations>["t"]) {
+  if (status === "running") {
+    return t("cloud.instances.statusRunning")
   }
-
-  if (["stopped", "terminated", "failed", "error"].includes(normalized)) {
-    return "destructive"
+  if (status === "stopped") {
+    return t("cloud.instances.statusStopped")
   }
-
-  if (!normalized) {
-    return "outline"
+  if (status === "pending") {
+    return t("cloud.instances.statusPending")
   }
-
-  return "secondary"
+  if (status === "error") {
+    return t("cloud.instances.statusError")
+  }
+  return t("cloud.instances.statusUnknown")
 }
 
 export default function CloudInstancesPage() {
   const { t, locale } = useAppTranslations("pages")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { data, loading, refreshing, execute } = useRequestState<CloudInstancesState>({
     instances: [],
+    total: 0,
   })
 
   const [searchKeyword, setSearchKeyword] = useState("")
   const [providerFilter, setProviderFilter] = useState("all")
   const [regionFilter, setRegionFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [pageSize, setPageSize] = useState<number>(20)
+  const [offset, setOffset] = useState(0)
+  const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState("")
+  const [allInstancesSnapshot, setAllInstancesSnapshot] = useState<CloudInstanceResponse[] | null>(null)
+  const syncingFromUrlRef = useRef(false)
 
   const instances = data.instances
+  const total = data.total
+
+  useEffect(() => {
+    syncingFromUrlRef.current = true
+
+    const nextSearchKeyword = searchParams.get("search") || ""
+    const nextProviderFilter = searchParams.get("provider") || "all"
+    const nextRegionFilter = searchParams.get("region") || "all"
+    const nextStatusFilter = searchParams.get("status") || "all"
+    const rawLimit = Number(searchParams.get("limit") || String(PAGE_SIZE_OPTIONS[1]))
+    const nextPageSize = PAGE_SIZE_OPTIONS.includes(rawLimit as (typeof PAGE_SIZE_OPTIONS)[number])
+      ? rawLimit
+      : PAGE_SIZE_OPTIONS[1]
+    const rawOffset = Number(searchParams.get("offset") || "0")
+    const nextOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
+
+    setSearchKeyword((prev) => (prev === nextSearchKeyword ? prev : nextSearchKeyword))
+    setProviderFilter((prev) => (prev === nextProviderFilter ? prev : nextProviderFilter))
+    setRegionFilter((prev) => (prev === nextRegionFilter ? prev : nextRegionFilter))
+    setStatusFilter((prev) => (prev === nextStatusFilter ? prev : nextStatusFilter))
+    setPageSize((prev) => (prev === nextPageSize ? prev : nextPageSize))
+    setOffset((prev) => (prev === nextOffset ? prev : nextOffset))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (searchKeyword.trim()) {
+      nextParams.set("search", searchKeyword)
+    } else {
+      nextParams.delete("search")
+    }
+
+    if (providerFilter !== "all") {
+      nextParams.set("provider", providerFilter)
+    } else {
+      nextParams.delete("provider")
+    }
+
+    if (regionFilter !== "all") {
+      nextParams.set("region", regionFilter)
+    } else {
+      nextParams.delete("region")
+    }
+
+    if (statusFilter !== "all") {
+      nextParams.set("status", statusFilter)
+    } else {
+      nextParams.delete("status")
+    }
+
+    if (pageSize !== PAGE_SIZE_OPTIONS[1]) {
+      nextParams.set("limit", String(pageSize))
+    } else {
+      nextParams.delete("limit")
+    }
+
+    if (offset > 0) {
+      nextParams.set("offset", String(offset))
+    } else {
+      nextParams.delete("offset")
+    }
+
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery === currentQuery) {
+      return
+    }
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }, [offset, pageSize, pathname, providerFilter, regionFilter, router, searchKeyword, searchParams, statusFilter])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchKeyword(searchKeyword)
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [searchKeyword])
+
+  useEffect(() => {
+    if (syncingFromUrlRef.current) {
+      syncingFromUrlRef.current = false
+      return
+    }
+
+    setOffset(0)
+  }, [debouncedSearchKeyword, pageSize, providerFilter, regionFilter, statusFilter])
 
   const fetchInstances = useCallback(async (silent = false) => {
+    const params: CloudInstanceQueryParams = {
+      provider: providerFilter !== "all" ? providerFilter : undefined,
+      region: regionFilter !== "all" ? regionFilter : undefined,
+      status: statusFilter !== "all" ? statusFilter : undefined,
+      search: debouncedSearchKeyword.trim() || undefined,
+      limit: pageSize,
+      offset,
+    }
+
     await execute(
-      async () => ({
-        instances: await api.listCloudInstances(),
-      }),
+      async () => {
+        const page = await api.listCloudInstancesPage(params)
+
+        return {
+          instances: page.items,
+          total: page.total,
+        }
+      },
       {
         silent,
         onError: (error) => {
-          toast.error(getApiErrorMessage(error, t("cloud.instances.toastFetchError")))
+          toastApiError(error, t("cloud.instances.toastFetchError"))
         },
       }
     )
-  }, [execute, t])
+  }, [debouncedSearchKeyword, execute, offset, pageSize, providerFilter, regionFilter, statusFilter, t])
 
   useEffect(() => {
     fetchInstances()
   }, [fetchInstances])
 
-  const providerOptions = useMemo(() => uniqueSorted(instances.map((item) => item.provider)), [instances])
-  const regionOptions = useMemo(() => uniqueSorted(instances.map((item) => item.region)), [instances])
-  const statusOptions = useMemo(() => uniqueSorted(instances.map((item) => item.status)), [instances])
+  useEffect(() => {
+    if (allInstancesSnapshot !== null) {
+      return
+    }
 
-  const filteredInstances = useMemo(() => {
-    const keyword = searchKeyword.trim().toLowerCase()
+    let cancelled = false
 
-    return instances.filter((item) => {
-      if (providerFilter !== "all" && item.provider !== providerFilter) {
-        return false
-      }
+    api.listCloudInstances()
+      .then((rows) => {
+        if (!cancelled) {
+          setAllInstancesSnapshot(rows)
+        }
+      })
+      .catch(() => {
+        // ignore snapshot fetch failures; page uses current table data as fallback
+      })
 
-      if (regionFilter !== "all" && item.region !== regionFilter) {
-        return false
-      }
+    return () => {
+      cancelled = true
+    }
+  }, [allInstancesSnapshot])
 
-      if (statusFilter !== "all" && (item.status || "") !== statusFilter) {
-        return false
-      }
+  const optionSourceInstances = allInstancesSnapshot ?? instances
 
-      if (!keyword) {
-        return true
-      }
+  const providerOptions = useMemo(
+    () => uniqueSortedWithLocale(optionSourceInstances.map((item) => item.provider), locale),
+    [locale, optionSourceInstances]
+  )
 
-      const haystack = [
-        item.instance_id,
-        item.instance_name ?? "",
-        item.account_config_key,
-        item.provider,
-        item.region,
-        item.public_ip ?? "",
-        item.private_ip ?? "",
-        item.os ?? "",
-        item.status ?? "",
-      ]
-        .join(" ")
-        .toLowerCase()
+  const regionOptions = useMemo(
+    () => uniqueSortedWithLocale(optionSourceInstances.map((item) => item.region), locale),
+    [locale, optionSourceInstances]
+  )
 
-      return haystack.includes(keyword)
-    })
-  }, [instances, providerFilter, regionFilter, searchKeyword, statusFilter])
+  const statusOptions = useMemo(() => {
+    const statusOrder: CloudInstanceStatusKey[] = ["running", "pending", "stopped", "error", "unknown"]
+    const normalizedStatusSet = new Set(optionSourceInstances.map((item) => normalizeCloudInstanceStatus(item.status)))
+    return statusOrder.filter((status) => normalizedStatusSet.has(status))
+  }, [optionSourceInstances])
 
-  const stats = useMemo(() => ({
-    total: instances.length,
-    providers: providerOptions.length,
-    regions: regionOptions.length,
-    publicIps: instances.filter((item) => Boolean(item.public_ip)).length,
-  }), [instances, providerOptions.length, regionOptions.length])
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit: pageSize,
+    currentItemsCount: instances.length,
+    totalItems: total,
+  })
+
+  const stats = useMemo(
+    () => ({
+      total: optionSourceInstances.length,
+      providers: providerOptions.length,
+      regions: regionOptions.length,
+      publicIps: optionSourceInstances.filter((item) => Boolean(item.public_ip)).length,
+    }),
+    [optionSourceInstances, providerOptions.length, regionOptions.length]
+  )
+
+  const getStatusLabel = useCallback(
+    (status: CloudInstanceStatusKey) => resolveStatusText(status, t),
+    [t]
+  )
+
+  const pageSizeOptionLabel = useCallback(
+    (size: number) => (locale === "zh" ? `${size} / 页` : `${size} / page`),
+    [locale]
+  )
 
   return (
     <div className="space-y-6">
@@ -157,179 +281,90 @@ export default function CloudInstancesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("cloud.instances.statTotal")}</CardDescription>
-            <CardTitle className="text-2xl">{stats.total}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("cloud.instances.statProviders")}</CardDescription>
-            <CardTitle className="text-2xl">{stats.providers}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("cloud.instances.statRegions")}</CardDescription>
-            <CardTitle className="text-2xl">{stats.regions}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("cloud.instances.statPublicIps")}</CardDescription>
-            <CardTitle className="text-2xl">{stats.publicIps}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+      <CloudInstancesStatsCards
+        stats={stats}
+        labels={{
+          total: t("cloud.instances.statTotal"),
+          providers: t("cloud.instances.statProviders"),
+          regions: t("cloud.instances.statRegions"),
+          publicIps: t("cloud.instances.statPublicIps"),
+        }}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("cloud.instances.filtersTitle")}</CardTitle>
-          <CardDescription>{t("cloud.instances.filtersDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-2 xl:col-span-2">
-            <Label htmlFor="cloud-instance-search">{t("cloud.instances.filterSearch")}</Label>
-            <div className="relative">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                id="cloud-instance-search"
-                className="pl-9"
-                value={searchKeyword}
-                onChange={(event) => setSearchKeyword(event.target.value)}
-                placeholder={t("cloud.instances.filterSearchPlaceholder")}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>{t("cloud.instances.filterProvider")}</Label>
-            <Select value={providerFilter} onValueChange={setProviderFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("cloud.instances.filterProviderAll")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("cloud.instances.filterProviderAll")}</SelectItem>
-                {providerOptions.map((provider) => (
-                  <SelectItem key={provider} value={provider}>{provider}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>{t("cloud.instances.filterRegion")}</Label>
-            <Select value={regionFilter} onValueChange={setRegionFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("cloud.instances.filterRegionAll")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("cloud.instances.filterRegionAll")}</SelectItem>
-                {regionOptions.map((region) => (
-                  <SelectItem key={region} value={region}>{region}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>{t("cloud.instances.filterStatus")}</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("cloud.instances.filterStatusAll")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("cloud.instances.filterStatusAll")}</SelectItem>
-                {statusOptions.map((status) => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <CloudInstancesFiltersCard
+        searchKeyword={searchKeyword}
+        providerFilter={providerFilter}
+        regionFilter={regionFilter}
+        statusFilter={statusFilter}
+        providerOptions={providerOptions}
+        regionOptions={regionOptions}
+        statusOptions={statusOptions}
+        onSearchKeywordChange={setSearchKeyword}
+        onProviderFilterChange={setProviderFilter}
+        onRegionFilterChange={setRegionFilter}
+        onStatusFilterChange={setStatusFilter}
+        getStatusLabel={getStatusLabel}
+        texts={{
+          title: t("cloud.instances.filtersTitle"),
+          description: t("cloud.instances.filtersDescription"),
+          filterSearch: t("cloud.instances.filterSearch"),
+          filterSearchPlaceholder: t("cloud.instances.filterSearchPlaceholder"),
+          filterProvider: t("cloud.instances.filterProvider"),
+          filterProviderAll: t("cloud.instances.filterProviderAll"),
+          filterRegion: t("cloud.instances.filterRegion"),
+          filterRegionAll: t("cloud.instances.filterRegionAll"),
+          filterStatus: t("cloud.instances.filterStatus"),
+          filterStatusAll: t("cloud.instances.filterStatusAll"),
+        }}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("cloud.instances.tableTitle")}</CardTitle>
-          <CardDescription>{t("cloud.instances.tableDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("cloud.instances.tableColInstance")}</TableHead>
-                  <TableHead>{t("cloud.instances.tableColProvider")}</TableHead>
-                  <TableHead>{t("cloud.instances.tableColAccount")}</TableHead>
-                  <TableHead>{t("cloud.instances.tableColRegion")}</TableHead>
-                  <TableHead>{t("cloud.instances.tableColIp")}</TableHead>
-                  <TableHead>{t("cloud.instances.tableColOs")}</TableHead>
-                  <TableHead>{t("cloud.instances.tableColStatus")}</TableHead>
-                  <TableHead>{t("cloud.instances.tableColLastSeen")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-28 text-center text-muted-foreground">
-                      {t("cloud.instances.tableLoading")}
-                    </TableCell>
-                  </TableRow>
-                ) : filteredInstances.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-28 text-center text-muted-foreground">
-                      {t("cloud.instances.tableEmpty")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredInstances.map((instance) => (
-                    <TableRow key={instance.id}>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <Link
-                            href={withLocalePrefix(`/cloud/instances/${instance.id}`, locale)}
-                            className="font-medium hover:underline"
-                          >
-                            {resolveInstanceName(instance)}
-                          </Link>
-                          <div className="font-mono text-xs text-muted-foreground">{instance.instance_id}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{instance.provider}</Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{instance.account_config_key}</TableCell>
-                      <TableCell>{instance.region}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1 text-xs">
-                          <div>{instance.public_ip || "-"}</div>
-                          <div className="text-muted-foreground">{instance.private_ip || "-"}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[220px] truncate">{instance.os || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant={resolveStatusVariant(instance.status)}>
-                          {instance.status || t("cloud.instances.statusUnknown")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-between gap-2">
-                          <span>{formatDateTime(instance.last_seen_at, locale)}</span>
-                          <Button asChild type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                            <Link href={withLocalePrefix(`/cloud/instances/${instance.id}`, locale)}>
-                              {t("cloud.instances.actionViewDetails")}
-                            </Link>
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <CloudInstancesTableCard
+        loading={loading}
+        locale={locale}
+        instances={instances}
+        title={t("cloud.instances.tableTitle")}
+        description={t("cloud.instances.tableDescription")}
+        getStatusLabel={getStatusLabel}
+        formatDateTime={formatDateTime}
+        tableTexts={{
+          colInstance: t("cloud.instances.tableColInstance"),
+          colProvider: t("cloud.instances.tableColProvider"),
+          colAccount: t("cloud.instances.tableColAccount"),
+          colRegion: t("cloud.instances.tableColRegion"),
+          colIp: t("cloud.instances.tableColIp"),
+          colOs: t("cloud.instances.tableColOs"),
+          colStatus: t("cloud.instances.tableColStatus"),
+          colLastSeen: t("cloud.instances.tableColLastSeen"),
+          loading: t("cloud.instances.tableLoading"),
+          empty: t("cloud.instances.tableEmpty"),
+          actionViewDetails: t("cloud.instances.actionViewDetails"),
+        }}
+        pagination={{
+          pageSize,
+          pageSizeOptions: [...PAGE_SIZE_OPTIONS],
+          onPageSizeChange: (nextPageSize) => {
+            setPageSize(nextPageSize)
+            setOffset(0)
+          },
+          summaryText: t("cloud.instances.paginationSummary", {
+            total,
+            start: pagination.rangeStart,
+            end: pagination.rangeEnd,
+          }),
+          pageIndicatorText: t("cloud.instances.paginationPage", {
+            current: pagination.currentPage,
+            total: pagination.totalPages,
+          }),
+          pageSizePlaceholder: t("cloud.instances.pageSizePlaceholder"),
+          prevLabel: t("cloud.instances.paginationPrev"),
+          nextLabel: t("cloud.instances.paginationNext"),
+          onPrevPage: () => setOffset((prev) => Math.max(0, prev - pageSize)),
+          onNextPage: () => setOffset((prev) => prev + pageSize),
+          prevDisabled: !pagination.canGoPrev || total === 0,
+          nextDisabled: !pagination.canGoNext || total === 0,
+          pageSizeOptionLabel,
+        }}
+      />
     </div>
   )
 }

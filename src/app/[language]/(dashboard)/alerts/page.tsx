@@ -2,18 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import { AlertEventResponse, AlertSummary } from "@/types/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   useAppTranslations,
   type AppNamespaceTranslator,
 } from "@/hooks/use-app-translations"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { ActiveAlertsListHeader, ActiveAlertsTopControls } from "@/components/alerts/ActiveAlertsHeader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +41,7 @@ import {
   AlertTriangle,
   Info,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   AreaChart,
@@ -211,7 +213,7 @@ export default function ActiveAlertsPage() {
         setAlertsTotal(alertsData.total)
         setSummary(summaryData)
       } catch (error) {
-        toast.error(getApiErrorMessage(error, t("active.toastFetchError")))
+        toastApiError(error, t("active.toastFetchError"))
       } finally {
         setLoading(false)
         setRefreshing(false)
@@ -261,7 +263,7 @@ export default function ActiveAlertsPage() {
         return next
       })
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("active.toastAckError")))
+      toastApiError(error, t("active.toastAckError"))
     } finally {
       setActionInProgress(null)
     }
@@ -280,7 +282,7 @@ export default function ActiveAlertsPage() {
         return next
       })
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("active.toastResolveError")))
+      toastApiError(error, t("active.toastResolveError"))
     } finally {
       setActionInProgress(null)
     }
@@ -298,7 +300,7 @@ export default function ActiveAlertsPage() {
       await fetchData(true)
       setSelectedAlerts(new Set())
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("active.toastBulkAckError")))
+      toastApiError(error, t("active.toastBulkAckError"))
     } finally {
       setActionInProgress(null)
     }
@@ -316,7 +318,7 @@ export default function ActiveAlertsPage() {
       await fetchData(true)
       setSelectedAlerts(new Set())
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("active.toastBulkResolveError")))
+      toastApiError(error, t("active.toastBulkResolveError"))
     } finally {
       setActionInProgress(null)
     }
@@ -346,8 +348,12 @@ export default function ActiveAlertsPage() {
     router.push(withLocalePrefix(`/alerts/${alert.id}`, locale))
   }
 
-  const canGoPrev = offset > 0
-  const canGoNext = offset + alerts.length < alertsTotal
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit,
+    currentItemsCount: alerts.length,
+    totalItems: alertsTotal,
+  })
   const allSelected = filteredAlerts.length > 0 && selectedAlerts.size === filteredAlerts.length
 
   // 生成趋势数据（按小时聚合）
@@ -767,30 +773,22 @@ export default function ActiveAlertsPage() {
           </div>
 
           {!loading && alerts.length > 0 && (
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {t("active.paginationPage", { page: Math.floor(offset / limit) + 1 })}
-                {searchQuery && ` • ${t("active.paginationFilteredResults", { count: filteredAlerts.length })}`}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setOffset(Math.max(0, offset - limit))}
-                  disabled={!canGoPrev}
-                >
-                  {t("active.paginationPrevious")}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setOffset(offset + limit)}
-                  disabled={!canGoNext}
-                >
-                  {t("active.paginationNext")}
-                </Button>
-              </div>
-            </div>
+            <ServerPaginationControls
+              className="mt-4 flex items-center justify-between"
+              pageSize={limit}
+              showSummary
+              showPageIndicator={false}
+              summaryText={`${t("active.paginationPage", { page: Math.floor(offset / limit) + 1 })}${
+                searchQuery ? ` • ${t("active.paginationFilteredResults", { count: filteredAlerts.length })}` : ""
+              }`}
+              pageIndicatorText=""
+              prevLabel={t("active.paginationPrevious")}
+              nextLabel={t("active.paginationNext")}
+              onPrevPage={() => setOffset(Math.max(0, offset - limit))}
+              onNextPage={() => setOffset(offset + limit)}
+              prevDisabled={!pagination.canGoPrev}
+              nextDisabled={!pagination.canGoNext}
+            />
           )}
         </CardContent>
       </Card>

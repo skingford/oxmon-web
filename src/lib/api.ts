@@ -793,6 +793,8 @@ export const api = {
     const queryParams = {
       provider: params?.provider,
       region: params?.region,
+      status: params?.status,
+      search: params?.search,
     }
 
     return requestAllPages<CloudInstanceResponse>((page) =>
@@ -801,6 +803,14 @@ export const api = {
       )
     )
   },
+
+  listCloudInstancesPage: (params: CloudInstanceQueryParams = {}) =>
+    request<unknown>(`/v1/cloud/instances${buildQueryString(params)}`).then((payload) =>
+      normalizeListResponse<CloudInstanceResponse>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+    ),
 
   getCloudInstanceDetail: (id: string) =>
     request<CloudInstanceDetailResponse>(`/v1/cloud/instances/${id}`),

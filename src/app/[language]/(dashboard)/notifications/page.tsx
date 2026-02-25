@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import {
   ChannelOverview,
 } from "@/types/api"
@@ -36,7 +36,7 @@ import {
   RefreshCw,
   X,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastApiError } from "@/lib/toast"
 
 const CHANNEL_SEVERITY_OPTIONS = ["info", "warning", "critical"] as const
 
@@ -79,7 +79,7 @@ export default function NotificationsPage() {
         {
           silent,
           onError: (error) => {
-            toast.error(getApiErrorMessage(error, t("notifications.toastFetchError")))
+            toastApiError(error, t("notifications.toastFetchError"))
           },
         }
       )
@@ -155,7 +155,7 @@ export default function NotificationsPage() {
 
         await fetchChannels(true)
       } catch (error) {
-        toast.error(getApiErrorMessage(error, t("notifications.toastToggleError")))
+        toastApiError(error, t("notifications.toastToggleError"))
       } finally {
         setTogglingId(null)
       }

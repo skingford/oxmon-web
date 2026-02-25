@@ -1,7 +1,7 @@
 "use client"
 
 import { Dispatch, FormEvent, SetStateAction, useCallback, useState } from "react"
-import { api, getApiErrorMessage } from "@/lib/api"
+import { api } from "@/lib/api"
 import {
   getConfigFormValuesFromConfigJson,
   getInitialFormState,
@@ -15,7 +15,7 @@ import type {
   CreateChannelRequest,
   UpdateChannelConfigRequest,
 } from "@/types/api"
-import { toast } from "sonner"
+import { toast, toastApiError, toastCreated, toastSaved } from "@/lib/toast"
 
 type UseNotificationChannelSubmitOptions = {
   t: AppNamespaceTranslator<"pages">
@@ -160,10 +160,10 @@ export function useNotificationChannelSubmit({
           }
 
           await api.updateChannelConfig(editingChannel.id, payload)
-          toast.success(t("notifications.toastUpdateSuccess"))
+          toastSaved(t("notifications.toastUpdateSuccess"))
         } else {
           await api.createChannelConfig(basePayload)
-          toast.success(t("notifications.toastCreateSuccess"))
+          toastCreated(t("notifications.toastCreateSuccess"))
         }
 
         setIsChannelDialogOpen(false)
@@ -171,11 +171,9 @@ export function useNotificationChannelSubmit({
         setChannelForm(getInitialFormState())
         await fetchChannels(true)
       } catch (error) {
-        toast.error(
-          getApiErrorMessage(
-            error,
-            editingChannel ? t("notifications.toastUpdateError") : t("notifications.toastCreateError")
-          )
+        toastApiError(
+          error,
+          editingChannel ? t("notifications.toastUpdateError") : t("notifications.toastCreateError")
         )
       } finally {
         setFormSubmitting(false)

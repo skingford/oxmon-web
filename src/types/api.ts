@@ -232,6 +232,8 @@ export interface CloudAccountQueryParams extends PaginationParams {
 export interface CloudInstanceQueryParams extends PaginationParams {
   provider?: string;
   region?: string;
+  status?: string;
+  search?: string;
 }
 
 export interface ListResponse<T> {

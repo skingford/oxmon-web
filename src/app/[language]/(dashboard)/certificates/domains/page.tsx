@@ -2,11 +2,12 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { ApiRequestError, api, getApiErrorMessage } from "@/lib/api"
+import { ApiRequestError, api } from "@/lib/api"
 import { formatCertificateDateTime, parseOptionalNonNegativeInt } from "@/lib/certificates/formats"
 import { pickCountKey } from "@/lib/i18n-count"
 import { CertCheckResult, CertDomain, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useCertificateAutoCreateDraft } from "@/hooks/use-certificate-auto-create-draft"
 import { useCertificateDomainsAutoCheckFlow } from "@/hooks/use-certificate-domains-auto-check-flow"
 import { useCertificateDomainsQueryState } from "@/hooks/use-certificate-domains-query-state"
@@ -25,7 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   Loader2,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast, toastActionSuccess, toastApiError, toastCreated, toastDeleted, toastStatusError } from "@/lib/toast"
 
 const PAGE_LIMIT = 20
 
@@ -144,18 +145,6 @@ export default function DomainsPage() {
     }
   }
 
-  const getStatusAwareMessage = (
-    error: unknown,
-    fallback: string,
-    statusMessages?: Partial<Record<number, string>>
-  ) => {
-    if (error instanceof ApiRequestError && statusMessages?.[error.status]) {
-      return statusMessages[error.status] as string
-    }
-
-    return getApiErrorMessage(error, fallback)
-  }
-
   const fetchDomains = useCallback(
     async (silent = false) => {
       await execute(
@@ -168,7 +157,7 @@ export default function DomainsPage() {
         {
           silent,
           onError: (error) => {
-            toast.error(getApiErrorMessage(error, t("certificates.domains.toastFetchError")))
+            toastApiError(error, t("certificates.domains.toastFetchError"))
           },
         }
       )
@@ -190,9 +179,12 @@ export default function DomainsPage() {
     }
   }, [autoCreateDomain, autoCreateHasAdvancedDraft])
 
-  const pageNumber = Math.floor(offset / PAGE_LIMIT) + 1
-  const canGoPrev = offset > 0
-  const canGoNext = offset + domains.length < domainsPage.total
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit: PAGE_LIMIT,
+    currentItemsCount: domains.length,
+    totalItems: domainsPage.total,
+  })
 
   const handleCreateDomain = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -223,7 +215,7 @@ export default function DomainsPage() {
         note: newNote.trim() ? newNote.trim() : null,
       })
 
-      toast.success(t("certificates.domains.toastCreateSuccess"))
+      toastCreated(t("certificates.domains.toastCreateSuccess"))
       setCreateDialogOpen(false)
       setNewDomain("")
       setNewPort("")
@@ -231,11 +223,9 @@ export default function DomainsPage() {
       setNewNote("")
       await fetchDomains(true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("certificates.domains.toastCreateError"), {
-          409: t("certificates.domains.toastCreateConflict"),
-        })
-      )
+      toastStatusError(error, t("certificates.domains.toastCreateError"), {
+        409: t("certificates.domains.toastCreateConflict"),
+      })
     } finally {
       setCreating(false)
     }
@@ -264,11 +254,9 @@ export default function DomainsPage() {
       setBatchDialogOpen(false)
       await fetchDomains(true)
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("certificates.domains.toastBatchError"), {
-          409: t("certificates.domains.toastCreateConflict"),
-        })
-      )
+      toastStatusError(error, t("certificates.domains.toastBatchError"), {
+        409: t("certificates.domains.toastCreateConflict"),
+      })
     } finally {
       setBatchCreating(false)
     }
@@ -284,7 +272,7 @@ export default function DomainsPage() {
         : t("certificates.domains.toastDisableSuccess"))
       await fetchDomains(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("certificates.domains.toastUpdateError")))
+      toastApiError(error, t("certificates.domains.toastUpdateError"))
     } finally {
       setUpdatingId(null)
     }
@@ -297,7 +285,7 @@ export default function DomainsPage() {
       const result = await api.checkSingleDomain(domain.id)
 
       if (result.is_valid && result.chain_valid) {
-        toast.success(t("certificates.domains.toastCheckSuccess"))
+        toastActionSuccess(t("certificates.domains.toastCheckSuccess"))
       } else {
         toast.error(
           t("certificates.domains.toastCheckFailed", {
@@ -308,7 +296,7 @@ export default function DomainsPage() {
 
       await fetchDomains(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("certificates.domains.toastCheckError")))
+      toastApiError(error, t("certificates.domains.toastCheckError"))
     } finally {
       setCheckingId(null)
     }
@@ -337,12 +325,12 @@ export default function DomainsPage() {
           total: results.length,
         }))
       } else {
-        toast.success(t("certificates.domains.toastCheckAllSuccess"))
+        toastActionSuccess(t("certificates.domains.toastCheckAllSuccess"))
       }
 
       await fetchDomains(true)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("certificates.domains.toastCheckAllError")))
+      toastApiError(error, t("certificates.domains.toastCheckAllError"))
     } finally {
       setCheckingAll(false)
     }
@@ -404,11 +392,9 @@ export default function DomainsPage() {
         }
       }
 
-      toast.error(
-        getStatusAwareMessage(error, t("certificates.domains.toastAutoCreateError"), {
-          409: t("certificates.domains.toastCreateConflict"),
-        })
-      )
+      toastStatusError(error, t("certificates.domains.toastAutoCreateError"), {
+        409: t("certificates.domains.toastCreateConflict"),
+      })
     } finally {
       setAutoCreating(false)
     }
@@ -427,7 +413,7 @@ export default function DomainsPage() {
 
       setHistoryItems(result)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("certificates.domains.toastHistoryError")))
+      toastApiError(error, t("certificates.domains.toastHistoryError"))
       setHistoryItems([])
     } finally {
       setHistoryLoading(false)
@@ -444,7 +430,7 @@ export default function DomainsPage() {
 
     try {
       await api.deleteDomain(target.id)
-      toast.success(t("certificates.domains.toastDeleteSuccess"))
+      toastDeleted(t("certificates.domains.toastDeleteSuccess"))
       setDeleteDialogDomain(null)
 
       if (domains.length === 1 && offset > 0) {
@@ -453,11 +439,9 @@ export default function DomainsPage() {
         await fetchDomains(true)
       }
     } catch (error) {
-      toast.error(
-        getStatusAwareMessage(error, t("certificates.domains.toastDeleteError"), {
-          404: t("certificates.domains.toastDeleteNotFound"),
-        })
-      )
+      toastStatusError(error, t("certificates.domains.toastDeleteError"), {
+        404: t("certificates.domains.toastDeleteNotFound"),
+      })
     } finally {
       setDeletingId(null)
     }
@@ -626,9 +610,9 @@ export default function DomainsPage() {
         pageLimit={PAGE_LIMIT}
         loading={loading}
         domains={domains}
-        pageNumber={pageNumber}
-        canGoPrev={canGoPrev}
-        canGoNext={canGoNext}
+        pageNumber={pagination.currentPage}
+        canGoPrev={pagination.canGoPrev}
+        canGoNext={pagination.canGoNext}
         checkingId={checkingId}
         updatingId={updatingId}
         deletingId={deletingId}
