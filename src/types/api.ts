@@ -250,12 +250,24 @@ export interface CertSummary {
   expiring_soon: number;
 }
 
+export interface CloudSummary {
+  total_accounts: number;
+  enabled_accounts: number;
+  total_instances: number;
+  running_instances: number;
+  stopped_instances: number;
+  pending_instances: number;
+  error_instances: number;
+  unknown_instances: number;
+}
+
 export interface DashboardOverview {
   active_agents: number;
   total_agents: number;
   alerts_24h: number;
   alerts_by_severity: Record<string, number>;
   cert_summary: CertSummary;
+  cloud_summary: CloudSummary;
   partition_count: number;
   storage_total_bytes: number;
   uptime_secs: number;
