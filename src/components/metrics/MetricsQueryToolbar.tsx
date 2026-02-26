@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { Database, Download, FileJson2, Link2, Loader2, RefreshCw, RotateCcw, Server } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
@@ -97,22 +98,166 @@ export function MetricsQueryToolbar({
   onExportJson,
   onCopyQueryLink,
 }: MetricsQueryToolbarProps) {
+  const RECENT_AGENTS_KEY = "metrics-recent-agents"
+  const [agentSearch, setAgentSearch] = useState("")
+  const [agentSelectOpen, setAgentSelectOpen] = useState(false)
+  const [recentAgents, setRecentAgents] = useState<string[]>([])
+
+  const normalizedAgentSearch = agentSearch.trim().toLowerCase()
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(RECENT_AGENTS_KEY)
+      const parsed = raw ? JSON.parse(raw) : []
+      if (Array.isArray(parsed)) {
+        setRecentAgents(parsed.filter((item): item is string => typeof item === "string").slice(0, 20))
+      }
+    } catch {
+      setRecentAgents([])
+    }
+  }, [])
+
+  const recentIndexMap = useMemo(() => {
+    const map = new Map<string, number>()
+    recentAgents.forEach((id, index) => map.set(id, index))
+    return map
+  }, [recentAgents])
+
+  const orderedAgents = useMemo(() => {
+    return [...agents].sort((a, b) => {
+      const ai = recentIndexMap.get(a)
+      const bi = recentIndexMap.get(b)
+      if (ai !== undefined && bi !== undefined) return ai - bi
+      if (ai !== undefined) return -1
+      if (bi !== undefined) return 1
+      return a.localeCompare(b)
+    })
+  }, [agents, recentIndexMap])
+
+  const handleSelectAgent = (agentId: string) => {
+    onSelectedAgentChange(agentId)
+    setRecentAgents((prev) => {
+      const next = [agentId, ...prev.filter((id) => id !== agentId)].slice(0, 20)
+      try {
+        window.localStorage.setItem(RECENT_AGENTS_KEY, JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }
+
+  const filteredAgents = useMemo(() => {
+    if (!normalizedAgentSearch) {
+      return orderedAgents.slice(0, 100)
+    }
+
+    const scored = orderedAgents
+      .map((agentId) => {
+        const text = agentId.toLowerCase()
+        const index = text.indexOf(normalizedAgentSearch)
+
+        if (index < 0) {
+          return null
+        }
+
+        let score = 3
+        if (text === normalizedAgentSearch) score = 0
+        else if (text.startsWith(normalizedAgentSearch)) score = 1
+        else if (index > 0) score = 2
+
+        return { agentId, score, index }
+      })
+      .filter((item): item is { agentId: string; score: number; index: number } => item !== null)
+      .sort((a, b) => {
+        const recentA = recentIndexMap.get(a.agentId)
+        const recentB = recentIndexMap.get(b.agentId)
+        return (
+          a.score - b.score ||
+          a.index - b.index ||
+          (recentA ?? Number.MAX_SAFE_INTEGER) - (recentB ?? Number.MAX_SAFE_INTEGER) ||
+          a.agentId.localeCompare(b.agentId)
+        )
+      })
+
+    return scored.slice(0, 100).map((item) => item.agentId)
+  }, [normalizedAgentSearch, orderedAgents, recentIndexMap])
+
+  const renderHighlightedAgent = (agentId: string) => {
+    if (!normalizedAgentSearch) {
+      return agentId
+    }
+
+    const lower = agentId.toLowerCase()
+    const start = lower.indexOf(normalizedAgentSearch)
+
+    if (start < 0) {
+      return agentId
+    }
+
+    const end = start + normalizedAgentSearch.length
+
+    return (
+      <>
+        {agentId.slice(0, start)}
+        <span className="rounded bg-primary/15 px-0.5 text-foreground">
+          {agentId.slice(start, end)}
+        </span>
+        {agentId.slice(end)}
+      </>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
       <div className="space-y-2">
         <div className="flex h-5 items-center gap-2 text-sm text-muted-foreground">
           <Server className="h-4 w-4" /> {texts.agentLabel}
         </div>
-        <Select value={selectedAgent} onValueChange={onSelectedAgentChange} disabled={fetchingOptions}>
+        <Select
+          open={agentSelectOpen}
+          value={selectedAgent}
+          onValueChange={handleSelectAgent}
+          disabled={fetchingOptions}
+          onOpenChange={(open) => {
+            setAgentSelectOpen(open)
+            if (!open) {
+              setAgentSearch("")
+            }
+          }}
+        >
           <SelectTrigger className="h-10">
             <SelectValue placeholder={texts.agentPlaceholder} />
           </SelectTrigger>
           <SelectContent>
-            {agents.map((agentId) => (
+            <div className="sticky top-0 z-10 bg-popover p-1">
+              <Input
+                value={agentSearch}
+                onChange={(event) => setAgentSearch(event.target.value)}
+                placeholder={texts.agentPlaceholder}
+                className="h-8"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    const first = filteredAgents[0]
+                    if (first) {
+                      handleSelectAgent(first)
+                      setAgentSelectOpen(false)
+                    }
+                    return
+                  }
+
+                  event.stopPropagation()
+                }}
+              />
+            </div>
+            {filteredAgents.map((agentId) => (
               <SelectItem key={agentId} value={agentId}>
-                {agentId}
+                {renderHighlightedAgent(agentId)}
               </SelectItem>
             ))}
+            {filteredAgents.length === 0 ? (
+              <div className="px-2 py-2 text-xs text-muted-foreground">No matching agents</div>
+            ) : null}
           </SelectContent>
         </Select>
       </div>

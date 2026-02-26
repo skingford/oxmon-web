@@ -70,9 +70,80 @@ function isTimeRange(value: string | null): value is TimeRange {
   return value === "15m" || value === "30m" || value === "1h" || value === "6h" || value === "24h" || value === "7d" || value === "all" || value === "custom"
 }
 
-function formatMetricValue(value: number) {
+type MetricUnitKind =
+  | "percent"
+  | "bytes"
+  | "bytes_per_sec"
+  | "iops"
+  | "ms"
+  | "seconds"
+  | "temperature_c"
+  | "count"
+  | "plain"
+
+function detectMetricUnit(metricName?: string): MetricUnitKind {
+  const name = (metricName || "").toLowerCase()
+
+  if (!name) return "plain"
+  if (/(percent|_pct|\.pct|cpu\.usage|memory\.usage|disk\.usage)/.test(name)) return "percent"
+  if (/(iops)/.test(name)) return "iops"
+  if (/(latency|duration)(_ms|\.ms)?|response_time_ms|_ms$|\.ms$/.test(name)) return "ms"
+  if (/(uptime|duration)(_secs|_seconds)?|_secs$|_seconds$|\.seconds$/.test(name)) return "seconds"
+  if (/(temp|temperature)/.test(name)) return "temperature_c"
+  if (/(bytes_per_sec|bytes\/s|network\.(bytes_recv|bytes_sent)|network_(in|out)_bytes)/.test(name)) return "bytes_per_sec"
+  if (/(bytes|_bytes|memory_used|disk_used|mem_used)/.test(name)) return "bytes"
+  if (/(connections|count|total|qps|rps|tps)/.test(name)) return "count"
+
+  return "plain"
+}
+
+function formatBinaryBytes(value: number, suffix = "") {
+  const abs = Math.abs(value)
+  if (abs === 0) return `0 B${suffix}`
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"]
+  const exponent = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), units.length - 1)
+  const scaled = value / 1024 ** exponent
+  const digits = Math.abs(scaled) >= 100 ? 0 : Math.abs(scaled) >= 10 ? 1 : 2
+  return `${scaled.toLocaleString(undefined, { maximumFractionDigits: digits })} ${units[exponent]}${suffix}`
+}
+
+function formatMetricValue(value: number, metricName?: string) {
   if (Number.isNaN(value)) {
     return "-"
+  }
+
+  const unit = detectMetricUnit(metricName)
+
+  if (unit === "percent") {
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
+  }
+
+  if (unit === "bytes") {
+    return formatBinaryBytes(value)
+  }
+
+  if (unit === "bytes_per_sec") {
+    return formatBinaryBytes(value, "/s")
+  }
+
+  if (unit === "iops") {
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} IOPS`
+  }
+
+  if (unit === "ms") {
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ms`
+  }
+
+  if (unit === "seconds") {
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} s`
+  }
+
+  if (unit === "temperature_c") {
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} °C`
+  }
+
+  if (unit === "count") {
+    return value.toLocaleString(undefined, { maximumFractionDigits: 0 })
   }
 
   if (Math.abs(value) >= 1000) {
@@ -224,6 +295,8 @@ function MetricsPageContent() {
   const [customTo, setCustomTo] = useState(searchParams.get("to") || "")
 
   const [autoQuery, setAutoQuery] = useState(true)
+  const [agentScopedMetricNames, setAgentScopedMetricNames] = useState<string[] | null>(null)
+  const [loadingAgentScopedMetricNames, setLoadingAgentScopedMetricNames] = useState(false)
 
   const [tablePageSize, setTablePageSize] = useState<TablePageSize>("20")
   const [sortField, setSortField] = useState<SortField>("timestamp")
@@ -231,6 +304,8 @@ function MetricsPageContent() {
 
   const hasCustomRange = timeRange !== "custom" || (Boolean(customFrom) && Boolean(customTo))
   const hasQueryCondition = Boolean(selectedAgent && selectedMetric && hasCustomRange)
+
+  const effectiveMetricNames = agentScopedMetricNames ?? metricNames
 
   const handleCopyQueryLink = async () => {
     if (typeof window === "undefined") {
@@ -520,7 +595,98 @@ function MetricsPageContent() {
   }, [pathname, router, searchParams, selectedAgent, selectedMetric, labelFilter, timeRange, customFrom, customTo])
 
   useEffect(() => {
-    if (!autoQuery || fetchingOptions || !hasQueryCondition) {
+    if (!selectedAgent) {
+      setAgentScopedMetricNames(null)
+      return
+    }
+
+    if (timeRange === "custom") {
+      if (!customFrom || !customTo) {
+        setAgentScopedMetricNames(null)
+        return
+      }
+
+      const fromTime = new Date(customFrom).getTime()
+      const toTime = new Date(customTo).getTime()
+      if (Number.isNaN(fromTime) || Number.isNaN(toTime) || fromTime > toTime) {
+        setAgentScopedMetricNames(null)
+        return
+      }
+    }
+
+    let cancelled = false
+
+    const loadAgentMetricNames = async () => {
+      setLoadingAgentScopedMetricNames(true)
+      try {
+        const bounds = getTimeBounds(timeRange, customFrom, customTo)
+        const names = new Set<string>()
+        const pageSize = 500
+        let offset = 0
+
+        while (!cancelled) {
+          const page = await api.queryAllMetrics({
+            agent_id__eq: selectedAgent,
+            timestamp__gte: bounds.from,
+            timestamp__lte: bounds.to,
+            limit: pageSize,
+            offset,
+          })
+
+          page.forEach((point) => {
+            if (point.metric_name) {
+              names.add(point.metric_name)
+            }
+          })
+
+          if (page.length < pageSize) {
+            break
+          }
+
+          offset += pageSize
+
+          // Defensive guard for very large ranges to avoid UI lockups.
+          if (offset >= 20000) {
+            break
+          }
+        }
+
+        if (!cancelled) {
+          setAgentScopedMetricNames(Array.from(names).sort())
+        }
+      } catch {
+        if (!cancelled) {
+          setAgentScopedMetricNames(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingAgentScopedMetricNames(false)
+        }
+      }
+    }
+
+    void loadAgentMetricNames()
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAgent, timeRange, customFrom, customTo])
+
+  useEffect(() => {
+    if (effectiveMetricNames.length === 0) {
+      if (selectedMetric) {
+        setSelectedMetric("")
+      }
+      return
+    }
+
+    if (!effectiveMetricNames.includes(selectedMetric)) {
+      setSelectedMetric(effectiveMetricNames[0])
+    }
+  }, [effectiveMetricNames, selectedMetric])
+
+  useEffect(() => {
+    if (!autoQuery || fetchingOptions || loadingAgentScopedMetricNames || !hasQueryCondition) {
       return
     }
 
@@ -531,7 +697,7 @@ function MetricsPageContent() {
     return () => {
       window.clearTimeout(timerId)
     }
-  }, [autoQuery, fetchingOptions, hasQueryCondition, selectedAgent, selectedMetric, labelFilter, timeRange, customFrom, customTo])
+  }, [autoQuery, fetchingOptions, loadingAgentScopedMetricNames, hasQueryCondition, selectedAgent, selectedMetric, labelFilter, timeRange, customFrom, customTo])
 
   const filteredDataPoints = useMemo(() => {
     if (!labelFilter.trim()) {
@@ -609,7 +775,7 @@ function MetricsPageContent() {
 
   const metricOptions = useMemo(
     () =>
-      metricNames.map((metricName) => {
+      effectiveMetricNames.map((metricName) => {
         const displayName = getMetricDisplayName(metricName, metricNameLabelMap)
         return {
           value: metricName,
@@ -617,7 +783,7 @@ function MetricsPageContent() {
           subtitle: displayName === metricName ? undefined : metricName,
         }
       }),
-    [metricNameLabelMap, metricNames]
+    [effectiveMetricNames, metricNameLabelMap]
   )
   const selectedMetricDisplayName = useMemo(
     () => getMetricDisplayName(selectedMetric, metricNameLabelMap),
@@ -651,8 +817,8 @@ function MetricsPageContent() {
             timeRange={timeRange}
             customFrom={customFrom}
             customTo={customTo}
-            fetchingOptions={fetchingOptions}
             querying={querying}
+            fetchingOptions={fetchingOptions || loadingAgentScopedMetricNames}
             hasQueryCondition={hasQueryCondition}
             canExport={filteredDataPoints.length > 0}
             onSelectedAgentChange={setSelectedAgent}
@@ -681,19 +847,19 @@ function MetricsPageContent() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("metrics.statMin")}</CardDescription>
-            <CardTitle>{summary ? formatMetricValue(summary.min) : "-"}</CardTitle>
+            <CardTitle>{summary ? formatMetricValue(summary.min, selectedMetric) : "-"}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("metrics.statAvg")}</CardDescription>
-            <CardTitle>{summary ? formatMetricValue(summary.avg) : "-"}</CardTitle>
+            <CardTitle>{summary ? formatMetricValue(summary.avg, selectedMetric) : "-"}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("metrics.statMax")}</CardDescription>
-            <CardTitle>{summary ? formatMetricValue(summary.max) : "-"}</CardTitle>
+            <CardTitle>{summary ? formatMetricValue(summary.max, selectedMetric) : "-"}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -733,7 +899,7 @@ function MetricsPageContent() {
                     <div className="text-muted-foreground">
                       {t("metrics.latestTime", { time: latestPoint ? new Date(latestPoint.timestamp).toLocaleString() : "-" })}
                     </div>
-                    <Badge variant="outline">{t("metrics.latestValue", { value: latestPoint ? formatMetricValue(latestPoint.value) : "-" })}</Badge>
+                    <Badge variant="outline">{t("metrics.latestValue", { value: latestPoint ? formatMetricValue(latestPoint.value, selectedMetric) : "-" })}</Badge>
                   </div>
 
                   <div className="h-[320px] w-full">
@@ -741,9 +907,9 @@ function MetricsPageContent() {
                       <AreaChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="time" tick={{ fontSize: 12 }} minTickGap={20} />
-                        <YAxis tick={{ fontSize: 12 }} width={80} />
+                        <YAxis tick={{ fontSize: 12 }} width={100} tickFormatter={(value) => formatMetricValue(Number(value), selectedMetric)} />
                         <Tooltip
-                          formatter={(value) => formatMetricValue(Number(value))}
+                          formatter={(value) => formatMetricValue(Number(value), selectedMetric)}
                           labelFormatter={(label, payload) => {
                             const point = payload?.[0]?.payload
                             return point?.timestamp || label
@@ -827,7 +993,7 @@ function MetricsPageContent() {
                           </div>
                         </TableCell>
                         <TableCell>{new Date(point.timestamp).toLocaleString()}</TableCell>
-                        <TableCell className="font-mono">{formatMetricValue(point.value)}</TableCell>
+                        <TableCell className="font-mono">{formatMetricValue(point.value, point.metric_name)}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {Object.entries(point.labels || {}).length === 0 ? (
