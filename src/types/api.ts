@@ -250,6 +250,19 @@ export interface CertSummary {
   expiring_soon: number;
 }
 
+export interface CertDomainsSummary {
+  total: number;
+  enabled: number;
+  disabled: number;
+}
+
+export interface CertStatusSummary {
+  total: number;
+  healthy: number;
+  failed: number;
+  expiring_soon: number;
+}
+
 export interface CloudSummary {
   total_accounts: number;
   enabled_accounts: number;
@@ -701,4 +714,51 @@ export interface TriggerCollectionResponse {
   success: boolean;
   message: string;
   collected_count?: number | null;
+}
+
+export interface AIAccountResponse {
+  id: string;
+  config_key: string;
+  provider?: string | null;
+  display_name: string;
+  description?: string | null;
+  enabled: boolean;
+  config_json: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAIAccountRequest {
+  config_key: string;
+  provider: string;
+  display_name: string;
+  description?: string | null;
+  enabled: boolean;
+  config: unknown;
+}
+
+export interface UpdateAIAccountRequest {
+  display_name?: string | null;
+  description?: string | null;
+  enabled?: boolean | null;
+  config?: unknown;
+}
+
+export interface AIReportListItem {
+  id: string;
+  report_date: string;
+  ai_account_id: string;
+  ai_provider: string;
+  ai_model: string;
+  total_agents: number;
+  risk_level: string;
+  notified: boolean;
+  created_at: string;
+}
+
+export interface AIReportRow extends AIReportListItem {
+  ai_analysis: string;
+  html_content: string;
+  raw_metrics_json: string;
+  updated_at: string;
 }

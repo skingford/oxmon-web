@@ -2,6 +2,7 @@ import {
   Activity,
   Bell,
   BookText,
+  Bot,
   Inbox,
   LayoutDashboard,
   List,
@@ -143,6 +144,9 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/notifications/silence": ["/v1/notifications/silence-windows"],
   "/cloud": ["/v1/cloud/accounts"],
   "/cloud/instances": ["/v1/cloud/instances"],
+  "/ai": ["/v1/ai/accounts"],
+  "/ai/reports": ["/v1/ai/reports"],
+  "/ai/reports/": ["/v1/ai/reports"],
   "/system": ["/v1/system/config"],
   "/system/dictionaries": ["/v1/dictionaries"],
 }
@@ -263,6 +267,23 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
           {
             titleKey: "itemCloudInstances",
             url: "/cloud/instances",
+            exact: true,
+          },
+        ],
+      },
+      {
+        titleKey: "itemAI",
+        url: "/ai",
+        icon: Bot,
+        children: [
+          {
+            titleKey: "itemAIAccounts",
+            url: "/ai",
+            exact: true,
+          },
+          {
+            titleKey: "itemAIReports",
+            url: "/ai/reports",
             exact: true,
           },
         ],

@@ -24,6 +24,7 @@ export function AppHeaderUserMenu() {
   const { t } = useAppTranslations("header")
   const locale = useAppLocale()
   const router = useRouter()
+  const appId = (process.env.NEXT_PUBLIC_OX_APP_ID || "").trim()
   const [user, setUser] = useState<{ username?: string; sub?: string } | null>(null)
 
   useEffect(() => {
@@ -52,6 +53,15 @@ export function AppHeaderUserMenu() {
       toastCopied(t("toastTokenCopied"))
     } else {
       toast.error(t("toastNoToken"))
+    }
+  }
+
+  const handleCopyAppId = () => {
+    if (appId) {
+      navigator.clipboard.writeText(appId)
+      toastCopied(t("toastAppIdCopied"))
+    } else {
+      toast.error(t("toastNoAppId"))
     }
   }
 
@@ -96,6 +106,10 @@ export function AppHeaderUserMenu() {
         <DropdownMenuItem onClick={handleCopyToken}>
           <Copy className="mr-2 h-4 w-4" />
           {t("menuCopyToken")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleCopyAppId}>
+          <Copy className="mr-2 h-4 w-4" />
+          {t("menuCopyAppId")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleGoToProfile}>
           <Settings className="mr-2 h-4 w-4" />

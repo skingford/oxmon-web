@@ -1,4 +1,7 @@
 import {
+  AIAccountResponse,
+  AIReportListItem,
+  AIReportRow,
   ActiveAlertQueryParams,
   AlertEventResponse,
   AlertRuleQueryParams,
@@ -17,6 +20,7 @@ import {
   CloudInstanceDetailResponse,
   CloudInstanceResponse,
   CreateCloudAccountRequest,
+  CreateAIAccountRequest,
   NotificationLogItem,
   NotificationLogListResponse,
   NotificationLogSummaryResponse,
@@ -36,6 +40,7 @@ import {
   TestConnectionResponse,
   CreateSystemConfigRequest,
   TriggerCollectionResponse,
+  UpdateAIAccountRequest,
   UpdateCloudAccountRequest,
   UpdateSystemConfigRequest,
   StorageInfo,
@@ -43,6 +48,8 @@ import {
   CertificateChainInfo,
   CertCheckResult,
   CertSummary,
+  CertStatusSummary,
+  CertDomainsSummary,
   CertDomain,
   CreateDomainRequest,
   UpdateDomainRequest,
@@ -294,6 +301,48 @@ function normalizeListResponse<T>(
     total,
     limit,
     offset,
+  }
+}
+
+function normalizeCertDomainsSummary(payload: unknown): CertDomainsSummary {
+  const record = toObject(payload)
+  const nestedData = record ? toObject(record.data) : null
+  const source = nestedData || record
+
+  const total = Math.max(0, Math.trunc(toNumberValue(source?.total ?? source?.total_domains, 0)))
+  const enabled = Math.max(0, Math.trunc(toNumberValue(source?.enabled ?? source?.enabled_domains, 0)))
+  const disabledFromPayload = Math.trunc(
+    toNumberValue(source?.disabled ?? source?.disabled_domains, Number.NaN)
+  )
+  const disabled = Number.isFinite(disabledFromPayload)
+    ? Math.max(0, disabledFromPayload)
+    : Math.max(0, total - enabled)
+
+  return {
+    total,
+    enabled,
+    disabled,
+  }
+}
+
+function normalizeCertStatusSummary(payload: unknown): CertStatusSummary {
+  const record = toObject(payload)
+  const nestedData = record ? toObject(record.data) : null
+  const source = nestedData || record
+
+  const total = Math.max(0, Math.trunc(toNumberValue(source?.total, 0)))
+  const healthy = Math.max(0, Math.trunc(toNumberValue(source?.healthy ?? source?.valid, 0)))
+  const failed = Math.max(0, Math.trunc(toNumberValue(source?.failed ?? source?.invalid, 0)))
+  const expiringSoon = Math.max(
+    0,
+    Math.trunc(toNumberValue(source?.expiring_soon ?? source?.expiringSoon, 0))
+  )
+
+  return {
+    total,
+    healthy,
+    failed,
+    expiring_soon: expiringSoon,
   }
 }
 
@@ -815,6 +864,32 @@ export const api = {
   getCloudInstanceDetail: (id: string) =>
     request<CloudInstanceDetailResponse>(`/v1/cloud/instances/${id}`),
 
+  // AI
+  listAIAccounts: () =>
+    request<unknown>("/v1/ai/accounts").then((payload) =>
+      extractListPayload(payload) as AIAccountResponse[]
+    ),
+
+  getAIAccountById: (id: string) =>
+    request<AIAccountResponse>(`/v1/ai/accounts/${id}`),
+
+  createAIAccount: (data: CreateAIAccountRequest) =>
+    request<AIAccountResponse>("/v1/ai/accounts", { method: "POST", body: data }),
+
+  updateAIAccount: (id: string, data: UpdateAIAccountRequest) =>
+    request<AIAccountResponse>(`/v1/ai/accounts/${id}`, { method: "PUT", body: data }),
+
+  deleteAIAccount: (id: string) =>
+    request<IdResponse>(`/v1/ai/accounts/${id}`, { method: "DELETE", allowEmptyResponse: true }),
+
+  listAIReports: () =>
+    request<unknown>("/v1/ai/reports").then((payload) =>
+      extractListPayload(payload) as AIReportListItem[]
+    ),
+
+  getAIReportById: (id: string) =>
+    request<AIReportRow>(`/v1/ai/reports/${id}`),
+
   // System
   getSystemConfig: () =>
     request<RuntimeConfig>("/v1/system/config"),
@@ -946,6 +1021,11 @@ export const api = {
       })
     ),
 
+  getCertDomainsSummary: () =>
+    request<unknown>("/v1/certs/domains/summary").then((payload) =>
+      normalizeCertDomainsSummary(payload)
+    ),
+
   createDomain: (data: CreateDomainRequest) =>
     request<IdResponse>("/v1/certs/domains", { method: "POST", body: data }),
 
@@ -977,6 +1057,11 @@ export const api = {
         fallbackLimit: params.limit ?? 0,
         fallbackOffset: params.offset ?? 0,
       })
+    ),
+
+  getCertStatusSummary: (params: Omit<CertStatusQueryParams, "limit" | "offset"> = {}) =>
+    request<unknown>(`/v1/certs/status/summary${buildQueryString(params)}`).then((payload) =>
+      normalizeCertStatusSummary(payload)
     ),
 
   getCertStatusByDomain: (domain: string) =>

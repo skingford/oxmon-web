@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api } from "@/lib/api"
 import { formatCertificateDateTime, parseOptionalNonNegativeInt } from "@/lib/certificates/formats"
 import { pickCountKey } from "@/lib/i18n-count"
-import { CertCheckResult, CertDomain, ListResponse } from "@/types/api"
+import { CertCheckResult, CertDomain, CertDomainsSummary, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useCertificateAutoCreateDraft } from "@/hooks/use-certificate-auto-create-draft"
@@ -16,19 +16,17 @@ import { DomainAutoCreateDialog } from "@/components/pages/certificates/domain-a
 import { DomainBatchCreateDialog } from "@/components/pages/certificates/domain-batch-create-dialog"
 import { DomainCreateDialog } from "@/components/pages/certificates/domain-create-dialog"
 import { DomainDeleteDialog } from "@/components/pages/certificates/domain-delete-dialog"
-import { DomainFiltersCard } from "@/components/pages/certificates/domain-filters-card"
-import { DomainHeaderActions } from "@/components/pages/certificates/domain-header-actions"
+import { DomainContentSection } from "@/components/pages/certificates/domain-content-section"
 import { DomainHistoryDialog } from "@/components/pages/certificates/domain-history-dialog"
-import { DomainStatsCards } from "@/components/pages/certificates/domain-stats-cards"
-import { DomainTableCard } from "@/components/pages/certificates/domain-table-card"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Loader2,
-} from "lucide-react"
+import { DomainToolbarSection } from "@/components/pages/certificates/domain-toolbar-section"
 import { toast, toastActionSuccess, toastApiError, toastCreated, toastDeleted, toastStatusError } from "@/lib/toast"
 
 const PAGE_LIMIT = 20
+
+type DomainsQueryState = {
+  domainsPage: ListResponse<CertDomain>
+  summary: CertDomainsSummary | null
+}
 
 export default function DomainsPage() {
   const { t, locale } = useAppTranslations("pages")
@@ -102,17 +100,22 @@ export default function DomainsPage() {
   )
 
   const {
-    data: domainsPage,
+    data: domainsData,
     loading,
     refreshing,
     execute,
-  } = useRequestState<ListResponse<CertDomain>>({
-    items: [],
-    total: 0,
-    limit: PAGE_LIMIT,
-    offset: 0,
+  } = useRequestState<DomainsQueryState>({
+    domainsPage: {
+      items: [],
+      total: 0,
+      limit: PAGE_LIMIT,
+      offset: 0,
+    },
+    summary: null,
   })
+  const domainsPage = domainsData.domainsPage
   const domains = domainsPage.items
+  const summary = domainsData.summary
 
   const resetAutoCreateDraft = (preserveAdvanced = true) => {
     setAutoCreateDomain(null)
@@ -148,12 +151,22 @@ export default function DomainsPage() {
   const fetchDomains = useCallback(
     async (silent = false) => {
       await execute(
-        () => api.listDomains({
-          limit: PAGE_LIMIT,
-          offset,
-          domain__contains: domainKeyword.trim() || undefined,
-          enabled__eq: statusFilter === "all" ? undefined : statusFilter === "enabled",
-        }),
+        async () => {
+          const [domainsPageData, summaryData] = await Promise.all([
+            api.listDomains({
+              limit: PAGE_LIMIT,
+              offset,
+              domain__contains: domainKeyword.trim() || undefined,
+              enabled__eq: statusFilter === "all" ? undefined : statusFilter === "enabled",
+            }),
+            api.getCertDomainsSummary(),
+          ])
+
+          return {
+            domainsPage: domainsPageData,
+            summary: summaryData,
+          }
+        },
         {
           silent,
           onError: (error) => {
@@ -448,23 +461,16 @@ export default function DomainsPage() {
   }
 
   const stats = useMemo(() => {
-    return domains.reduce(
-      (result, domain) => {
-        if (domain.enabled) {
-          result.enabled += 1
-        } else {
-          result.disabled += 1
-        }
+    if (summary) {
+      return summary
+    }
 
-        return result
-      },
-      {
-        total: domains.length,
-        enabled: 0,
-        disabled: 0,
-      }
-    )
-  }, [domains])
+    return {
+      total: 0,
+      enabled: 0,
+      disabled: 0,
+    }
+  }, [summary])
 
   const createDialogText = {
     trigger: t("certificates.domains.addButton"),
@@ -544,87 +550,81 @@ export default function DomainsPage() {
 
   return (
     <div className="min-w-0 space-y-6 p-4 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">{t("certificates.domains.title")}</h2>
-          <p className="text-sm text-muted-foreground">{t("certificates.domains.description")}</p>
-        </div>
-
-        <DomainHeaderActions
-          checkingAll={checkingAll}
-          loading={loading}
-          refreshing={refreshing}
-          onCheckAllDomains={handleCheckAllDomains}
-          onRefreshDomains={() => {
-            void fetchDomains(true)
+      <DomainToolbarSection
+        title={t("certificates.domains.title")}
+        description={t("certificates.domains.description")}
+        checkingAll={checkingAll}
+        loading={loading}
+        refreshing={refreshing}
+        onCheckAllDomains={handleCheckAllDomains}
+        onRefreshDomains={() => {
+          void fetchDomains(true)
+        }}
+        checkAllLabel={t("certificates.domains.checkAllButton")}
+        refreshLabel={t("certificates.domains.refreshButton")}
+      >
+        <DomainCreateDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+          onSubmit={handleCreateDomain}
+          creating={creating}
+          values={{
+            domain: newDomain,
+            port: newPort,
+            interval: newCheckInterval,
+            note: newNote,
           }}
-          checkAllLabel={t("certificates.domains.checkAllButton")}
-          refreshLabel={t("certificates.domains.refreshButton")}
-        >
-          <DomainCreateDialog
-            open={createDialogOpen}
-            onOpenChange={setCreateDialogOpen}
-            onSubmit={handleCreateDomain}
-            creating={creating}
-            values={{
-              domain: newDomain,
-              port: newPort,
-              interval: newCheckInterval,
-              note: newNote,
-            }}
-            onChange={{
-              domain: setNewDomain,
-              port: setNewPort,
-              interval: setNewCheckInterval,
-              note: setNewNote,
-            }}
-            text={createDialogText}
-          />
+          onChange={{
+            domain: setNewDomain,
+            port: setNewPort,
+            interval: setNewCheckInterval,
+            note: setNewNote,
+          }}
+          text={createDialogText}
+        />
 
-          <DomainBatchCreateDialog
-            open={batchDialogOpen}
-            onOpenChange={setBatchDialogOpen}
-            value={batchDomains}
-            onValueChange={setBatchDomains}
-            onSubmit={handleBatchCreate}
-            submitting={batchCreating}
-            text={batchCreateDialogText}
-          />
-        </DomainHeaderActions>
-      </div>
+        <DomainBatchCreateDialog
+          open={batchDialogOpen}
+          onOpenChange={setBatchDialogOpen}
+          value={batchDomains}
+          onValueChange={setBatchDomains}
+          onSubmit={handleBatchCreate}
+          submitting={batchCreating}
+          text={batchCreateDialogText}
+        />
+      </DomainToolbarSection>
 
-      <DomainStatsCards t={t} stats={stats} />
-
-      <DomainFiltersCard
-        t={t}
-        domainKeyword={domainKeyword}
-        statusFilter={statusFilter}
-        onDomainKeywordChange={handleDomainKeywordChange}
-        onStatusFilterChange={handleStatusFilterChange}
-        onResetFilters={handleResetFilters}
-      />
-
-      <DomainTableCard
+      <DomainContentSection
         t={t}
         locale={locale}
-        pageLimit={PAGE_LIMIT}
-        loading={loading}
-        domains={domains}
-        pageNumber={pagination.currentPage}
-        canGoPrev={pagination.canGoPrev}
-        canGoNext={pagination.canGoNext}
-        checkingId={checkingId}
-        updatingId={updatingId}
-        deletingId={deletingId}
-        onOpenCreateDialog={() => setCreateDialogOpen(true)}
-        onToggleEnabled={handleToggleEnabled}
-        onCheckDomain={(domain) => {
-          void handleCheckDomain(domain)
+        stats={stats}
+        filters={{
+          domainKeyword,
+          statusFilter,
+          onDomainKeywordChange: handleDomainKeywordChange,
+          onStatusFilterChange: handleStatusFilterChange,
+          onResetFilters: handleResetFilters,
         }}
-        onOpenHistory={openHistoryDialog}
-        onDeleteDomain={setDeleteDialogDomain}
-        onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
-        onNextPage={() => setOffset((previous) => previous + PAGE_LIMIT)}
+        table={{
+          pageLimit: PAGE_LIMIT,
+          loading,
+          domains,
+          pageNumber: pagination.currentPage,
+          canGoPrev: pagination.canGoPrev,
+          canGoNext: pagination.canGoNext,
+          checkingId,
+          updatingId,
+          deletingId,
+          onOpenCreateDialog: () => setCreateDialogOpen(true),
+          onToggleEnabled: handleToggleEnabled,
+          onCheckDomain: (domain) => {
+            void handleCheckDomain(domain)
+          },
+          onOpenHistory: openHistoryDialog,
+          onDeleteDomain: setDeleteDialogDomain,
+          onPrevPage: () => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT)),
+          onNextPage: () => setOffset((previous) => previous + PAGE_LIMIT),
+        }}
       />
 
       <DomainDeleteDialog

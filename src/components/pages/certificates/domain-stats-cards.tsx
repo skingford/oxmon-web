@@ -31,7 +31,7 @@ export function DomainStatsCards({ t, stats }: DomainStatsCardsProps) {
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>{t("certificates.domains.statDisabled")}</CardDescription>
-          <CardTitle className="text-3xl text-muted-foreground">{stats.disabled}</CardTitle>
+          <CardTitle className="text-3xl text-red-600">{stats.disabled}</CardTitle>
         </CardHeader>
       </Card>
     </div>

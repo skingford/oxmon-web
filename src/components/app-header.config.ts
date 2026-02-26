@@ -84,6 +84,14 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "itemCloudInstances",
     descriptionKey: "cloudInstancesDescription",
   },
+  "/ai": {
+    titleKey: "itemAIAccounts",
+    descriptionKey: "aiAccountsDescription",
+  },
+  "/ai/reports": {
+    titleKey: "itemAIReports",
+    descriptionKey: "aiReportsDescription",
+  },
   "/system": {
     titleKey: "itemSystem",
     descriptionKey: "systemDescription",
@@ -128,6 +136,13 @@ const headerMetaByPrefix: Array<{
     meta: {
       titleKey: "itemCloudInstances",
       descriptionKey: "cloudInstanceDetailDescription",
+    },
+  },
+  {
+    prefix: "/ai/reports/",
+    meta: {
+      titleKey: "itemAIReports",
+      descriptionKey: "aiReportsDescription",
     },
   },
 ]

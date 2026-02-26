@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
 import { formatCertificateDateTime } from "@/lib/certificates/formats"
-import { CertCheckResult, ListResponse } from "@/types/api"
+import { CertCheckResult, CertStatusSummary, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
@@ -37,6 +37,10 @@ import { toast, toastActionSuccess, toastApiError, toastCopied } from "@/lib/toa
 
 const PAGE_LIMIT = 20
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
+type CertificateStatusQueryState = {
+  statusesPage: ListResponse<CertCheckResult>
+  summary: CertStatusSummary | null
+}
 
 function isValidNonNegativeIntegerText(value: string) {
   const trimmed = value.trim()
@@ -92,17 +96,22 @@ export default function CertificateStatusPage() {
   const [checkingAll, setCheckingAll] = useState(false)
 
   const {
-    data: statusesPage,
+    data: statusData,
     loading,
     refreshing,
     execute,
-  } = useRequestState<ListResponse<CertCheckResult>>({
-    items: [],
-    total: 0,
-    limit: PAGE_LIMIT,
-    offset: 0,
+  } = useRequestState<CertificateStatusQueryState>({
+    statusesPage: {
+      items: [],
+      total: 0,
+      limit: PAGE_LIMIT,
+      offset: 0,
+    },
+    summary: null,
   })
+  const statusesPage = statusData.statusesPage
   const statuses = statusesPage.items
+  const summary = statusData.summary
 
   const expiryDaysLimit = useMemo(() => {
     const value = Number(expiryDays)
@@ -117,17 +126,30 @@ export default function CertificateStatusPage() {
   const fetchStatus = useCallback(
     async (silent = false) => {
       await execute(
-        () =>
-          api.getCertStatusAll({
-            limit: PAGE_LIMIT,
-            offset,
+        async () => {
+          const commonFilters = {
             domain__contains: domainKeyword.trim() || undefined,
             is_valid__eq:
               isValidFilter === "all"
                 ? undefined
                 : isValidFilter === "true",
             days_until_expiry__lte: expiryDaysLimit,
-          }),
+          }
+
+          const [statusesPageData, summaryData] = await Promise.all([
+            api.getCertStatusAll({
+              limit: PAGE_LIMIT,
+              offset,
+              ...commonFilters,
+            }),
+            api.getCertStatusSummary(commonFilters),
+          ])
+
+          return {
+            statusesPage: statusesPageData,
+            summary: summaryData,
+          }
+        },
         {
           silent,
           onError: (error) => {
@@ -144,30 +166,22 @@ export default function CertificateStatusPage() {
   }, [fetchStatus])
 
   const stats = useMemo(() => {
-    return statuses.reduce(
-      (result, status) => {
-        const healthy = status.is_valid && status.chain_valid
-
-        if (healthy) {
-          result.healthy += 1
-        } else {
-          result.failed += 1
-        }
-
-        if (typeof status.days_until_expiry === "number" && status.days_until_expiry >= 0 && status.days_until_expiry <= 30) {
-          result.expiringSoon += 1
-        }
-
-        return result
-      },
-      {
-        total: statuses.length,
-        healthy: 0,
-        failed: 0,
-        expiringSoon: 0,
+    if (summary) {
+      return {
+        total: summary.total,
+        healthy: summary.healthy,
+        failed: summary.failed,
+        expiringSoon: summary.expiring_soon,
       }
-    )
-  }, [statuses])
+    }
+
+    return {
+      total: 0,
+      healthy: 0,
+      failed: 0,
+      expiringSoon: 0,
+    }
+  }, [summary])
 
   const pagination = useServerOffsetPagination({
     offset,
