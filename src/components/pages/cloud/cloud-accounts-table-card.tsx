@@ -1,6 +1,6 @@
 "use client"
 
-import { Copy, Loader2, Play, TestTube2, Trash2 } from "lucide-react"
+import { Loader2, MoreHorizontal, Play, TestTube2 } from "lucide-react"
 import type { CloudAccountResponse } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { CopyCurlSubmenu } from "@/components/ui/copy-curl-dropdown"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -49,6 +50,7 @@ type CloudAccountsTableCardProps = {
     statusDisabled: string
     actionTest: string
     actionCollect: string
+    actionMore: string
     actionDebugCurl: string
     actionCopyTestCurl: string
     actionCopyCollectCurl: string
@@ -145,42 +147,42 @@ export function CloudAccountsTableCard({
                     <TableCell>{formatDateTime(account.updated_at, locale)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onTestConnection(account)}
-                          disabled={testingId === account.id}
-                        >
-                          {testingId === account.id ? (
-                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <TestTube2 className="mr-1 h-3.5 w-3.5" />
-                          )}
-                          {texts.actionTest}
+                        <Button type="button" variant="outline" size="sm" onClick={() => onEdit(account)}>
+                          {texts.actionEdit}
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onCollect(account)}
-                          disabled={collectingId === account.id}
-                        >
-                          {collectingId === account.id ? (
-                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Play className="mr-1 h-3.5 w-3.5" />
-                          )}
-                          {texts.actionCollect}
-                        </Button>
-                        <DropdownMenu>
+                        <DropdownMenu modal>
                           <DropdownMenuTrigger asChild>
                             <Button type="button" variant="outline" size="sm">
-                              <Copy className="mr-1 h-3.5 w-3.5" />
-                              {texts.actionDebugCurl}
+                              <MoreHorizontal className="mr-1 h-3.5 w-3.5" />
+                              {texts.actionMore}
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="z-[200] bg-popover shadow-xl">
+                          <DropdownMenuContent align="end" sideOffset={6} className="z-[200] bg-popover shadow-xl">
+                            <DropdownMenuLabel>{texts.actionMore}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onSelect={() => onTestConnection(account)}
+                              disabled={testingId === account.id}
+                            >
+                              {testingId === account.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <TestTube2 className="h-3.5 w-3.5" />
+                              )}
+                              {texts.actionTest}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => onCollect(account)}
+                              disabled={collectingId === account.id}
+                            >
+                              {collectingId === account.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Play className="h-3.5 w-3.5" />
+                              )}
+                              {texts.actionCollect}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuLabel>{texts.debugMenuLabel}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <CopyCurlSubmenu
@@ -219,15 +221,15 @@ export function CloudAccountsTableCard({
                               suffix={<HttpMethodBadge method="PUT" className="ml-auto" />}
                               insecureBadgeLabel={texts.copyApiCurlInsecureBadge}
                             />
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() => onDelete(account)}
+                            >
+                              {texts.actionDelete}
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button type="button" variant="outline" size="sm" onClick={() => onEdit(account)}>
-                          {texts.actionEdit}
-                        </Button>
-                        <Button type="button" variant="destructive" size="sm" onClick={() => onDelete(account)}>
-                          <Trash2 className="mr-1 h-3.5 w-3.5" />
-                          {texts.actionDelete}
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

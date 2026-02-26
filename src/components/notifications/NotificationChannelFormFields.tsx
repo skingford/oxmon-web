@@ -1,6 +1,7 @@
 "use client"
 
 import { Dispatch, SetStateAction, useState } from "react"
+import { Eye, EyeOff } from "lucide-react"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -9,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { JsonTextarea } from "@/components/ui/json-textarea"
-import { Eye, EyeOff } from "lucide-react"
 import {
   CHANNEL_TYPE_OPTIONS,
   getChannelConfigSchema,
@@ -258,10 +258,12 @@ type ConfigFieldInputProps = {
 function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldInputProps) {
   const inputId = `${idPrefix}-config-${field.key}`
   const [showPassword, setShowPassword] = useState(false)
+  const shouldTakeFullRow = field.key === "webhook_url" || field.key === "secret"
+  const fieldContainerClassName = shouldTakeFullRow ? "min-w-0 space-y-2 sm:col-span-2" : "min-w-0 space-y-2"
 
   if (field.type === "boolean") {
     return (
-      <div className="min-w-0 space-y-2">
+      <div className={fieldContainerClassName}>
         <Label htmlFor={inputId}>{t(field.labelKey)}</Label>
         <div className="flex h-10 items-center rounded-md border px-3">
           <Switch
@@ -297,7 +299,7 @@ function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldIn
 
   if (field.type === "password") {
     return (
-      <div className="min-w-0 space-y-2">
+      <div className={fieldContainerClassName}>
         <Label htmlFor={inputId}>{t(field.labelKey)}</Label>
         <div className="relative">
           <Input
@@ -315,6 +317,7 @@ function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldIn
             className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2"
             onClick={() => setShowPassword((previous) => !previous)}
             aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
@@ -324,7 +327,7 @@ function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldIn
   }
 
   return (
-    <div className="min-w-0 space-y-2">
+    <div className={fieldContainerClassName}>
       <Label htmlFor={inputId}>{t(field.labelKey)}</Label>
       <Input
         id={inputId}

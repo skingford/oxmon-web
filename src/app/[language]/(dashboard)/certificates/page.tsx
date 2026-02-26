@@ -36,7 +36,6 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import {
   Copy,
-  ChevronRight as ArrowRight,
   Loader2,
   RefreshCw,
   ShieldAlert,
@@ -701,7 +700,7 @@ export default function CertificatesPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -709,7 +708,6 @@ export default function CertificatesPage() {
                             }}
                           >
                             {t("certificates.overview.actionViewDetails")}
-                            <ArrowRight className="ml-1 h-4 w-4" />
                           </Button>
                         </TableCell>
                       </TableRow>

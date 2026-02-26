@@ -135,7 +135,7 @@ export function CloudInstancesTableCard({
                       <TableCell>
                         <div className="flex items-center justify-between gap-2">
                           <span>{formatDateTime(instance.last_seen_at, locale)}</span>
-                          <Button asChild type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                          <Button asChild type="button" variant="outline" size="sm">
                             <Link href={withLocalePrefix(`/cloud/instances/${instance.id}`, locale)}>
                               {tableTexts.actionViewDetails}
                             </Link>

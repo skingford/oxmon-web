@@ -1200,6 +1200,7 @@
         "copyApiCurlInsecureBadge": "仅开发环境",
         "actionCopyTestCurl": "复制测试连接 curl",
         "actionCollect": "触发采集",
+        "actionMore": "更多操作",
         "actionCopyCollectCurl": "复制触发采集 curl",
         "actionCopyUpdateCurl": "复制更新账户 curl",
         "actionEdit": "编辑",

@@ -340,7 +340,7 @@ export default function AgentsPage() {
                           {formatLastSeen(agent.last_seen, t)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" asChild>
+                          <Button variant="outline" size="sm" asChild>
                             <Link href={detailPath}>{t("agents.detailAction")}</Link>
                           </Button>
                         </TableCell>

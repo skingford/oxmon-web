@@ -680,14 +680,13 @@ export default function ActiveAlertsPage() {
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="hidden items-center justify-end gap-1 sm:flex">
                               <Button
-                                variant="ghost"
-                                size="icon"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => handleViewDetails(alert)}
-                                className="h-8 w-8"
                                 title={t("active.viewDetails")}
                                 aria-label={t("active.viewDetails")}
                               >
-                                <ExternalLink className="h-4 w-4" />
+                                {t("active.viewDetails")}
                               </Button>
                               <Button
                                 variant="ghost"

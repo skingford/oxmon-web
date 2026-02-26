@@ -26,7 +26,6 @@ import {
 import {
   CheckCircle2,
   CircleOff,
-  ExternalLink,
   TriangleAlert,
 } from "lucide-react"
 
@@ -137,9 +136,9 @@ export function NotificationsChannelsTable({
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
-                          <Button asChild type="button" variant="ghost" size="icon" title={t("notifications.actionDetails")}>
+                          <Button asChild type="button" variant="outline" size="sm">
                             <Link href={withLocalePrefix(`/notifications/${channel.id}`, locale)}>
-                              <ExternalLink className="h-4 w-4" />
+                              {t("notifications.actionDetails")}
                             </Link>
                           </Button>
                         </div>

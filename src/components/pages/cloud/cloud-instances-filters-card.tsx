@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { CloudInstanceStatusKey } from "@/components/pages/cloud/cloud-instance-list-utils"
 
 type CloudInstancesFiltersCardProps = {
   searchKeyword: string
@@ -14,12 +13,12 @@ type CloudInstancesFiltersCardProps = {
   statusFilter: string
   providerOptions: string[]
   regionOptions: string[]
-  statusOptions: CloudInstanceStatusKey[]
+  statusOptions: string[]
   onSearchKeywordChange: (value: string) => void
   onProviderFilterChange: (value: string) => void
   onRegionFilterChange: (value: string) => void
   onStatusFilterChange: (value: string) => void
-  getStatusLabel: (status: CloudInstanceStatusKey) => string
+  getStatusLabel: (status: string) => string
   texts: {
     title: string
     description: string
@@ -55,8 +54,8 @@ export function CloudInstancesFiltersCard({
         <CardTitle>{texts.title}</CardTitle>
         <CardDescription>{texts.description}</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <div className="space-y-2">
+      <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="min-w-0 space-y-2">
           <Label>{texts.filterProvider}</Label>
           <Select value={providerFilter} onValueChange={onProviderFilterChange}>
             <SelectTrigger>
@@ -71,7 +70,7 @@ export function CloudInstancesFiltersCard({
           </Select>
         </div>
 
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label>{texts.filterRegion}</Label>
           <Select value={regionFilter} onValueChange={onRegionFilterChange}>
             <SelectTrigger>
@@ -86,7 +85,7 @@ export function CloudInstancesFiltersCard({
           </Select>
         </div>
 
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label>{texts.filterStatus}</Label>
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
             <SelectTrigger>
@@ -101,7 +100,7 @@ export function CloudInstancesFiltersCard({
           </Select>
         </div>
 
-        <div className="space-y-2 md:col-span-2 xl:col-span-2">
+        <div className="min-w-0 space-y-2">
           <Label htmlFor="cloud-instance-search">{texts.filterSearch}</Label>
           <div className="relative">
             <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />

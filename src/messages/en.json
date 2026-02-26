@@ -1200,6 +1200,7 @@
         "copyApiCurlInsecureBadge": "DEV ONLY",
         "actionCopyTestCurl": "Copy test curl",
         "actionCollect": "Collect",
+        "actionMore": "More Actions",
         "actionCopyCollectCurl": "Copy collect curl",
         "actionCopyUpdateCurl": "Copy update curl",
         "actionEdit": "Edit",

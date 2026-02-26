@@ -17,7 +17,7 @@ import { useRequestState } from "@/hooks/use-request-state"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { api } from "@/lib/api"
 import { toastApiError } from "@/lib/toast"
-import type { CloudInstanceQueryParams, CloudInstanceResponse } from "@/types/api"
+import type { CloudInstanceQueryParams, CloudInstanceResponse, DictionaryItem } from "@/types/api"
 
 type CloudInstancesState = {
   instances: CloudInstanceResponse[]
@@ -25,6 +25,17 @@ type CloudInstancesState = {
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
+const CLOUD_INSTANCE_STATUS_DICT_TYPE = "cloud_instance_status"
+
+type CloudInstanceStatusDictionaryOption = {
+  value: string
+  label: string
+  sortOrder: number
+}
+
+function normalizeStatusFilterValue(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase()
+}
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   if (!value) {
@@ -58,6 +69,34 @@ function resolveStatusText(status: CloudInstanceStatusKey, t: ReturnType<typeof 
   return t("cloud.instances.statusUnknown")
 }
 
+function normalizeStatusDictionaryItems(items: DictionaryItem[]): CloudInstanceStatusDictionaryOption[] {
+  const normalizedItems = items
+    .map((item) => ({
+      value: normalizeStatusFilterValue(item.dict_key),
+      label: item.dict_label.trim() || item.dict_key.trim(),
+      sortOrder: item.sort_order,
+    }))
+    .filter((item) => Boolean(item.value) && item.value !== "all")
+    .sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder
+      }
+
+      return left.value.localeCompare(right.value)
+    })
+
+  const seen = new Set<string>()
+
+  return normalizedItems.filter((item) => {
+    if (seen.has(item.value)) {
+      return false
+    }
+
+    seen.add(item.value)
+    return true
+  })
+}
+
 export default function CloudInstancesPage() {
   const { t, locale } = useAppTranslations("pages")
   const router = useRouter()
@@ -76,6 +115,7 @@ export default function CloudInstancesPage() {
   const [offset, setOffset] = useState(0)
   const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState("")
   const [allInstancesSnapshot, setAllInstancesSnapshot] = useState<CloudInstanceResponse[] | null>(null)
+  const [statusDictionaryOptions, setStatusDictionaryOptions] = useState<CloudInstanceStatusDictionaryOption[]>([])
   const syncingFromUrlRef = useRef(false)
 
   const instances = data.instances
@@ -87,7 +127,7 @@ export default function CloudInstancesPage() {
     const nextSearchKeyword = searchParams.get("search") || ""
     const nextProviderFilter = searchParams.get("provider") || "all"
     const nextRegionFilter = searchParams.get("region") || "all"
-    const nextStatusFilter = searchParams.get("status") || "all"
+    const nextStatusFilter = normalizeStatusFilterValue(searchParams.get("status")) || "all"
     const rawLimit = Number(searchParams.get("limit") || String(PAGE_SIZE_OPTIONS[1]))
     const nextPageSize = PAGE_SIZE_OPTIONS.includes(rawLimit as (typeof PAGE_SIZE_OPTIONS)[number])
       ? rawLimit
@@ -223,6 +263,31 @@ export default function CloudInstancesPage() {
     }
   }, [allInstancesSnapshot])
 
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchStatusDictionary = async () => {
+      try {
+        const items = await api.listDictionariesByType(CLOUD_INSTANCE_STATUS_DICT_TYPE)
+
+        if (!cancelled) {
+          setStatusDictionaryOptions(normalizeStatusDictionaryItems(items))
+        }
+      } catch {
+        // strictly rely on cloud_instance_status dictionary
+        if (!cancelled) {
+          setStatusDictionaryOptions([])
+        }
+      }
+    }
+
+    fetchStatusDictionary()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const optionSourceInstances = allInstancesSnapshot ?? instances
 
   const providerOptions = useMemo(
@@ -236,10 +301,18 @@ export default function CloudInstancesPage() {
   )
 
   const statusOptions = useMemo(() => {
-    const statusOrder: CloudInstanceStatusKey[] = ["running", "pending", "stopped", "error", "unknown"]
-    const normalizedStatusSet = new Set(optionSourceInstances.map((item) => normalizeCloudInstanceStatus(item.status)))
-    return statusOrder.filter((status) => normalizedStatusSet.has(status))
-  }, [optionSourceInstances])
+    return statusDictionaryOptions.map((item) => item.value)
+  }, [statusDictionaryOptions])
+
+  useEffect(() => {
+    if (statusFilter === "all") {
+      return
+    }
+
+    if (!statusOptions.includes(statusFilter)) {
+      setStatusFilter("all")
+    }
+  }, [statusFilter, statusOptions])
 
   const pagination = useServerOffsetPagination({
     offset,
@@ -258,9 +331,22 @@ export default function CloudInstancesPage() {
     [optionSourceInstances, providerOptions.length, regionOptions.length]
   )
 
-  const getStatusLabel = useCallback(
+  const statusDictionaryLabelMap = useMemo(
+    () => new Map(statusDictionaryOptions.map((item) => [item.value, item.label])),
+    [statusDictionaryOptions]
+  )
+
+  const getTableStatusLabel = useCallback(
     (status: CloudInstanceStatusKey) => resolveStatusText(status, t),
     [t]
+  )
+
+  const getStatusFilterLabel = useCallback(
+    (status: string) => {
+      const normalizedStatus = normalizeStatusFilterValue(status)
+      return statusDictionaryLabelMap.get(normalizedStatus) || resolveStatusText(normalizeCloudInstanceStatus(status), t)
+    },
+    [statusDictionaryLabelMap, t]
   )
 
   const pageSizeOptionLabel = useCallback(
@@ -303,7 +389,7 @@ export default function CloudInstancesPage() {
         onProviderFilterChange={setProviderFilter}
         onRegionFilterChange={setRegionFilter}
         onStatusFilterChange={setStatusFilter}
-        getStatusLabel={getStatusLabel}
+        getStatusLabel={getStatusFilterLabel}
         texts={{
           title: t("cloud.instances.filtersTitle"),
           description: t("cloud.instances.filtersDescription"),
@@ -324,7 +410,7 @@ export default function CloudInstancesPage() {
         instances={instances}
         title={t("cloud.instances.tableTitle")}
         description={t("cloud.instances.tableDescription")}
-        getStatusLabel={getStatusLabel}
+        getStatusLabel={getTableStatusLabel}
         formatDateTime={formatDateTime}
         tableTexts={{
           colInstance: t("cloud.instances.tableColInstance"),
