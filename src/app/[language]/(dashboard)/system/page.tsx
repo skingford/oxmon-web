@@ -1,20 +1,36 @@
-"use client"
+"use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { api, getApiErrorMessage } from "@/lib/api"
-import { clearAuthToken } from "@/lib/auth-token"
-import { clearGlobalConfigCache, writeGlobalConfigCache } from "@/lib/global-config-cache"
-import { encryptPasswordWithPublicKey } from "@/lib/password-encryption"
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { api, getApiErrorMessage } from "@/lib/api";
+import { clearAuthToken } from "@/lib/auth-token";
+import {
+  clearGlobalConfigCache,
+  writeGlobalConfigCache,
+} from "@/lib/global-config-cache";
+import { encryptPasswordWithPublicKey } from "@/lib/password-encryption";
 import {
   CreateSystemConfigRequest,
   RuntimeConfig,
   StorageInfo,
   SystemConfigResponse,
   UpdateSystemConfigRequest,
-} from "@/types/api"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { toast, toastActionSuccess, toastApiError, toastCreated, toastDeleted, toastSaved } from "@/lib/toast"
+} from "@/types/api";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  toast,
+  toastActionSuccess,
+  toastApiError,
+  toastCreated,
+  toastDeleted,
+  toastSaved,
+} from "@/lib/toast";
 import {
   BookText,
   FilterX,
@@ -28,13 +44,20 @@ import {
   Tag,
   Trash2,
   Pencil,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -42,7 +65,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,7 +75,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -60,46 +83,64 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { useAppTranslations } from "@/hooks/use-app-translations"
-import { SystemConfigFormFields, SystemConfigFormState } from "@/components/system/SystemConfigFormFields"
+} from "@/components/ui/dialog";
+import { useAppTranslations } from "@/hooks/use-app-translations";
+import {
+  SystemConfigFormFields,
+  SystemConfigFormState,
+} from "@/components/system/SystemConfigFormFields";
 import {
   getInitialSystemConfigForm,
   getSystemConfigFormFromItem,
-} from "@/lib/system/system-config-form"
-import { withLocalePrefix } from "@/components/app-locale"
-import { motion } from "framer-motion"
+} from "@/lib/system/system-config-form";
+import { withLocalePrefix } from "@/components/app-locale";
+import { motion } from "framer-motion";
 
-type SystemConfigStatusFilter = "all" | "enabled" | "disabled"
+type SystemConfigStatusFilter = "all" | "enabled" | "disabled";
 
 export default function SystemPage() {
-  const { t, locale } = useAppTranslations("system")
-  const [config, setConfig] = useState<RuntimeConfig | null>(null)
-  const [storage, setStorage] = useState<StorageInfo | null>(null)
-  const [systemConfigs, setSystemConfigs] = useState<SystemConfigResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [cleaning, setCleaning] = useState(false)
-  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
-  const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false)
-  const [isSystemConfigDialogOpen, setIsSystemConfigDialogOpen] = useState(false)
-  const [editingSystemConfig, setEditingSystemConfig] = useState<SystemConfigResponse | null>(null)
-  const [systemConfigForm, setSystemConfigForm] = useState<SystemConfigFormState>(getInitialSystemConfigForm)
-  const [systemConfigSubmitting, setSystemConfigSubmitting] = useState(false)
-  const [systemConfigDeleteTarget, setSystemConfigDeleteTarget] = useState<SystemConfigResponse | null>(null)
-  const [deletingSystemConfigId, setDeletingSystemConfigId] = useState<string | null>(null)
-  const [togglingSystemConfigId, setTogglingSystemConfigId] = useState<string | null>(null)
-  const [systemConfigSearchKeyword, setSystemConfigSearchKeyword] = useState("")
-  const [systemConfigTypeFilter, setSystemConfigTypeFilter] = useState("all")
-  const [systemConfigStatusFilter, setSystemConfigStatusFilter] = useState<SystemConfigStatusFilter>("all")
-  const [passwordForm, setPasswordForm] = useState({ current_password: "", new_password: "" })
-  const [changing, setChanging] = useState(false)
+  const { t, locale } = useAppTranslations("system");
+  const [config, setConfig] = useState<RuntimeConfig | null>(null);
+  const [storage, setStorage] = useState<StorageInfo | null>(null);
+  const [systemConfigs, setSystemConfigs] = useState<SystemConfigResponse[]>(
+    [],
+  );
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
+  const [isSystemConfigDialogOpen, setIsSystemConfigDialogOpen] =
+    useState(false);
+  const [editingSystemConfig, setEditingSystemConfig] =
+    useState<SystemConfigResponse | null>(null);
+  const [systemConfigForm, setSystemConfigForm] =
+    useState<SystemConfigFormState>(getInitialSystemConfigForm);
+  const [systemConfigSubmitting, setSystemConfigSubmitting] = useState(false);
+  const [systemConfigDeleteTarget, setSystemConfigDeleteTarget] =
+    useState<SystemConfigResponse | null>(null);
+  const [deletingSystemConfigId, setDeletingSystemConfigId] = useState<
+    string | null
+  >(null);
+  const [togglingSystemConfigId, setTogglingSystemConfigId] = useState<
+    string | null
+  >(null);
+  const [systemConfigSearchKeyword, setSystemConfigSearchKeyword] =
+    useState("");
+  const [systemConfigTypeFilter, setSystemConfigTypeFilter] = useState("all");
+  const [systemConfigStatusFilter, setSystemConfigStatusFilter] =
+    useState<SystemConfigStatusFilter>("all");
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: "",
+    new_password: "",
+  });
+  const [changing, setChanging] = useState(false);
 
   const fetchData = async (silent = false) => {
     if (silent) {
-      setRefreshing(true)
+      setRefreshing(true);
     } else {
-      setLoading(true)
+      setLoading(true);
     }
 
     try {
@@ -107,97 +148,106 @@ export default function SystemPage() {
         api.getSystemConfig(),
         api.getStorageInfo(),
         api.listSystemConfigs(),
-      ])
-      setConfig(configData)
-      setStorage(storageData)
-      setSystemConfigs(systemConfigRows)
+      ]);
+      setConfig(configData);
+      setStorage(storageData);
+      setSystemConfigs(systemConfigRows);
       writeGlobalConfigCache({
         runtimeConfig: configData,
         systemConfigs: systemConfigRows,
-      })
+      });
     } catch (error) {
-      toastApiError(error, t("toastFetchError"))
+      toastApiError(error, t("toastFetchError"));
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      setLoading(false);
+      setRefreshing(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    fetchData();
+  }, []);
 
   const handleConfirmCleanup = async () => {
-    setCleaning(true)
+    setCleaning(true);
     try {
-      await api.triggerCleanup()
-      toastActionSuccess(t("toastCleanupSuccess"))
-      const storageData = await api.getStorageInfo()
-      setStorage(storageData)
-      setIsCleanupDialogOpen(false)
+      await api.triggerCleanup();
+      toastActionSuccess(t("toastCleanupSuccess"));
+      const storageData = await api.getStorageInfo();
+      setStorage(storageData);
+      setIsCleanupDialogOpen(false);
     } catch (error) {
-      toastApiError(error, t("toastCleanupError"))
+      toastApiError(error, t("toastCleanupError"));
     } finally {
-      setCleaning(false)
+      setCleaning(false);
     }
-  }
+  };
 
   const handleChangePassword = async () => {
     if (!passwordForm.current_password || !passwordForm.new_password) {
-      toast.error(t("toastPasswordRequired"))
-      return
+      toast.error(t("toastPasswordRequired"));
+      return;
     }
-    setChanging(true)
+    setChanging(true);
     try {
-      const publicKeyResponse = await api.getAuthPublicKey()
+      const publicKeyResponse = await api.getAuthPublicKey();
 
       if (publicKeyResponse.algorithm !== "RSA-OAEP-SHA256") {
-        throw new Error(`Unsupported login encryption algorithm: ${publicKeyResponse.algorithm}`)
+        throw new Error(
+          `Unsupported login encryption algorithm: ${publicKeyResponse.algorithm}`,
+        );
       }
 
-      const [encryptedCurrentPassword, encryptedNewPassword] = await Promise.all([
-        encryptPasswordWithPublicKey(publicKeyResponse.public_key, passwordForm.current_password),
-        encryptPasswordWithPublicKey(publicKeyResponse.public_key, passwordForm.new_password),
-      ])
+      const [encryptedCurrentPassword, encryptedNewPassword] =
+        await Promise.all([
+          encryptPasswordWithPublicKey(
+            publicKeyResponse.public_key,
+            passwordForm.current_password,
+          ),
+          encryptPasswordWithPublicKey(
+            publicKeyResponse.public_key,
+            passwordForm.new_password,
+          ),
+        ]);
 
       await api.changePassword({
         encrypted_current_password: encryptedCurrentPassword,
         encrypted_new_password: encryptedNewPassword,
-      })
-      toastActionSuccess(t("toastPasswordSuccess"))
-      clearAuthToken()
-      clearGlobalConfigCache()
-      setIsPasswordDialogOpen(false)
-      setPasswordForm({ current_password: "", new_password: "" })
+      });
+      toastActionSuccess(t("toastPasswordSuccess"));
+      clearAuthToken();
+      clearGlobalConfigCache();
+      setIsPasswordDialogOpen(false);
+      setPasswordForm({ current_password: "", new_password: "" });
       window.setTimeout(() => {
-        window.location.replace(withLocalePrefix("/login", locale))
-      }, 300)
+        window.location.replace(withLocalePrefix("/login", locale));
+      }, 300);
     } catch (error) {
-      toastApiError(error, t("toastPasswordError"))
+      toastApiError(error, t("toastPasswordError"));
     } finally {
-      setChanging(false)
+      setChanging(false);
     }
-  }
+  };
 
   const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
   const formatUptime = (seconds: number) => {
-    const days = Math.floor(seconds / 86400)
-    const hours = Math.floor((seconds % 86400) / 3600)
-    return t("uptimeFormat", { days, hours })
-  }
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    return t("uptimeFormat", { days, hours });
+  };
 
   const formatDateTime = (value: string) => {
-    const date = new Date(value)
+    const date = new Date(value);
 
     if (Number.isNaN(date.getTime())) {
-      return "-"
+      return "-";
     }
 
     return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
@@ -207,54 +257,57 @@ export default function SystemPage() {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
-    })
-  }
+    });
+  };
 
   const formatConfigJsonPreview = (value: unknown) => {
     if (typeof value === "string") {
-      return value
+      return value;
     }
 
     try {
-      return JSON.stringify(value ?? {})
+      return JSON.stringify(value ?? {});
     } catch {
-      return "{}"
+      return "{}";
     }
-  }
+  };
 
   const systemConfigStats = useMemo(() => {
-    const total = systemConfigs.length
-    const enabled = systemConfigs.filter((item) => item.enabled).length
-    const disabled = total - enabled
+    const total = systemConfigs.length;
+    const enabled = systemConfigs.filter((item) => item.enabled).length;
+    const disabled = total - enabled;
 
-    return { total, enabled, disabled }
-  }, [systemConfigs])
+    return { total, enabled, disabled };
+  }, [systemConfigs]);
 
   const availableSystemConfigTypes = useMemo(() => {
-    return Array.from(new Set(systemConfigs.map((item) => item.config_type))).sort((a, b) =>
-      a.localeCompare(b)
-    )
-  }, [systemConfigs])
+    return Array.from(
+      new Set(systemConfigs.map((item) => item.config_type)),
+    ).sort((a, b) => a.localeCompare(b));
+  }, [systemConfigs]);
 
   const filteredSystemConfigs = useMemo(() => {
-    const keyword = systemConfigSearchKeyword.trim().toLowerCase()
+    const keyword = systemConfigSearchKeyword.trim().toLowerCase();
 
     return systemConfigs
       .filter((item) => {
-        if (systemConfigTypeFilter !== "all" && item.config_type !== systemConfigTypeFilter) {
-          return false
+        if (
+          systemConfigTypeFilter !== "all" &&
+          item.config_type !== systemConfigTypeFilter
+        ) {
+          return false;
         }
 
         if (systemConfigStatusFilter === "enabled" && !item.enabled) {
-          return false
+          return false;
         }
 
         if (systemConfigStatusFilter === "disabled" && item.enabled) {
-          return false
+          return false;
         }
 
         if (!keyword) {
-          return true
+          return true;
         }
 
         return [
@@ -265,88 +318,99 @@ export default function SystemPage() {
         ]
           .join(" ")
           .toLowerCase()
-          .includes(keyword)
+          .includes(keyword);
       })
       .sort((left, right) => {
-        const leftTime = new Date(left.updated_at).getTime() || 0
-        const rightTime = new Date(right.updated_at).getTime() || 0
-        return rightTime - leftTime
-      })
-  }, [systemConfigs, systemConfigSearchKeyword, systemConfigStatusFilter, systemConfigTypeFilter])
+        const leftTime = new Date(left.updated_at).getTime() || 0;
+        const rightTime = new Date(right.updated_at).getTime() || 0;
+        return rightTime - leftTime;
+      });
+  }, [
+    systemConfigs,
+    systemConfigSearchKeyword,
+    systemConfigStatusFilter,
+    systemConfigTypeFilter,
+  ]);
 
   const systemConfigTypeOptions = useMemo(() => {
-    const optionSet = new Set<string>(["email", "sms", ...availableSystemConfigTypes])
-    const currentType = systemConfigForm.configType.trim()
+    const optionSet = new Set<string>([
+      "email",
+      "sms",
+      ...availableSystemConfigTypes,
+    ]);
+    const currentType = systemConfigForm.configType.trim();
 
     if (currentType) {
-      optionSet.add(currentType)
+      optionSet.add(currentType);
     }
 
-    return Array.from(optionSet).sort((a, b) => a.localeCompare(b))
-  }, [availableSystemConfigTypes, systemConfigForm.configType])
+    return Array.from(optionSet).sort((a, b) => a.localeCompare(b));
+  }, [availableSystemConfigTypes, systemConfigForm.configType]);
 
   const hasActiveSystemConfigFilters =
     Boolean(systemConfigSearchKeyword.trim()) ||
     systemConfigTypeFilter !== "all" ||
-    systemConfigStatusFilter !== "all"
+    systemConfigStatusFilter !== "all";
 
   const openCreateSystemConfigDialog = () => {
-    setEditingSystemConfig(null)
-    setSystemConfigForm(getInitialSystemConfigForm())
-    setIsSystemConfigDialogOpen(true)
-  }
+    setEditingSystemConfig(null);
+    setSystemConfigForm(getInitialSystemConfigForm());
+    setIsSystemConfigDialogOpen(true);
+  };
 
   const openEditSystemConfigDialog = (item: SystemConfigResponse) => {
-    setEditingSystemConfig(item)
-    setSystemConfigForm(getSystemConfigFormFromItem(item))
-    setIsSystemConfigDialogOpen(true)
-  }
+    setEditingSystemConfig(item);
+    setSystemConfigForm(getSystemConfigFormFromItem(item));
+    setIsSystemConfigDialogOpen(true);
+  };
 
   const handleResetSystemConfigFilters = () => {
-    setSystemConfigSearchKeyword("")
-    setSystemConfigTypeFilter("all")
-    setSystemConfigStatusFilter("all")
-  }
+    setSystemConfigSearchKeyword("");
+    setSystemConfigTypeFilter("all");
+    setSystemConfigStatusFilter("all");
+  };
 
-  const handleSubmitSystemConfig = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const handleSubmitSystemConfig = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
 
-    const displayName = systemConfigForm.displayName.trim()
-    const configKey = systemConfigForm.configKey.trim()
-    const configType = systemConfigForm.configType.trim().toLowerCase()
-    const description = systemConfigForm.description.trim()
-    const configJsonInput = systemConfigForm.configJson.trim()
+    const displayName = systemConfigForm.displayName.trim();
+    const configKey = systemConfigForm.configKey.trim();
+    const configType = systemConfigForm.configType.trim().toLowerCase();
+    const description = systemConfigForm.description.trim();
+    const configJsonInput = systemConfigForm.configJson.trim();
 
     if (!displayName) {
-      toast.error(t("systemConfigToastDisplayNameRequired"))
-      return
+      toast.error(t("systemConfigToastDisplayNameRequired"));
+      return;
     }
 
     if (!editingSystemConfig && !configKey) {
-      toast.error(t("systemConfigToastConfigKeyRequired"))
-      return
+      toast.error(t("systemConfigToastConfigKeyRequired"));
+      return;
     }
 
     if (!editingSystemConfig && !configType) {
-      toast.error(t("systemConfigToastConfigTypeRequired"))
-      return
+      toast.error(t("systemConfigToastConfigTypeRequired"));
+      return;
     }
 
     if (!configJsonInput) {
-      toast.error(t("systemConfigToastConfigJsonRequired"))
-      return
+      toast.error(t("systemConfigToastConfigJsonRequired"));
+      return;
     }
 
-    let normalizedConfigJson = "{}"
+    let normalizedConfigJson = "{}";
 
     try {
-      normalizedConfigJson = JSON.stringify(JSON.parse(configJsonInput))
+      normalizedConfigJson = JSON.stringify(JSON.parse(configJsonInput));
     } catch {
-      toast.error(t("systemConfigToastConfigJsonInvalid"))
-      return
+      toast.error(t("systemConfigToastConfigJsonInvalid"));
+      return;
     }
 
-    setSystemConfigSubmitting(true)
+    setSystemConfigSubmitting(true);
 
     try {
       if (editingSystemConfig) {
@@ -355,10 +419,10 @@ export default function SystemPage() {
           description: description || null,
           config_json: normalizedConfigJson,
           enabled: systemConfigForm.enabled,
-        }
+        };
 
-        await api.updateSystemConfig(editingSystemConfig.id, payload)
-        toastSaved(t("systemConfigToastUpdateSuccess"))
+        await api.updateSystemConfig(editingSystemConfig.id, payload);
+        toastSaved(t("systemConfigToastUpdateSuccess"));
       } else {
         const payload: CreateSystemConfigRequest = {
           config_key: configKey,
@@ -366,84 +430,89 @@ export default function SystemPage() {
           display_name: displayName,
           description: description || null,
           config_json: normalizedConfigJson,
-        }
+        };
 
-        await api.createSystemConfig(payload)
-        toastCreated(t("systemConfigToastCreateSuccess"))
+        await api.createSystemConfig(payload);
+        toastCreated(t("systemConfigToastCreateSuccess"));
       }
 
-      setIsSystemConfigDialogOpen(false)
-      setEditingSystemConfig(null)
-      setSystemConfigForm(getInitialSystemConfigForm())
-      await fetchData(true)
+      setIsSystemConfigDialogOpen(false);
+      setEditingSystemConfig(null);
+      setSystemConfigForm(getInitialSystemConfigForm());
+      await fetchData(true);
     } catch (error) {
       toast.error(
         getApiErrorMessage(
           error,
           editingSystemConfig
             ? t("systemConfigToastUpdateError")
-            : t("systemConfigToastCreateError")
-        )
-      )
+            : t("systemConfigToastCreateError"),
+        ),
+      );
     } finally {
-      setSystemConfigSubmitting(false)
+      setSystemConfigSubmitting(false);
     }
-  }
+  };
 
-  const handleToggleSystemConfigEnabled = async (item: SystemConfigResponse, enabled: boolean) => {
+  const handleToggleSystemConfigEnabled = async (
+    item: SystemConfigResponse,
+    enabled: boolean,
+  ) => {
     if (item.enabled === enabled) {
-      return
+      return;
     }
 
-    setTogglingSystemConfigId(item.id)
+    setTogglingSystemConfigId(item.id);
 
     try {
-      await api.updateSystemConfig(item.id, { enabled })
-      await fetchData(true)
+      await api.updateSystemConfig(item.id, { enabled });
+      await fetchData(true);
       toast.success(
         enabled
           ? t("systemConfigToastEnableSuccess")
-          : t("systemConfigToastDisableSuccess")
-      )
+          : t("systemConfigToastDisableSuccess"),
+      );
     } catch (error) {
-      toastApiError(error, t("systemConfigToastToggleError"))
+      toastApiError(error, t("systemConfigToastToggleError"));
     } finally {
-      setTogglingSystemConfigId(null)
+      setTogglingSystemConfigId(null);
     }
-  }
+  };
 
   const handleDeleteSystemConfig = async () => {
     if (!systemConfigDeleteTarget) {
-      return
+      return;
     }
 
-    setDeletingSystemConfigId(systemConfigDeleteTarget.id)
+    setDeletingSystemConfigId(systemConfigDeleteTarget.id);
 
     try {
-      await api.deleteSystemConfig(systemConfigDeleteTarget.id)
-      toastDeleted(t("systemConfigToastDeleteSuccess"))
-      setSystemConfigDeleteTarget(null)
-      await fetchData(true)
+      await api.deleteSystemConfig(systemConfigDeleteTarget.id);
+      toastDeleted(t("systemConfigToastDeleteSuccess"));
+      setSystemConfigDeleteTarget(null);
+      await fetchData(true);
     } catch (error) {
-      toastApiError(error, t("systemConfigToastDeleteError"))
+      toastApiError(error, t("systemConfigToastDeleteError"));
     } finally {
-      setDeletingSystemConfigId(null)
+      setDeletingSystemConfigId(null);
     }
-  }
+  };
 
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6 px-8 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">{t("title")}</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            {t("title")}
+          </h2>
           <p className="text-sm text-muted-foreground">{t("description")}</p>
         </div>
         <Button
@@ -451,7 +520,9 @@ export default function SystemPage() {
           onClick={() => fetchData(true)}
           disabled={refreshing}
         >
-          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+          />
           {t("btnRefresh")}
         </Button>
       </div>
@@ -474,23 +545,43 @@ export default function SystemPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldHttpPort")}</Label>
-                  <Input readOnly value={config?.http_port} className="bg-muted font-mono" />
+                  <Label className="text-sm font-medium">
+                    {t("fieldHttpPort")}
+                  </Label>
+                  <Input
+                    readOnly
+                    value={config?.http_port}
+                    className="bg-muted font-mono"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldGrpcPort")}</Label>
-                  <Input readOnly value={config?.grpc_port} className="bg-muted font-mono" />
+                  <Label className="text-sm font-medium">
+                    {t("fieldGrpcPort")}
+                  </Label>
+                  <Input
+                    readOnly
+                    value={config?.grpc_port}
+                    className="bg-muted font-mono"
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">{t("fieldDataDir")}</Label>
-                <Input readOnly value={config?.data_dir || "N/A"} className="bg-muted font-mono" />
+                <Label className="text-sm font-medium">
+                  {t("fieldDataDir")}
+                </Label>
+                <Input
+                  readOnly
+                  value={config?.data_dir || "N/A"}
+                  className="bg-muted font-mono"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldRetentionDays")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldRetentionDays")}
+                  </Label>
                   <Input
                     readOnly
                     value={config?.retention_days ?? "N/A"}
@@ -498,7 +589,9 @@ export default function SystemPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldAgentAuth")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldAgentAuth")}
+                  </Label>
                   <Input
                     readOnly
                     value={
@@ -513,7 +606,9 @@ export default function SystemPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldCertCheckEnabled")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldCertCheckEnabled")}
+                  </Label>
                   <Input
                     readOnly
                     value={
@@ -525,7 +620,9 @@ export default function SystemPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldCertCheckDefaultInterval")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldCertCheckDefaultInterval")}
+                  </Label>
                   <Input
                     readOnly
                     value={config?.cert_check_default_interval_secs ?? "N/A"}
@@ -536,7 +633,9 @@ export default function SystemPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldCertCheckTickSecs")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldCertCheckTickSecs")}
+                  </Label>
                   <Input
                     readOnly
                     value={config?.cert_check_tick_secs ?? "N/A"}
@@ -544,7 +643,9 @@ export default function SystemPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldCertCheckMaxConcurrent")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldCertCheckMaxConcurrent")}
+                  </Label>
                   <Input
                     readOnly
                     value={config?.cert_check_max_concurrent ?? "N/A"}
@@ -555,15 +656,21 @@ export default function SystemPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldNotifyAggregationWindow")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldNotifyAggregationWindow")}
+                  </Label>
                   <Input
                     readOnly
-                    value={config?.notification_aggregation_window_secs ?? "N/A"}
+                    value={
+                      config?.notification_aggregation_window_secs ?? "N/A"
+                    }
                     className="bg-muted font-mono"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldAlertRulesCount")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldAlertRulesCount")}
+                  </Label>
                   <Input
                     readOnly
                     value={config?.alert_rules_count ?? 0}
@@ -573,7 +680,9 @@ export default function SystemPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">{t("fieldNotificationChannelsCount")}</Label>
+                <Label className="text-sm font-medium">
+                  {t("fieldNotificationChannelsCount")}
+                </Label>
                 <Input
                   readOnly
                   value={config?.notification_channels_count ?? 0}
@@ -600,17 +709,23 @@ export default function SystemPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">{t("fieldTotalSize")}</Label>
+                <Label className="text-sm font-medium">
+                  {t("fieldTotalSize")}
+                </Label>
                 <Input
                   readOnly
-                  value={storage ? formatBytes(storage.total_size_bytes) : "0 Bytes"}
+                  value={
+                    storage ? formatBytes(storage.total_size_bytes) : "0 Bytes"
+                  }
                   className="bg-muted font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldTotalPartitions")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldTotalPartitions")}
+                  </Label>
                   <Input
                     readOnly
                     value={storage?.total_partitions || 0}
@@ -618,7 +733,9 @@ export default function SystemPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("fieldLatestPartitionDate")}</Label>
+                  <Label className="text-sm font-medium">
+                    {t("fieldLatestPartitionDate")}
+                  </Label>
                   <Input
                     readOnly
                     value={storage?.partitions?.[0]?.date || "-"}
@@ -654,7 +771,9 @@ export default function SystemPage() {
                   <Settings className="h-5 w-5" />
                   {t("systemConfigTitle")}
                 </CardTitle>
-                <CardDescription>{t("systemConfigDescription")}</CardDescription>
+                <CardDescription>
+                  {t("systemConfigDescription")}
+                </CardDescription>
               </div>
               <Button onClick={openCreateSystemConfigDialog}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -663,43 +782,68 @@ export default function SystemPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <span>{t("systemConfigStatsTotal", { count: systemConfigStats.total })}</span>
-                <span>{t("systemConfigStatsEnabled", { count: systemConfigStats.enabled })}</span>
-                <span>{t("systemConfigStatsDisabled", { count: systemConfigStats.disabled })}</span>
+                <span>
+                  {t("systemConfigStatsTotal", {
+                    count: systemConfigStats.total,
+                  })}
+                </span>
+                <span>
+                  {t("systemConfigStatsEnabled", {
+                    count: systemConfigStats.enabled,
+                  })}
+                </span>
+                <span>
+                  {t("systemConfigStatsDisabled", {
+                    count: systemConfigStats.disabled,
+                  })}
+                </span>
               </div>
 
               <div className="grid gap-3 lg:grid-cols-[1fr_200px_200px_auto]">
                 <Input
                   value={systemConfigSearchKeyword}
-                  onChange={(event) => setSystemConfigSearchKeyword(event.target.value)}
+                  onChange={(event) =>
+                    setSystemConfigSearchKeyword(event.target.value)
+                  }
                   placeholder={t("systemConfigSearchPlaceholder")}
                 />
 
-                <Select value={systemConfigTypeFilter} onValueChange={setSystemConfigTypeFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={t("systemConfigFilterType")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("systemConfigFilterTypeAll")}</SelectItem>
-                    {availableSystemConfigTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableCombobox
+                  value={systemConfigTypeFilter}
+                  options={[
+                    { value: "all", label: t("systemConfigFilterTypeAll") },
+                    ...availableSystemConfigTypes.map((type) => ({
+                      value: type,
+                      label: type,
+                    })),
+                  ]}
+                  onValueChange={setSystemConfigTypeFilter}
+                  placeholder={t("systemConfigFilterType")}
+                  clearSearchOnClose
+                  clearSearchOnSelect
+                />
 
                 <Select
                   value={systemConfigStatusFilter}
-                  onValueChange={(value) => setSystemConfigStatusFilter(value as SystemConfigStatusFilter)}
+                  onValueChange={(value) =>
+                    setSystemConfigStatusFilter(
+                      value as SystemConfigStatusFilter,
+                    )
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={t("systemConfigFilterStatus")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{t("systemConfigFilterStatusAll")}</SelectItem>
-                    <SelectItem value="enabled">{t("systemConfigFilterStatusEnabled")}</SelectItem>
-                    <SelectItem value="disabled">{t("systemConfigFilterStatusDisabled")}</SelectItem>
+                    <SelectItem value="all">
+                      {t("systemConfigFilterStatusAll")}
+                    </SelectItem>
+                    <SelectItem value="enabled">
+                      {t("systemConfigFilterStatusEnabled")}
+                    </SelectItem>
+                    <SelectItem value="disabled">
+                      {t("systemConfigFilterStatusDisabled")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -722,45 +866,67 @@ export default function SystemPage() {
                       <TableHead>{t("systemConfigColConfigJson")}</TableHead>
                       <TableHead>{t("systemConfigColStatus")}</TableHead>
                       <TableHead>{t("systemConfigColUpdatedAt")}</TableHead>
-                      <TableHead className="text-right">{t("dictionaryTableColActions")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("dictionaryTableColActions")}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredSystemConfigs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        <TableCell
+                          colSpan={6}
+                          className="h-24 text-center text-muted-foreground"
+                        >
                           {t("systemConfigEmpty")}
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredSystemConfigs.map((item) => {
-                        const jsonPreview = formatConfigJsonPreview(item.config_json)
-                        const toggling = togglingSystemConfigId === item.id
+                        const jsonPreview = formatConfigJsonPreview(
+                          item.config_json,
+                        );
+                        const toggling = togglingSystemConfigId === item.id;
 
                         return (
                           <TableRow key={item.id}>
                             <TableCell>
                               <div className="space-y-1">
-                                <p className="font-medium">{item.display_name}</p>
+                                <p className="font-medium">
+                                  {item.display_name}
+                                </p>
                                 {item.description ? (
-                                  <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                                    {item.description}
+                                  </p>
                                 ) : null}
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="space-y-1">
-                                <p className="font-mono text-xs">{item.config_key}</p>
-                                <p className="text-xs text-muted-foreground">{item.config_type}</p>
+                                <p className="font-mono text-xs">
+                                  {item.config_key}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {item.config_type}
+                                </p>
                               </div>
                             </TableCell>
                             <TableCell className="max-w-[260px]">
-                              <p className="truncate font-mono text-xs" title={jsonPreview}>
+                              <p
+                                className="truncate font-mono text-xs"
+                                title={jsonPreview}
+                              >
                                 {jsonPreview}
                               </p>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <Badge variant={item.enabled ? "success" : "secondary"}>
+                                <Badge
+                                  variant={
+                                    item.enabled ? "success" : "secondary"
+                                  }
+                                >
                                   {item.enabled
                                     ? t("systemConfigFilterStatusEnabled")
                                     : t("systemConfigFilterStatusDisabled")}
@@ -770,10 +936,15 @@ export default function SystemPage() {
                                   disabled={toggling}
                                   aria-label={`${t("systemConfigFieldEnabled")} ${item.display_name}`}
                                   onCheckedChange={(checked) =>
-                                    handleToggleSystemConfigEnabled(item, checked)
+                                    handleToggleSystemConfigEnabled(
+                                      item,
+                                      checked,
+                                    )
                                   }
                                 />
-                                {toggling ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+                                {toggling ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                ) : null}
                               </div>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
@@ -784,7 +955,9 @@ export default function SystemPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => openEditSystemConfigDialog(item)}
+                                  onClick={() =>
+                                    openEditSystemConfigDialog(item)
+                                  }
                                   title={t("systemConfigActionEdit")}
                                 >
                                   <Pencil className="h-4 w-4" />
@@ -793,7 +966,9 @@ export default function SystemPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="text-destructive hover:text-destructive"
-                                  onClick={() => setSystemConfigDeleteTarget(item)}
+                                  onClick={() =>
+                                    setSystemConfigDeleteTarget(item)
+                                  }
                                   title={t("systemConfigActionDelete")}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -801,7 +976,7 @@ export default function SystemPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        )
+                        );
                       })
                     )}
                   </TableBody>
@@ -854,18 +1029,33 @@ export default function SystemPage() {
                 <BookText className="h-5 w-5" />
                 {t("dictionaryQuickTitle")}
               </CardTitle>
-              <CardDescription>{t("dictionaryQuickDescription")}</CardDescription>
+              <CardDescription>
+                {t("dictionaryQuickDescription")}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 md:grid-cols-2">
-                <Button asChild variant="outline" className="h-11 justify-start">
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-11 justify-start"
+                >
                   <Link href={withLocalePrefix("/system/dictionaries", locale)}>
                     <BookText className="mr-2 h-4 w-4" />
                     {t("dictionaryQuickEntries")}
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="h-11 justify-start">
-                  <Link href={withLocalePrefix("/system/dictionaries/types", locale)}>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-11 justify-start"
+                >
+                  <Link
+                    href={withLocalePrefix(
+                      "/system/dictionaries/types",
+                      locale,
+                    )}
+                  >
                     <Tag className="mr-2 h-4 w-4" />
                     {t("dictionaryQuickTypes")}
                   </Link>
@@ -879,11 +1069,11 @@ export default function SystemPage() {
       <Dialog
         open={isSystemConfigDialogOpen}
         onOpenChange={(open) => {
-          setIsSystemConfigDialogOpen(open)
+          setIsSystemConfigDialogOpen(open);
 
           if (!open) {
-            setEditingSystemConfig(null)
-            setSystemConfigForm(getInitialSystemConfigForm())
+            setEditingSystemConfig(null);
+            setSystemConfigForm(getInitialSystemConfigForm());
           }
         }}
       >
@@ -921,7 +1111,9 @@ export default function SystemPage() {
                 {t("btnCancel")}
               </Button>
               <Button type="submit" disabled={systemConfigSubmitting}>
-                {systemConfigSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {systemConfigSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
                 {editingSystemConfig
                   ? t("systemConfigDialogUpdateSubmit")
                   : t("systemConfigDialogCreateSubmit")}
@@ -935,13 +1127,15 @@ export default function SystemPage() {
         open={Boolean(systemConfigDeleteTarget)}
         onOpenChange={(open) => {
           if (!open) {
-            setSystemConfigDeleteTarget(null)
+            setSystemConfigDeleteTarget(null);
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("systemConfigDeleteDialogTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("systemConfigDeleteDialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               <div className="space-y-2">
                 <p>
@@ -962,7 +1156,9 @@ export default function SystemPage() {
               disabled={Boolean(deletingSystemConfigId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deletingSystemConfigId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {deletingSystemConfigId ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
               {t("systemConfigDeleteDialogConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -970,7 +1166,10 @@ export default function SystemPage() {
       </AlertDialog>
 
       {/* Change Password Dialog */}
-      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+      <Dialog
+        open={isPasswordDialogOpen}
+        onOpenChange={setIsPasswordDialogOpen}
+      >
         <DialogContent className="bg-white border border-gray-200">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900">
@@ -983,7 +1182,10 @@ export default function SystemPage() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="old-password" className="font-medium text-gray-900">
+              <Label
+                htmlFor="old-password"
+                className="font-medium text-gray-900"
+              >
                 {t("fieldOldPassword")}
               </Label>
               <Input
@@ -991,14 +1193,20 @@ export default function SystemPage() {
                 type="password"
                 value={passwordForm.current_password}
                 onChange={(e) =>
-                  setPasswordForm({ ...passwordForm, current_password: e.target.value })
+                  setPasswordForm({
+                    ...passwordForm,
+                    current_password: e.target.value,
+                  })
                 }
                 className="bg-white border-gray-300 text-gray-900"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="new-password" className="font-medium text-gray-900">
+              <Label
+                htmlFor="new-password"
+                className="font-medium text-gray-900"
+              >
                 {t("fieldNewPassword")}
               </Label>
               <Input
@@ -1006,7 +1214,10 @@ export default function SystemPage() {
                 type="password"
                 value={passwordForm.new_password}
                 onChange={(e) =>
-                  setPasswordForm({ ...passwordForm, new_password: e.target.value })
+                  setPasswordForm({
+                    ...passwordForm,
+                    new_password: e.target.value,
+                  })
                 }
                 className="bg-white border-gray-300 text-gray-900"
               />
@@ -1030,7 +1241,10 @@ export default function SystemPage() {
       </Dialog>
 
       {/* Cleanup Confirmation Dialog */}
-      <AlertDialog open={isCleanupDialogOpen} onOpenChange={setIsCleanupDialogOpen}>
+      <AlertDialog
+        open={isCleanupDialogOpen}
+        onOpenChange={setIsCleanupDialogOpen}
+      >
         <AlertDialogContent className="bg-white border border-gray-200">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold text-gray-900">
@@ -1055,5 +1269,5 @@ export default function SystemPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

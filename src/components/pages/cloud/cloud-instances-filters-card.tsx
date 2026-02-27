@@ -1,37 +1,43 @@
-"use client"
+"use client";
 
-import { Search } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 
 type CloudInstancesFiltersCardProps = {
-  searchKeyword: string
-  providerFilter: string
-  regionFilter: string
-  statusFilter: string
-  providerOptions: string[]
-  regionOptions: string[]
-  statusOptions: string[]
-  onSearchKeywordChange: (value: string) => void
-  onProviderFilterChange: (value: string) => void
-  onRegionFilterChange: (value: string) => void
-  onStatusFilterChange: (value: string) => void
-  getStatusLabel: (status: string) => string
+  searchKeyword: string;
+  providerFilter: string;
+  regionFilter: string;
+  statusFilter: string;
+  providerOptions: string[];
+  regionOptions: string[];
+  statusOptions: string[];
+  onSearchKeywordChange: (value: string) => void;
+  onProviderFilterChange: (value: string) => void;
+  onRegionFilterChange: (value: string) => void;
+  onStatusFilterChange: (value: string) => void;
+  getStatusLabel: (status: string) => string;
   texts: {
-    title: string
-    description: string
-    filterSearch: string
-    filterSearchPlaceholder: string
-    filterProvider: string
-    filterProviderAll: string
-    filterRegion: string
-    filterRegionAll: string
-    filterStatus: string
-    filterStatusAll: string
-  }
-}
+    title: string;
+    description: string;
+    filterSearch: string;
+    filterSearchPlaceholder: string;
+    filterProvider: string;
+    filterProviderAll: string;
+    filterRegion: string;
+    filterRegionAll: string;
+    filterStatus: string;
+    filterStatusAll: string;
+  };
+};
 
 export function CloudInstancesFiltersCard({
   searchKeyword,
@@ -57,47 +63,50 @@ export function CloudInstancesFiltersCard({
       <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="min-w-0 space-y-2">
           <Label>{texts.filterProvider}</Label>
-          <Select value={providerFilter} onValueChange={onProviderFilterChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={texts.filterProviderAll} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{texts.filterProviderAll}</SelectItem>
-              {providerOptions.map((provider) => (
-                <SelectItem key={provider} value={provider}>{provider}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            value={providerFilter}
+            options={[
+              { value: "all", label: texts.filterProviderAll },
+              ...providerOptions.map((provider) => ({
+                value: provider,
+                label: provider,
+              })),
+            ]}
+            onValueChange={onProviderFilterChange}
+            placeholder={texts.filterProviderAll}
+          />
         </div>
 
         <div className="min-w-0 space-y-2">
           <Label>{texts.filterRegion}</Label>
-          <Select value={regionFilter} onValueChange={onRegionFilterChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={texts.filterRegionAll} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{texts.filterRegionAll}</SelectItem>
-              {regionOptions.map((region) => (
-                <SelectItem key={region} value={region}>{region}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            value={regionFilter}
+            options={[
+              { value: "all", label: texts.filterRegionAll },
+              ...regionOptions.map((region) => ({
+                value: region,
+                label: region,
+              })),
+            ]}
+            onValueChange={onRegionFilterChange}
+            placeholder={texts.filterRegionAll}
+          />
         </div>
 
         <div className="min-w-0 space-y-2">
           <Label>{texts.filterStatus}</Label>
-          <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={texts.filterStatusAll} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{texts.filterStatusAll}</SelectItem>
-              {statusOptions.map((status) => (
-                <SelectItem key={status} value={status}>{getStatusLabel(status)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            value={statusFilter}
+            options={[
+              { value: "all", label: texts.filterStatusAll },
+              ...statusOptions.map((status) => ({
+                value: status,
+                label: getStatusLabel(status),
+              })),
+            ]}
+            onValueChange={onStatusFilterChange}
+            placeholder={texts.filterStatusAll}
+          />
         </div>
 
         <div className="min-w-0 space-y-2">
@@ -115,5 +124,5 @@ export function CloudInstancesFiltersCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

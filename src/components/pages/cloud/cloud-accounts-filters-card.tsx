@@ -1,34 +1,40 @@
-"use client"
+"use client";
 
-import { Search } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 
-type EnabledFilter = "all" | "enabled" | "disabled"
+type EnabledFilter = "all" | "enabled" | "disabled";
 
 type CloudAccountsFiltersCardProps = {
-  searchKeyword: string
-  providerFilter: string
-  enabledFilter: EnabledFilter
-  providerOptions: string[]
-  onSearchKeywordChange: (value: string) => void
-  onProviderFilterChange: (value: string) => void
-  onEnabledFilterChange: (value: EnabledFilter) => void
+  searchKeyword: string;
+  providerFilter: string;
+  enabledFilter: EnabledFilter;
+  providerOptions: string[];
+  onSearchKeywordChange: (value: string) => void;
+  onProviderFilterChange: (value: string) => void;
+  onEnabledFilterChange: (value: EnabledFilter) => void;
   texts: {
-    title: string
-    description: string
-    filterSearch: string
-    filterSearchPlaceholder: string
-    filterProvider: string
-    filterProviderAll: string
-    filterStatus: string
-    filterStatusAll: string
-    filterStatusEnabled: string
-    filterStatusDisabled: string
-  }
-}
+    title: string;
+    description: string;
+    filterSearch: string;
+    filterSearchPlaceholder: string;
+    filterProvider: string;
+    filterProviderAll: string;
+    filterStatus: string;
+    filterStatusAll: string;
+    filterStatusEnabled: string;
+    filterStatusDisabled: string;
+  };
+};
 
 export function CloudAccountsFiltersCard({
   searchKeyword,
@@ -62,32 +68,35 @@ export function CloudAccountsFiltersCard({
         </div>
         <div className="space-y-2">
           <Label>{texts.filterProvider}</Label>
-          <Select value={providerFilter} onValueChange={onProviderFilterChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={texts.filterProviderAll} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{texts.filterProviderAll}</SelectItem>
-              {providerOptions.map((provider) => (
-                <SelectItem key={provider} value={provider}>{provider}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            value={providerFilter}
+            options={[
+              { value: "all", label: texts.filterProviderAll },
+              ...providerOptions.map((provider) => ({
+                value: provider,
+                label: provider,
+              })),
+            ]}
+            onValueChange={onProviderFilterChange}
+            placeholder={texts.filterProviderAll}
+          />
         </div>
         <div className="space-y-2">
           <Label>{texts.filterStatus}</Label>
-          <Select value={enabledFilter} onValueChange={(value) => onEnabledFilterChange(value as EnabledFilter)}>
-            <SelectTrigger>
-              <SelectValue placeholder={texts.filterStatusAll} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{texts.filterStatusAll}</SelectItem>
-              <SelectItem value="enabled">{texts.filterStatusEnabled}</SelectItem>
-              <SelectItem value="disabled">{texts.filterStatusDisabled}</SelectItem>
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            value={enabledFilter}
+            options={[
+              { value: "all", label: texts.filterStatusAll },
+              { value: "enabled", label: texts.filterStatusEnabled },
+              { value: "disabled", label: texts.filterStatusDisabled },
+            ]}
+            onValueChange={(value) =>
+              onEnabledFilterChange(value as EnabledFilter)
+            }
+            placeholder={texts.filterStatusAll}
+          />
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -1,25 +1,35 @@
-"use client"
+"use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
-import { api } from "@/lib/api"
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
 import {
   CreateDictionaryRequest,
   DictionaryItem,
   UpdateDictionaryRequest,
-} from "@/types/api"
-import { useAppTranslations } from "@/hooks/use-app-translations"
-import { useDictionaryTypes } from "@/hooks/use-dictionary-types"
+} from "@/types/api";
+import { useAppTranslations } from "@/hooks/use-app-translations";
+import { useDictionaryTypes } from "@/hooks/use-dictionary-types";
 import {
   DictionaryEntryFormFields,
   DictionaryEntryFormLabels,
   DictionaryEntryFormState,
-} from "@/components/system/DictionaryEntryFormFields"
+} from "@/components/system/DictionaryEntryFormFields";
 
-import { formatDateTime, normalizeNullableText, parseOptionalSortOrder } from "@/lib/dictionary-utils"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
+import {
+  formatDateTime,
+  normalizeNullableText,
+  parseOptionalSortOrder,
+} from "@/lib/dictionary-utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import {
   Dialog,
   DialogContent,
@@ -27,11 +37,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -39,7 +56,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +66,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import {
   BookText,
   FilterX,
@@ -58,8 +75,15 @@ import {
   Plus,
   RefreshCw,
   Trash2,
-} from "lucide-react"
-import { toast, toastApiError, toastCreated, toastDeleted, toastSaved, toastStatusError } from "@/lib/toast"
+} from "lucide-react";
+import {
+  toast,
+  toastApiError,
+  toastCreated,
+  toastDeleted,
+  toastSaved,
+  toastStatusError,
+} from "@/lib/toast";
 
 type DictionarySortMode =
   | "sort_order_asc"
@@ -67,9 +91,9 @@ type DictionarySortMode =
   | "updated_at_desc"
   | "updated_at_asc"
   | "dict_key_asc"
-  | "dict_key_desc"
+  | "dict_key_desc";
 
-const DEFAULT_DICTIONARY_SORT_MODE: DictionarySortMode = "sort_order_asc"
+const DEFAULT_DICTIONARY_SORT_MODE: DictionarySortMode = "sort_order_asc";
 
 function getInitialDictionaryForm(dictType: string): DictionaryEntryFormState {
   return {
@@ -81,7 +105,7 @@ function getInitialDictionaryForm(dictType: string): DictionaryEntryFormState {
     enabled: true,
     description: "",
     extraJson: "",
-  }
+  };
 }
 
 function getEditFormFromItem(item: DictionaryItem): DictionaryEntryFormState {
@@ -94,40 +118,48 @@ function getEditFormFromItem(item: DictionaryItem): DictionaryEntryFormState {
     enabled: item.enabled,
     description: item.description || "",
     extraJson: item.extra_json || "",
-  }
+  };
 }
 
 export default function SystemDictionaryEntriesPage() {
-  const { t, locale } = useAppTranslations("system")
+  const { t, locale } = useAppTranslations("system");
 
-  const [items, setItems] = useState<DictionaryItem[]>([])
+  const [items, setItems] = useState<DictionaryItem[]>([]);
 
-  const [loadingItems, setLoadingItems] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
+  const [loadingItems, setLoadingItems] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [enabledOnly, setEnabledOnly] = useState(false)
-  const [searchKeyword, setSearchKeyword] = useState("")
-  const [sortMode, setSortMode] = useState<DictionarySortMode>(DEFAULT_DICTIONARY_SORT_MODE)
+  const [enabledOnly, setEnabledOnly] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [sortMode, setSortMode] = useState<DictionarySortMode>(
+    DEFAULT_DICTIONARY_SORT_MODE,
+  );
 
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [createSubmitting, setCreateSubmitting] = useState(false)
-  const [createForm, setCreateForm] = useState<DictionaryEntryFormState>(() => getInitialDictionaryForm(""))
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [createForm, setCreateForm] = useState<DictionaryEntryFormState>(() =>
+    getInitialDictionaryForm(""),
+  );
 
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<DictionaryItem | null>(null)
-  const [editSubmitting, setEditSubmitting] = useState(false)
-  const [editForm, setEditForm] = useState<DictionaryEntryFormState>(() => getInitialDictionaryForm(""))
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<DictionaryItem | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editForm, setEditForm] = useState<DictionaryEntryFormState>(() =>
+    getInitialDictionaryForm(""),
+  );
 
-  const [deleteTarget, setDeleteTarget] = useState<DictionaryItem | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [togglingEnabledId, setTogglingEnabledId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DictionaryItem | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingEnabledId, setTogglingEnabledId] = useState<string | null>(
+    null,
+  );
 
   const handleTypeFetchError = useCallback(
     (error: unknown) => {
-      toastApiError(error, t("dictionaryToastFetchTypesError"))
+      toastApiError(error, t("dictionaryToastFetchTypesError"));
     },
-    [t]
-  )
+    [t],
+  );
 
   const {
     typeSummaries,
@@ -137,53 +169,56 @@ export default function SystemDictionaryEntriesPage() {
     fetchDictionaryTypes,
   } = useDictionaryTypes({
     onError: handleTypeFetchError,
-  })
+  });
 
   const fetchDictionaryItems = useCallback(
     async (dictType: string, silent = false) => {
       if (!dictType) {
-        setItems([])
-        return []
+        setItems([]);
+        return [];
       }
 
       if (!silent) {
-        setLoadingItems(true)
+        setLoadingItems(true);
       }
 
       try {
-        const data = await api.listDictionariesByType(dictType, enabledOnly)
-        setItems(data)
-        return data
+        const data = await api.listDictionariesByType(dictType, enabledOnly);
+        setItems(data);
+        return data;
       } catch (error) {
-        toastApiError(error, t("dictionaryToastFetchItemsError"))
-        setItems([])
-        return []
+        toastApiError(error, t("dictionaryToastFetchItemsError"));
+        setItems([]);
+        return [];
       } finally {
         if (!silent) {
-          setLoadingItems(false)
+          setLoadingItems(false);
         }
       }
     },
-    [enabledOnly, t]
-  )
+    [enabledOnly, t],
+  );
 
   useEffect(() => {
     if (!selectedType) {
-      setItems([])
-      setLoadingItems(false)
-      return
+      setItems([]);
+      setLoadingItems(false);
+      return;
     }
 
-    fetchDictionaryItems(selectedType)
-  }, [fetchDictionaryItems, selectedType])
+    fetchDictionaryItems(selectedType);
+  }, [fetchDictionaryItems, selectedType]);
 
   const selectedTypeSummary = useMemo(() => {
-    return typeSummaries.find((summary) => summary.dict_type === selectedType) || null
-  }, [selectedType, typeSummaries])
+    return (
+      typeSummaries.find((summary) => summary.dict_type === selectedType) ||
+      null
+    );
+  }, [selectedType, typeSummaries]);
 
   const currentTypeDisplay = selectedTypeSummary
     ? `${selectedTypeSummary.dict_type_label} (${selectedTypeSummary.dict_type})`
-    : "-"
+    : "-";
 
   const dictionaryEntryFieldLabels: DictionaryEntryFormLabels = useMemo(
     () => ({
@@ -197,23 +232,23 @@ export default function SystemDictionaryEntriesPage() {
       extraJson: t("dictionaryFieldExtraJson"),
       extraJsonHint: t("dictionaryFieldExtraJsonHint"),
     }),
-    [t]
-  )
+    [t],
+  );
 
   const stats = useMemo(() => {
-    const total = items.length
-    const enabled = items.filter((item) => item.enabled).length
-    const system = items.filter((item) => item.is_system).length
+    const total = items.length;
+    const enabled = items.filter((item) => item.enabled).length;
+    const system = items.filter((item) => item.is_system).length;
 
     return {
       total,
       enabled,
       system,
-    }
-  }, [items])
+    };
+  }, [items]);
 
   const filteredItems = useMemo(() => {
-    const keyword = searchKeyword.trim().toLowerCase()
+    const keyword = searchKeyword.trim().toLowerCase();
 
     const matchedItems = keyword
       ? items.filter((item) => {
@@ -224,141 +259,144 @@ export default function SystemDictionaryEntriesPage() {
             item.description || "",
           ]
             .join(" ")
-            .toLowerCase()
+            .toLowerCase();
 
-          return searchable.includes(keyword)
+          return searchable.includes(keyword);
         })
-      : items
+      : items;
 
     return matchedItems.slice().sort((left, right) => {
       if (sortMode === "sort_order_asc") {
         if (left.sort_order !== right.sort_order) {
-          return left.sort_order - right.sort_order
+          return left.sort_order - right.sort_order;
         }
 
-        return left.dict_key.localeCompare(right.dict_key)
+        return left.dict_key.localeCompare(right.dict_key);
       }
 
       if (sortMode === "sort_order_desc") {
         if (left.sort_order !== right.sort_order) {
-          return right.sort_order - left.sort_order
+          return right.sort_order - left.sort_order;
         }
 
-        return right.dict_key.localeCompare(left.dict_key)
+        return right.dict_key.localeCompare(left.dict_key);
       }
 
       if (sortMode === "updated_at_desc") {
-        const leftTime = new Date(left.updated_at).getTime() || 0
-        const rightTime = new Date(right.updated_at).getTime() || 0
+        const leftTime = new Date(left.updated_at).getTime() || 0;
+        const rightTime = new Date(right.updated_at).getTime() || 0;
 
         if (leftTime !== rightTime) {
-          return rightTime - leftTime
+          return rightTime - leftTime;
         }
 
-        return left.dict_key.localeCompare(right.dict_key)
+        return left.dict_key.localeCompare(right.dict_key);
       }
 
       if (sortMode === "updated_at_asc") {
-        const leftTime = new Date(left.updated_at).getTime() || 0
-        const rightTime = new Date(right.updated_at).getTime() || 0
+        const leftTime = new Date(left.updated_at).getTime() || 0;
+        const rightTime = new Date(right.updated_at).getTime() || 0;
 
         if (leftTime !== rightTime) {
-          return leftTime - rightTime
+          return leftTime - rightTime;
         }
 
-        return left.dict_key.localeCompare(right.dict_key)
+        return left.dict_key.localeCompare(right.dict_key);
       }
 
       if (sortMode === "dict_key_desc") {
-        return right.dict_key.localeCompare(left.dict_key)
+        return right.dict_key.localeCompare(left.dict_key);
       }
 
-      return left.dict_key.localeCompare(right.dict_key)
-    })
-  }, [items, searchKeyword, sortMode])
+      return left.dict_key.localeCompare(right.dict_key);
+    });
+  }, [items, searchKeyword, sortMode]);
 
   const hasActiveFilters =
     Boolean(searchKeyword.trim()) ||
     enabledOnly ||
-    sortMode !== DEFAULT_DICTIONARY_SORT_MODE
+    sortMode !== DEFAULT_DICTIONARY_SORT_MODE;
 
   const handleResetFilters = () => {
-    setSearchKeyword("")
-    setEnabledOnly(false)
-    setSortMode(DEFAULT_DICTIONARY_SORT_MODE)
-  }
+    setSearchKeyword("");
+    setEnabledOnly(false);
+    setSortMode(DEFAULT_DICTIONARY_SORT_MODE);
+  };
 
   const openCreateDialog = () => {
     if (!selectedType || typeSummaries.length === 0) {
-      toast.error(t("dictionaryToastNoTypeToCreateEntry"))
-      return
+      toast.error(t("dictionaryToastNoTypeToCreateEntry"));
+      return;
     }
 
-    setCreateForm(getInitialDictionaryForm(selectedType))
-    setIsCreateDialogOpen(true)
-  }
+    setCreateForm(getInitialDictionaryForm(selectedType));
+    setIsCreateDialogOpen(true);
+  };
 
   const handleRefresh = async () => {
-    setRefreshing(true)
+    setRefreshing(true);
 
-    const latestTypes = await fetchDictionaryTypes(true)
+    const latestTypes = await fetchDictionaryTypes(true);
     const targetType =
-      selectedType && latestTypes.some((item) => item.dict_type === selectedType)
+      selectedType &&
+      latestTypes.some((item) => item.dict_type === selectedType)
         ? selectedType
-        : latestTypes[0]?.dict_type || ""
+        : latestTypes[0]?.dict_type || "";
 
     if (targetType) {
-      await fetchDictionaryItems(targetType, true)
-      setSelectedType(targetType)
+      await fetchDictionaryItems(targetType, true);
+      setSelectedType(targetType);
     } else {
-      setItems([])
+      setItems([]);
     }
 
-    setRefreshing(false)
-  }
+    setRefreshing(false);
+  };
 
   const handleCreateDictionary = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+    event.preventDefault();
 
-    const dictType = createForm.dictType.trim()
-    const dictKey = createForm.dictKey.trim()
-    const dictLabel = createForm.dictLabel.trim()
+    const dictType = createForm.dictType.trim();
+    const dictKey = createForm.dictKey.trim();
+    const dictLabel = createForm.dictLabel.trim();
 
     if (!dictType) {
-      toast.error(t("dictionaryToastTypeRequired"))
-      return
+      toast.error(t("dictionaryToastTypeRequired"));
+      return;
     }
 
-    if (!typeSummaries.some((typeSummary) => typeSummary.dict_type === dictType)) {
-      toast.error(t("dictionaryToastTypeInvalid"))
-      return
+    if (
+      !typeSummaries.some((typeSummary) => typeSummary.dict_type === dictType)
+    ) {
+      toast.error(t("dictionaryToastTypeInvalid"));
+      return;
     }
 
     if (!dictKey) {
-      toast.error(t("dictionaryToastKeyRequired"))
-      return
+      toast.error(t("dictionaryToastKeyRequired"));
+      return;
     }
 
     if (!dictLabel) {
-      toast.error(t("dictionaryToastLabelRequired"))
-      return
+      toast.error(t("dictionaryToastLabelRequired"));
+      return;
     }
 
-    const sortOrder = parseOptionalSortOrder(createForm.sortOrder)
+    const sortOrder = parseOptionalSortOrder(createForm.sortOrder);
 
     if (sortOrder === undefined) {
-      toast.error(t("dictionaryToastSortOrderInvalid"))
-      return
+      toast.error(t("dictionaryToastSortOrderInvalid"));
+      return;
     }
 
-    const extraJson = createForm.extraJson.trim()
+    const extraJson = createForm.extraJson.trim();
 
     if (extraJson) {
       try {
-        JSON.parse(extraJson)
+        JSON.parse(extraJson);
       } catch {
-        toast.error(t("dictionaryToastExtraJsonInvalid"))
-        return
+        toast.error(t("dictionaryToastExtraJsonInvalid"));
+        return;
       }
     }
 
@@ -367,83 +405,83 @@ export default function SystemDictionaryEntriesPage() {
       dict_key: dictKey,
       dict_label: dictLabel,
       enabled: createForm.enabled,
-    }
+    };
 
-    const dictValue = createForm.dictValue.trim()
+    const dictValue = createForm.dictValue.trim();
 
     if (dictValue) {
-      payload.dict_value = dictValue
+      payload.dict_value = dictValue;
     }
 
     if (sortOrder !== null) {
-      payload.sort_order = sortOrder
+      payload.sort_order = sortOrder;
     }
 
-    const description = createForm.description.trim()
+    const description = createForm.description.trim();
 
     if (description) {
-      payload.description = description
+      payload.description = description;
     }
 
     if (extraJson) {
-      payload.extra_json = extraJson
+      payload.extra_json = extraJson;
     }
 
-    setCreateSubmitting(true)
+    setCreateSubmitting(true);
 
     try {
-      await api.createDictionary(payload)
-      toastCreated(t("dictionaryToastCreateSuccess"))
-      setIsCreateDialogOpen(false)
-      setCreateForm(getInitialDictionaryForm(dictType))
+      await api.createDictionary(payload);
+      toastCreated(t("dictionaryToastCreateSuccess"));
+      setIsCreateDialogOpen(false);
+      setCreateForm(getInitialDictionaryForm(dictType));
 
-      await fetchDictionaryTypes(true)
-      setSelectedType(dictType)
-      await fetchDictionaryItems(dictType, true)
+      await fetchDictionaryTypes(true);
+      setSelectedType(dictType);
+      await fetchDictionaryItems(dictType, true);
     } catch (error) {
       toastStatusError(error, t("dictionaryToastCreateError"), {
         409: t("dictionaryToastCreateConflict"),
-      })
+      });
     } finally {
-      setCreateSubmitting(false)
+      setCreateSubmitting(false);
     }
-  }
+  };
 
   const openEditDialog = (item: DictionaryItem) => {
-    setEditingItem(item)
-    setEditForm(getEditFormFromItem(item))
-    setIsEditDialogOpen(true)
-  }
+    setEditingItem(item);
+    setEditForm(getEditFormFromItem(item));
+    setIsEditDialogOpen(true);
+  };
 
   const handleUpdateDictionary = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+    event.preventDefault();
 
     if (!editingItem) {
-      return
+      return;
     }
 
-    const dictLabel = editForm.dictLabel.trim()
+    const dictLabel = editForm.dictLabel.trim();
 
     if (!dictLabel) {
-      toast.error(t("dictionaryToastLabelRequired"))
-      return
+      toast.error(t("dictionaryToastLabelRequired"));
+      return;
     }
 
-    const sortOrder = parseOptionalSortOrder(editForm.sortOrder)
+    const sortOrder = parseOptionalSortOrder(editForm.sortOrder);
 
     if (sortOrder === undefined) {
-      toast.error(t("dictionaryToastSortOrderInvalid"))
-      return
+      toast.error(t("dictionaryToastSortOrderInvalid"));
+      return;
     }
 
-    const extraJsonValue = editForm.extraJson.trim()
+    const extraJsonValue = editForm.extraJson.trim();
 
     if (extraJsonValue) {
       try {
-        JSON.parse(extraJsonValue)
+        JSON.parse(extraJsonValue);
       } catch {
-        toast.error(t("dictionaryToastExtraJsonInvalid"))
-        return
+        toast.error(t("dictionaryToastExtraJsonInvalid"));
+        return;
       }
     }
 
@@ -454,95 +492,110 @@ export default function SystemDictionaryEntriesPage() {
       enabled: editForm.enabled,
       description: normalizeNullableText(editForm.description),
       extra_json: normalizeNullableText(editForm.extraJson),
-    }
+    };
 
-    setEditSubmitting(true)
+    setEditSubmitting(true);
 
     try {
-      await api.updateDictionary(editingItem.id, payload)
-      toastSaved(t("dictionaryToastUpdateSuccess"))
-      setIsEditDialogOpen(false)
-      setEditingItem(null)
-      await fetchDictionaryItems(selectedType, true)
+      await api.updateDictionary(editingItem.id, payload);
+      toastSaved(t("dictionaryToastUpdateSuccess"));
+      setIsEditDialogOpen(false);
+      setEditingItem(null);
+      await fetchDictionaryItems(selectedType, true);
     } catch (error) {
       toastStatusError(error, t("dictionaryToastUpdateError"), {
         404: t("dictionaryToastUpdateNotFound"),
-      })
+      });
     } finally {
-      setEditSubmitting(false)
+      setEditSubmitting(false);
     }
-  }
+  };
 
-  const handleToggleItemEnabled = async (item: DictionaryItem, enabled: boolean) => {
+  const handleToggleItemEnabled = async (
+    item: DictionaryItem,
+    enabled: boolean,
+  ) => {
     if (item.enabled === enabled) {
-      return
+      return;
     }
 
-    setTogglingEnabledId(item.id)
+    setTogglingEnabledId(item.id);
 
     try {
-      await api.updateDictionary(item.id, { enabled })
+      await api.updateDictionary(item.id, { enabled });
 
       setItems((previous) =>
         previous.map((previousItem) =>
-          previousItem.id === item.id ? { ...previousItem, enabled } : previousItem
-        )
-      )
+          previousItem.id === item.id
+            ? { ...previousItem, enabled }
+            : previousItem,
+        ),
+      );
 
-      toastSaved(t("dictionaryToastUpdateSuccess"))
+      toastSaved(t("dictionaryToastUpdateSuccess"));
     } catch (error) {
       toastStatusError(error, t("dictionaryToastUpdateError"), {
         404: t("dictionaryToastUpdateNotFound"),
-      })
+      });
     } finally {
-      setTogglingEnabledId(null)
+      setTogglingEnabledId(null);
     }
-  }
+  };
 
   const handleDeleteDictionary = async () => {
     if (!deleteTarget) {
-      return
+      return;
     }
 
     if (deleteTarget.is_system) {
-      toast.error(t("dictionaryToastSystemItemUndeletable"))
-      setDeleteTarget(null)
-      return
+      toast.error(t("dictionaryToastSystemItemUndeletable"));
+      setDeleteTarget(null);
+      return;
     }
 
-    const targetId = deleteTarget.id
+    const targetId = deleteTarget.id;
 
-    setDeletingId(targetId)
+    setDeletingId(targetId);
 
     try {
-      await api.deleteDictionary(targetId)
-      toastDeleted(t("dictionaryToastDeleteSuccess"))
-      setDeleteTarget(null)
-      await fetchDictionaryItems(selectedType, true)
-      await fetchDictionaryTypes(true)
+      await api.deleteDictionary(targetId);
+      toastDeleted(t("dictionaryToastDeleteSuccess"));
+      setDeleteTarget(null);
+      await fetchDictionaryItems(selectedType, true);
+      await fetchDictionaryTypes(true);
     } catch (error) {
       toastStatusError(error, t("dictionaryToastDeleteError"), {
         403: t("dictionaryToastDeleteForbidden"),
         404: t("dictionaryToastDeleteNotFound"),
-      })
+      });
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
-  }
+  };
 
-  const isInitialLoading = loadingTypes && !selectedType
+  const isInitialLoading = loadingTypes && !selectedType;
 
   return (
     <div className="space-y-6 px-8 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">{t("dictionaryTitle")}</h2>
-          <p className="text-sm text-muted-foreground">{t("dictionaryDescription")}</p>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            {t("dictionaryTitle")}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {t("dictionaryDescription")}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+            />
             {t("dictionaryButtonRefresh")}
           </Button>
           <Button onClick={openCreateDialog}>
@@ -560,9 +613,15 @@ export default function SystemDictionaryEntriesPage() {
               {t("dictionaryTypeLabel")}
             </CardTitle>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">{t("dictionaryStatsTotal", { count: stats.total })}</Badge>
-              <Badge variant="secondary">{t("dictionaryStatsEnabled", { count: stats.enabled })}</Badge>
-              <Badge variant="secondary">{t("dictionaryStatsSystem", { count: stats.system })}</Badge>
+              <Badge variant="secondary">
+                {t("dictionaryStatsTotal", { count: stats.total })}
+              </Badge>
+              <Badge variant="secondary">
+                {t("dictionaryStatsEnabled", { count: stats.enabled })}
+              </Badge>
+              <Badge variant="secondary">
+                {t("dictionaryStatsSystem", { count: stats.system })}
+              </Badge>
             </div>
           </div>
 
@@ -578,50 +637,57 @@ export default function SystemDictionaryEntriesPage() {
           >
             <div className="space-y-2">
               <Label>{t("dictionaryTypeLabel")}</Label>
-              <Select
-                value={selectedType || undefined}
+              <SearchableCombobox
+                value={selectedType || ""}
+                options={typeSummaries.map((typeSummary) => ({
+                  value: typeSummary.dict_type,
+                  label: typeSummary.dict_type_label,
+                  subtitle: `${typeSummary.dict_type} · ${typeSummary.count}`,
+                }))}
                 onValueChange={(value) => setSelectedType(value)}
                 disabled={loadingTypes || typeSummaries.length === 0}
-              >
-                <SelectTrigger className="h-10 w-full bg-background">
-                  <SelectValue
-                    placeholder={
-                      loadingTypes ? t("dictionaryLoading") : t("dictionaryTypePlaceholder")
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {typeSummaries.length === 0 ? (
-                    <SelectItem value="__empty__" disabled>
-                      {t("dictionaryTypeEmpty")}
-                    </SelectItem>
-                  ) : (
-                    typeSummaries.map((typeSummary) => (
-                      <SelectItem key={typeSummary.dict_type} value={typeSummary.dict_type}>
-                        {typeSummary.dict_type_label} ({typeSummary.dict_type}) · {typeSummary.count}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                placeholder={
+                  loadingTypes
+                    ? t("dictionaryLoading")
+                    : t("dictionaryTypePlaceholder")
+                }
+                emptyText={t("dictionaryTypeEmpty")}
+                clearSearchOnClose
+                clearSearchOnSelect
+                inputClassName="h-10 bg-background"
+              />
             </div>
 
             <div className="space-y-2">
               <Label>{t("dictionarySortLabel")}</Label>
               <Select
                 value={sortMode}
-                onValueChange={(value) => setSortMode(value as DictionarySortMode)}
+                onValueChange={(value) =>
+                  setSortMode(value as DictionarySortMode)
+                }
               >
                 <SelectTrigger className="h-10 w-full bg-background">
                   <SelectValue placeholder={t("dictionarySortPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sort_order_asc">{t("dictionarySortOrderAsc")}</SelectItem>
-                  <SelectItem value="sort_order_desc">{t("dictionarySortOrderDesc")}</SelectItem>
-                  <SelectItem value="updated_at_desc">{t("dictionarySortUpdatedDesc")}</SelectItem>
-                  <SelectItem value="updated_at_asc">{t("dictionarySortUpdatedAsc")}</SelectItem>
-                  <SelectItem value="dict_key_asc">{t("dictionarySortKeyAsc")}</SelectItem>
-                  <SelectItem value="dict_key_desc">{t("dictionarySortKeyDesc")}</SelectItem>
+                  <SelectItem value="sort_order_asc">
+                    {t("dictionarySortOrderAsc")}
+                  </SelectItem>
+                  <SelectItem value="sort_order_desc">
+                    {t("dictionarySortOrderDesc")}
+                  </SelectItem>
+                  <SelectItem value="updated_at_desc">
+                    {t("dictionarySortUpdatedDesc")}
+                  </SelectItem>
+                  <SelectItem value="updated_at_asc">
+                    {t("dictionarySortUpdatedAsc")}
+                  </SelectItem>
+                  <SelectItem value="dict_key_asc">
+                    {t("dictionarySortKeyAsc")}
+                  </SelectItem>
+                  <SelectItem value="dict_key_desc">
+                    {t("dictionarySortKeyDesc")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -629,7 +695,9 @@ export default function SystemDictionaryEntriesPage() {
             <div className="space-y-2">
               <Label>{t("dictionaryEnabledOnlyShort")}</Label>
               <div className="flex h-10 w-full items-center justify-between rounded-md border bg-background px-3">
-                <p className="text-sm text-muted-foreground">{t("dictionaryEnabledOnlyShort")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("dictionaryEnabledOnlyShort")}
+                </p>
                 <Switch
                   checked={enabledOnly}
                   onCheckedChange={setEnabledOnly}
@@ -686,21 +754,29 @@ export default function SystemDictionaryEntriesPage() {
                 <TableHead>{t("dictionaryTableColStatus")}</TableHead>
                 <TableHead>{t("dictionaryTableColSystem")}</TableHead>
                 <TableHead>{t("dictionaryTableColUpdatedAt")}</TableHead>
-                <TableHead className="text-right">{t("dictionaryTableColActions")}</TableHead>
+                <TableHead className="text-right">
+                  {t("dictionaryTableColActions")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isInitialLoading || loadingItems ? (
                 Array.from({ length: 4 }).map((_, index) => (
                   <TableRow key={index}>
-                    <TableCell colSpan={8} className="h-14 text-muted-foreground">
+                    <TableCell
+                      colSpan={8}
+                      className="h-14 text-muted-foreground"
+                    >
                       {t("dictionaryLoading")}
                     </TableCell>
                   </TableRow>
                 ))
               ) : filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-36 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={8}
+                    className="h-36 text-center text-muted-foreground"
+                  >
                     <div className="space-y-1">
                       <p>{t("dictionaryEmpty")}</p>
                       <p className="text-xs">{t("dictionaryEmptyHint")}</p>
@@ -713,33 +789,45 @@ export default function SystemDictionaryEntriesPage() {
                     <TableCell>
                       <div className="space-y-1">
                         <p className="font-medium">{item.dict_key}</p>
-                        <p className="font-mono text-xs text-muted-foreground">{item.id}</p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {item.id}
+                        </p>
                       </div>
                     </TableCell>
                     <TableCell>{item.dict_label}</TableCell>
-                    <TableCell className="max-w-[240px] truncate">{item.dict_value || "-"}</TableCell>
+                    <TableCell className="max-w-[240px] truncate">
+                      {item.dict_value || "-"}
+                    </TableCell>
                     <TableCell>{item.sort_order}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={item.enabled}
-                          onCheckedChange={(checked) => handleToggleItemEnabled(item, checked)}
+                          onCheckedChange={(checked) =>
+                            handleToggleItemEnabled(item, checked)
+                          }
                           disabled={togglingEnabledId === item.id}
                         />
                         <Badge variant={item.enabled ? "secondary" : "outline"}>
                           {togglingEnabledId === item.id ? (
                             <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                           ) : null}
-                          {item.enabled ? t("dictionaryStatusEnabled") : t("dictionaryStatusDisabled")}
+                          {item.enabled
+                            ? t("dictionaryStatusEnabled")
+                            : t("dictionaryStatusDisabled")}
                         </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={item.is_system ? "secondary" : "outline"}>
-                        {item.is_system ? t("dictionarySystemBuiltIn") : t("dictionarySystemCustom")}
+                        {item.is_system
+                          ? t("dictionarySystemBuiltIn")
+                          : t("dictionarySystemCustom")}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDateTime(item.updated_at, locale)}</TableCell>
+                    <TableCell>
+                      {formatDateTime(item.updated_at, locale)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button
@@ -779,23 +867,27 @@ export default function SystemDictionaryEntriesPage() {
       <Dialog
         open={isCreateDialogOpen}
         onOpenChange={(open) => {
-          setIsCreateDialogOpen(open)
+          setIsCreateDialogOpen(open);
 
           if (!open) {
-            setCreateForm(getInitialDictionaryForm(selectedType))
+            setCreateForm(getInitialDictionaryForm(selectedType));
           }
         }}
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t("dictionaryCreateDialogTitle")}</DialogTitle>
-            <DialogDescription>{t("dictionaryCreateDialogDescription")}</DialogDescription>
+            <DialogDescription>
+              {t("dictionaryCreateDialogDescription")}
+            </DialogDescription>
           </DialogHeader>
 
           <form className="space-y-4" onSubmit={handleCreateDictionary}>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="dictionary-create-type">{t("dictionaryFieldType")}</Label>
+                <Label htmlFor="dictionary-create-type">
+                  {t("dictionaryFieldType")}
+                </Label>
                 <Select
                   value={createForm.dictType || undefined}
                   onValueChange={(value) =>
@@ -816,8 +908,12 @@ export default function SystemDictionaryEntriesPage() {
                       </SelectItem>
                     ) : (
                       typeSummaries.map((typeSummary) => (
-                        <SelectItem key={typeSummary.dict_type} value={typeSummary.dict_type}>
-                          {typeSummary.dict_type_label} ({typeSummary.dict_type})
+                        <SelectItem
+                          key={typeSummary.dict_type}
+                          value={typeSummary.dict_type}
+                        >
+                          {typeSummary.dict_type_label} ({typeSummary.dict_type}
+                          )
                         </SelectItem>
                       ))
                     )}
@@ -826,7 +922,9 @@ export default function SystemDictionaryEntriesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="dictionary-create-key">{t("dictionaryFieldKey")}</Label>
+                <Label htmlFor="dictionary-create-key">
+                  {t("dictionaryFieldKey")}
+                </Label>
                 <Input
                   id="dictionary-create-key"
                   value={createForm.dictKey}
@@ -859,8 +957,12 @@ export default function SystemDictionaryEntriesPage() {
                 {t("dictionaryDialogCancel")}
               </Button>
               <Button type="submit" disabled={createSubmitting}>
-                {createSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {createSubmitting ? t("dictionaryDialogCreating") : t("dictionaryDialogCreateSubmit")}
+                {createSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {createSubmitting
+                  ? t("dictionaryDialogCreating")
+                  : t("dictionaryDialogCreateSubmit")}
               </Button>
             </DialogFooter>
           </form>
@@ -870,10 +972,10 @@ export default function SystemDictionaryEntriesPage() {
       <Dialog
         open={isEditDialogOpen}
         onOpenChange={(open) => {
-          setIsEditDialogOpen(open)
+          setIsEditDialogOpen(open);
 
           if (!open) {
-            setEditingItem(null)
+            setEditingItem(null);
           }
         }}
       >
@@ -881,7 +983,9 @@ export default function SystemDictionaryEntriesPage() {
           <DialogHeader>
             <DialogTitle>{t("dictionaryEditDialogTitle")}</DialogTitle>
             <DialogDescription>
-              {t("dictionaryEditDialogDescription", { key: editingItem?.dict_key || "-" })}
+              {t("dictionaryEditDialogDescription", {
+                key: editingItem?.dict_key || "-",
+              })}
             </DialogDescription>
           </DialogHeader>
 
@@ -889,7 +993,11 @@ export default function SystemDictionaryEntriesPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>{t("dictionaryFieldType")}</Label>
-                <Input value={editForm.dictType} readOnly className="bg-muted" />
+                <Input
+                  value={editForm.dictType}
+                  readOnly
+                  className="bg-muted"
+                />
               </div>
               <div className="space-y-2">
                 <Label>{t("dictionaryFieldKey")}</Label>
@@ -914,8 +1022,12 @@ export default function SystemDictionaryEntriesPage() {
                 {t("dictionaryDialogCancel")}
               </Button>
               <Button type="submit" disabled={editSubmitting}>
-                {editSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {editSubmitting ? t("dictionaryDialogUpdating") : t("dictionaryDialogUpdateSubmit")}
+                {editSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {editSubmitting
+                  ? t("dictionaryDialogUpdating")
+                  : t("dictionaryDialogUpdateSubmit")}
               </Button>
             </DialogFooter>
           </form>
@@ -926,15 +1038,19 @@ export default function SystemDictionaryEntriesPage() {
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!open) {
-            setDeleteTarget(null)
+            setDeleteTarget(null);
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("dictionaryDeleteDialogTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("dictionaryDeleteDialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("dictionaryDeleteDialogDescription", { key: deleteTarget?.dict_key || "-" })}
+              {t("dictionaryDeleteDialogDescription", {
+                key: deleteTarget?.dict_key || "-",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -946,12 +1062,14 @@ export default function SystemDictionaryEntriesPage() {
               disabled={Boolean(deletingId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deletingId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {deletingId ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
               {t("dictionaryDeleteDialogConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }
