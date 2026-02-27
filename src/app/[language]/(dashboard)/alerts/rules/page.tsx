@@ -1,15 +1,16 @@
-"use client"
+"use client";
 
-import { useAppTranslations } from "@/hooks/use-app-translations"
-import { useAlertRulesActions } from "@/hooks/use-alert-rules-actions"
-import { useAlertRulesData } from "@/hooks/use-alert-rules-data"
-import { useAlertRulesDialogState } from "@/hooks/use-alert-rules-dialog-state"
-import { api } from "@/lib/api"
-import { AlertRuleDeleteDialog } from "@/components/alerts/AlertRuleDeleteDialog"
-import { AlertRuleFormFields } from "@/components/alerts/AlertRuleFormFields"
-import { AlertRulesPageHeader } from "@/components/alerts/AlertRulesHeader"
-import { AlertRulesTable } from "@/components/alerts/AlertRulesTable"
-import { Button } from "@/components/ui/button"
+import { useMemo } from "react";
+import { useAppTranslations } from "@/hooks/use-app-translations";
+import { useAlertRulesActions } from "@/hooks/use-alert-rules-actions";
+import { useAlertRulesData } from "@/hooks/use-alert-rules-data";
+import { useAlertRulesDialogState } from "@/hooks/use-alert-rules-dialog-state";
+import { api } from "@/lib/api";
+import { AlertRuleDeleteDialog } from "@/components/alerts/AlertRuleDeleteDialog";
+import { AlertRuleFormFields } from "@/components/alerts/AlertRuleFormFields";
+import { AlertRulesPageHeader } from "@/components/alerts/AlertRulesHeader";
+import { AlertRulesTable } from "@/components/alerts/AlertRulesTable";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -17,23 +18,27 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Loader2 } from "lucide-react"
-import { toast, toastApiError } from "@/lib/toast"
+} from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
+import { toast, toastApiError } from "@/lib/toast";
+
+function normalizeMetricKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
 export default function AlertRulesPage() {
-  const { t } = useAppTranslations("alerts")
+  const { t } = useAppTranslations("alerts");
 
   const {
     rules,
     loading,
     refreshing,
-    metricNames,
+    metricOptions,
     loadingMetrics,
     allowManualInput,
     fetchRules,
     fetchMetricNames,
-  } = useAlertRulesData({ t })
+  } = useAlertRulesData({ t });
 
   const {
     isDialogOpen,
@@ -49,24 +54,30 @@ export default function AlertRulesPage() {
     openDeleteDialog,
     closeDeleteDialog,
     handleDeleteDialogOpenChange,
-  } = useAlertRulesDialogState()
+  } = useAlertRulesDialogState();
 
   const handleOpenCreateDialog = () => {
-    openCreateDialog()
-    fetchMetricNames()
-  }
+    openCreateDialog();
+    fetchMetricNames();
+  };
 
   const handleOpenEditDialog = async (ruleId: string) => {
     try {
-      const detail = await api.getAlertRule(ruleId)
-      openEditDialog(detail)
-      fetchMetricNames()
+      const detail = await api.getAlertRule(ruleId);
+      openEditDialog(detail);
+      fetchMetricNames();
     } catch (error) {
-      toastApiError(error, t("rules.toastFetchError"))
+      toastApiError(error, t("rules.toastFetchError"));
     }
-  }
+  };
 
-  const { submitting, deleting, handleSubmit, handleConfirmDelete, handleToggleEnabled } = useAlertRulesActions({
+  const {
+    submitting,
+    deleting,
+    handleSubmit,
+    handleConfirmDelete,
+    handleToggleEnabled,
+  } = useAlertRulesActions({
     t,
     fetchRules,
     editingRuleId,
@@ -74,7 +85,17 @@ export default function AlertRulesPage() {
     onCloseDialog: closeDialog,
     deletingRuleId,
     onDeleteDone: closeDeleteDialog,
-  })
+  });
+
+  const metricLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    metricOptions.forEach((item) => {
+      if (!item.value) return;
+      map[item.value] = item.label || item.value;
+      map[normalizeMetricKey(item.value)] = item.label || item.value;
+    });
+    return map;
+  }, [metricOptions]);
 
   return (
     <div className="space-y-6">
@@ -88,6 +109,7 @@ export default function AlertRulesPage() {
       <AlertRulesTable
         loading={loading}
         rules={rules}
+        metricLabelMap={metricLabelMap}
         onToggleEnabled={handleToggleEnabled}
         onEditRule={(rule) => handleOpenEditDialog(rule.id)}
         onDeleteRule={openDeleteDialog}
@@ -97,23 +119,31 @@ export default function AlertRulesPage() {
         <DialogContent className="bg-white border border-gray-200 sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900">
-              {editingRuleId ? t("rules.dialogEditTitle") : t("rules.dialogCreateTitle")}
+              {editingRuleId
+                ? t("rules.dialogEditTitle")
+                : t("rules.dialogCreateTitle")}
             </DialogTitle>
             <DialogDescription className="text-base text-gray-600">
-              {editingRuleId ? t("rules.dialogEditDesc") : t("rules.dialogCreateDesc")}
+              {editingRuleId
+                ? t("rules.dialogEditDesc")
+                : t("rules.dialogCreateDesc")}
             </DialogDescription>
           </DialogHeader>
 
           <AlertRuleFormFields
             ruleForm={ruleForm}
-            metricNames={metricNames}
+            metricOptions={metricOptions}
             loadingMetrics={loadingMetrics}
             allowManualInput={allowManualInput}
             onRuleFormChange={(next) => setRuleForm(next)}
           />
 
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialog} disabled={submitting}>
+            <Button
+              variant="outline"
+              onClick={closeDialog}
+              disabled={submitting}
+            >
               {t("rules.btnCancel")}
             </Button>
             <Button onClick={handleSubmit} disabled={submitting}>
@@ -133,5 +163,5 @@ export default function AlertRulesPage() {
         onConfirmDelete={handleConfirmDelete}
       />
     </div>
-  )
+  );
 }

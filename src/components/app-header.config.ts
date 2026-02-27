@@ -2,22 +2,22 @@ import {
   DEFAULT_APP_LOCALE,
   stripLocalePrefix,
   type AppLocale,
-} from "@/components/app-locale"
+} from "@/components/app-locale";
 import {
   createScopedTranslator,
   type HeaderDescriptionKey,
   type NavigationLabelKey,
-} from "@/components/app-messages"
+} from "@/components/app-messages";
 
 export type AppHeaderMeta = {
-  title?: string
-  description?: string
-}
+  title?: string;
+  description?: string;
+};
 
 type AppHeaderMetaKeyConfig = {
-  titleKey?: NavigationLabelKey
-  descriptionKey?: HeaderDescriptionKey
-}
+  titleKey?: NavigationLabelKey;
+  descriptionKey?: HeaderDescriptionKey;
+};
 
 const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
   "/": {
@@ -104,11 +104,11 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "itemProfile",
     descriptionKey: "profileDescription",
   },
-}
+};
 
 const headerMetaByPrefix: Array<{
-  prefix: string
-  meta: AppHeaderMetaKeyConfig
+  prefix: string;
+  meta: AppHeaderMetaKeyConfig;
 }> = [
   {
     prefix: "/alerts/",
@@ -145,49 +145,53 @@ const headerMetaByPrefix: Array<{
       descriptionKey: "aiReportsDescription",
     },
   },
-]
+];
 
 function resolveAppHeaderMeta(
   meta: AppHeaderMetaKeyConfig,
-  locale: AppLocale
+  locale: AppLocale,
 ): AppHeaderMeta | undefined {
-  const translateNavigation = createScopedTranslator(locale, "navigation")
-  const translateHeader = createScopedTranslator(locale, "header")
+  const translateNavigation = createScopedTranslator(locale, "navigation");
+  const translateHeader = createScopedTranslator(locale, "header");
 
-  const title = meta.titleKey ? translateNavigation(`labels.${meta.titleKey}`) : undefined
+  const title = meta.titleKey
+    ? translateNavigation(`labels.${meta.titleKey}`)
+    : undefined;
   const description = meta.descriptionKey
     ? translateHeader(`descriptions.${meta.descriptionKey}`)
-    : undefined
+    : undefined;
 
   if (!title && !description) {
-    return undefined
+    return undefined;
   }
 
   return {
     title,
     description,
-  }
+  };
 }
 
 export function getAppHeaderMeta(
   pathname: string,
-  locale: AppLocale = DEFAULT_APP_LOCALE
+  locale: AppLocale = DEFAULT_APP_LOCALE,
 ): AppHeaderMeta | undefined {
-  const normalizedPathname = stripLocalePrefix(pathname)
-  const exactMeta = headerMetaByExactPath[normalizedPathname]
+  const normalizedPathname = stripLocalePrefix(pathname);
+  const exactMeta = headerMetaByExactPath[normalizedPathname];
 
   if (exactMeta) {
-    return resolveAppHeaderMeta(exactMeta, locale)
+    return resolveAppHeaderMeta(exactMeta, locale);
   }
 
   const prefixMeta = headerMetaByPrefix.find((entry) =>
-    normalizedPathname.startsWith(entry.prefix)
-  )
+    normalizedPathname.startsWith(entry.prefix),
+  );
 
-  return prefixMeta ? resolveAppHeaderMeta(prefixMeta.meta, locale) : undefined
+  return prefixMeta ? resolveAppHeaderMeta(prefixMeta.meta, locale) : undefined;
 }
 
-export function getDefaultAppHeaderTitle(locale: AppLocale = DEFAULT_APP_LOCALE) {
-  const translateNavigation = createScopedTranslator(locale, "navigation")
-  return translateNavigation("labels.itemDashboard")
+export function getDefaultAppHeaderTitle(
+  locale: AppLocale = DEFAULT_APP_LOCALE,
+) {
+  const translateNavigation = createScopedTranslator(locale, "navigation");
+  return translateNavigation("labels.itemDashboard");
 }

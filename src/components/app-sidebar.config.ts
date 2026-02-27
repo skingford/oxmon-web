@@ -11,120 +11,141 @@ import {
   Cloud,
   User,
   type LucideIcon,
-} from "lucide-react"
-import { DEFAULT_APP_LOCALE, type AppLocale } from "@/components/app-locale"
+} from "lucide-react";
+import { DEFAULT_APP_LOCALE, type AppLocale } from "@/components/app-locale";
 import {
   createScopedTranslator,
   type NavigationLabelKey,
-} from "@/components/app-messages"
+} from "@/components/app-messages";
 
-type SidebarPath = string
+type SidebarPath = string;
 
-type NavigationTranslate = (path: `labels.${NavigationLabelKey}`) => string
+type NavigationTranslate = (path: `labels.${NavigationLabelKey}`) => string;
 
 export type SidebarChildItem = {
-  title: string
-  url: SidebarPath
-  exact?: boolean
-  apiPaths?: string[]
-}
+  title: string;
+  url: SidebarPath;
+  exact?: boolean;
+  apiPaths?: string[];
+};
 
 export type SidebarItem = {
-  title: string
-  url: SidebarPath
-  icon: LucideIcon
-  exact?: boolean
-  apiPaths?: string[]
-  children?: SidebarChildItem[]
-}
+  title: string;
+  url: SidebarPath;
+  icon: LucideIcon;
+  exact?: boolean;
+  apiPaths?: string[];
+  children?: SidebarChildItem[];
+};
 
 export type SidebarGroupConfig = {
-  label: string
-  items: SidebarItem[]
-}
+  label: string;
+  items: SidebarItem[];
+};
 
 type SidebarChildItemConfig = Omit<SidebarChildItem, "title" | "apiPaths"> & {
-  titleKey: NavigationLabelKey
-}
+  titleKey: NavigationLabelKey;
+};
 
-type SidebarItemConfig = Omit<SidebarItem, "title" | "apiPaths" | "children"> & {
-  titleKey: NavigationLabelKey
-  children?: SidebarChildItemConfig[]
-}
+type SidebarItemConfig = Omit<
+  SidebarItem,
+  "title" | "apiPaths" | "children"
+> & {
+  titleKey: NavigationLabelKey;
+  children?: SidebarChildItemConfig[];
+};
 
 type SidebarGroupConfigBase = {
-  labelKey: NavigationLabelKey
-  items: SidebarItemConfig[]
-}
+  labelKey: NavigationLabelKey;
+  items: SidebarItemConfig[];
+};
 
 function isApiPathSupported(requiredPath: string, supportedPaths: Set<string>) {
   if (supportedPaths.has(requiredPath)) {
-    return true
+    return true;
   }
 
-  const pathPrefix = `${requiredPath}/`
+  const pathPrefix = `${requiredPath}/`;
 
   for (const path of supportedPaths) {
     if (path.startsWith(pathPrefix)) {
-      return true
+      return true;
     }
   }
 
-  return false
+  return false;
 }
 
-function hasSupportedApiPaths(apiPaths: string[] | undefined, supportedPaths?: Set<string>) {
-  if (!supportedPaths || supportedPaths.size === 0 || !apiPaths || apiPaths.length === 0) {
-    return true
+function hasSupportedApiPaths(
+  apiPaths: string[] | undefined,
+  supportedPaths?: Set<string>,
+) {
+  if (
+    !supportedPaths ||
+    supportedPaths.size === 0 ||
+    !apiPaths ||
+    apiPaths.length === 0
+  ) {
+    return true;
   }
 
-  return apiPaths.some((path) => isApiPathSupported(path, supportedPaths))
+  return apiPaths.some((path) => isApiPathSupported(path, supportedPaths));
 }
 
-function resolveSidebarLabel(labelKey: NavigationLabelKey, translate: NavigationTranslate) {
-  return translate(`labels.${labelKey}`)
+function resolveSidebarLabel(
+  labelKey: NavigationLabelKey,
+  translate: NavigationTranslate,
+) {
+  return translate(`labels.${labelKey}`);
 }
 
 export function filterSidebarItemsByApiPaths(
   items: SidebarItem[],
-  supportedPaths?: Set<string>
+  supportedPaths?: Set<string>,
 ): SidebarItem[] {
-  return items.filter((item) => hasSupportedApiPaths(item.apiPaths, supportedPaths))
+  return items.filter((item) =>
+    hasSupportedApiPaths(item.apiPaths, supportedPaths),
+  );
 }
 
 export function filterSidebarGroupsByApiPaths(
   groups: SidebarGroupConfig[],
-  supportedPaths?: Set<string>
+  supportedPaths?: Set<string>,
 ): SidebarGroupConfig[] {
   return groups
     .map((group) => {
       const items = group.items
         .map((item) => {
           if (!item.children || item.children.length === 0) {
-            return hasSupportedApiPaths(item.apiPaths, supportedPaths) ? item : null
+            return hasSupportedApiPaths(item.apiPaths, supportedPaths)
+              ? item
+              : null;
           }
 
           const children = item.children.filter((child) =>
-            hasSupportedApiPaths(child.apiPaths, supportedPaths)
-          )
+            hasSupportedApiPaths(child.apiPaths, supportedPaths),
+          );
 
-          if (!hasSupportedApiPaths(item.apiPaths, supportedPaths) && children.length === 0) {
-            return null
+          if (
+            !hasSupportedApiPaths(item.apiPaths, supportedPaths) &&
+            children.length === 0
+          ) {
+            return null;
           }
 
           return {
             ...item,
             children,
-          }
+          };
         })
-        .filter((item): item is SidebarItem => item !== null)
+        .filter((item): item is SidebarItem => item !== null);
 
       return {
         ...group,
         items,
-      }
+      };
     })
-    .filter((group) => group.items.length > 0)
+    .filter((group) => group.items.length > 0);
 }
 
 export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
@@ -149,7 +170,7 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/ai/reports/": ["/v1/ai/reports"],
   "/system": ["/v1/system/config"],
   "/system/dictionaries": ["/v1/dictionaries"],
-}
+};
 
 const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
   {
@@ -307,7 +328,7 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
       },
     ],
   },
-]
+];
 
 const sidebarFooterItemsBase: SidebarItemConfig[] = [
   {
@@ -316,41 +337,52 @@ const sidebarFooterItemsBase: SidebarItemConfig[] = [
     icon: User,
     exact: true,
   },
-]
+];
 
 function withApiPathsForChild(
   item: SidebarChildItemConfig,
-  translate: NavigationTranslate
+  translate: NavigationTranslate,
 ): SidebarChildItem {
   return {
     ...item,
     title: resolveSidebarLabel(item.titleKey, translate),
     apiPaths: sidebarApiPathMap[item.url],
-  }
+  };
 }
 
-function withApiPathsForItem(item: SidebarItemConfig, translate: NavigationTranslate): SidebarItem {
+function withApiPathsForItem(
+  item: SidebarItemConfig,
+  translate: NavigationTranslate,
+): SidebarItem {
   return {
     ...item,
     title: resolveSidebarLabel(item.titleKey, translate),
     apiPaths: sidebarApiPathMap[item.url],
-    children: item.children?.map((child) => withApiPathsForChild(child, translate)),
-  }
+    children: item.children?.map((child) =>
+      withApiPathsForChild(child, translate),
+    ),
+  };
 }
 
-export function getSidebarMenuGroups(locale: AppLocale = DEFAULT_APP_LOCALE): SidebarGroupConfig[] {
-  const translate = createScopedTranslator(locale, "navigation")
+export function getSidebarMenuGroups(
+  locale: AppLocale = DEFAULT_APP_LOCALE,
+): SidebarGroupConfig[] {
+  const translate = createScopedTranslator(locale, "navigation");
 
   return sidebarMenuGroupsBase.map((group) => ({
     label: resolveSidebarLabel(group.labelKey, translate),
     items: group.items.map((item) => withApiPathsForItem(item, translate)),
-  }))
+  }));
 }
 
-export function getSidebarFooterItems(locale: AppLocale = DEFAULT_APP_LOCALE): SidebarItem[] {
-  const translate = createScopedTranslator(locale, "navigation")
-  return sidebarFooterItemsBase.map((item) => withApiPathsForItem(item, translate))
+export function getSidebarFooterItems(
+  locale: AppLocale = DEFAULT_APP_LOCALE,
+): SidebarItem[] {
+  const translate = createScopedTranslator(locale, "navigation");
+  return sidebarFooterItemsBase.map((item) =>
+    withApiPathsForItem(item, translate),
+  );
 }
 
-export const sidebarMenuGroups: SidebarGroupConfig[] = getSidebarMenuGroups()
-export const sidebarFooterItems: SidebarItem[] = getSidebarFooterItems()
+export const sidebarMenuGroups: SidebarGroupConfig[] = getSidebarMenuGroups();
+export const sidebarFooterItems: SidebarItem[] = getSidebarFooterItems();

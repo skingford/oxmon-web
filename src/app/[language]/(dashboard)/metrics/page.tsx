@@ -1,73 +1,120 @@
-"use client"
+"use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Area, AreaChart, Brush, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { Activity, ArrowDown, ArrowUp, ArrowUpDown, Filter, Loader2 } from "lucide-react"
-import { api } from "@/lib/api"
-import { MetricDataPointResponse, MetricSummaryResponse } from "@/types/api"
-import { useRequestState } from "@/hooks/use-request-state"
-import { useAppTranslations } from "@/hooks/use-app-translations"
-import { useClientPagination } from "@/hooks/use-client-pagination"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { MetricsQueryToolbar, MetricsTimeRange } from "@/components/metrics/MetricsQueryToolbar"
-import { Button } from "@/components/ui/button"
-import { TablePaginationControls } from "@/components/ui/table-pagination-controls"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast, toastActionSuccess, toastApiError, toastCopied } from "@/lib/toast"
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  Area,
+  AreaChart,
+  Brush,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Filter,
+  Loader2,
+} from "lucide-react";
+import { api } from "@/lib/api";
+import { MetricDataPointResponse, MetricSummaryResponse } from "@/types/api";
+import { useRequestState } from "@/hooks/use-request-state";
+import { useAppTranslations } from "@/hooks/use-app-translations";
+import { useClientPagination } from "@/hooks/use-client-pagination";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  MetricsQueryToolbar,
+  MetricsTimeRange,
+} from "@/components/metrics/MetricsQueryToolbar";
+import { Button } from "@/components/ui/button";
+import { TablePaginationControls } from "@/components/ui/table-pagination-controls";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  toast,
+  toastActionSuccess,
+  toastApiError,
+  toastCopied,
+} from "@/lib/toast";
 
-type TimeRange = MetricsTimeRange
-type TablePageSize = "20" | "50" | "100"
-type SortField = "timestamp" | "value"
-type SortDirection = "asc" | "desc"
+type TimeRange = MetricsTimeRange;
+type TablePageSize = "20" | "50" | "100";
+type SortField = "timestamp" | "value";
+type SortDirection = "asc" | "desc";
 
 interface TimeBounds {
-  from?: string
-  to?: string
+  from?: string;
+  to?: string;
 }
 
 interface MetricFilterOptionsData {
-  agents: string[]
-  metricNames: string[]
-  metricNameLabelMap: Record<string, string>
+  agents: string[];
+  metricNames: string[];
+  metricNameLabelMap: Record<string, string>;
 }
 
 interface MetricQueryResultData {
-  dataPoints: MetricDataPointResponse[]
-  summary: MetricSummaryResponse | null
+  dataPoints: MetricDataPointResponse[];
+  summary: MetricSummaryResponse | null;
 }
 
 function matchLabelFilter(labels: Record<string, string>, rawFilter: string) {
-  const filterText = rawFilter.trim().toLowerCase()
+  const filterText = rawFilter.trim().toLowerCase();
 
   if (!filterText) {
-    return true
+    return true;
   }
 
-  const separatorIndex = filterText.indexOf(":")
+  const separatorIndex = filterText.indexOf(":");
 
   if (separatorIndex >= 0) {
-    const keyFilter = filterText.slice(0, separatorIndex).trim()
-    const valueFilter = filterText.slice(separatorIndex + 1).trim()
+    const keyFilter = filterText.slice(0, separatorIndex).trim();
+    const valueFilter = filterText.slice(separatorIndex + 1).trim();
 
     return Object.entries(labels).some(([key, value]) => {
-      const keyMatch = !keyFilter || key.toLowerCase().includes(keyFilter)
-      const valueMatch = !valueFilter || value.toLowerCase().includes(valueFilter)
-      return keyMatch && valueMatch
-    })
+      const keyMatch = !keyFilter || key.toLowerCase().includes(keyFilter);
+      const valueMatch =
+        !valueFilter || value.toLowerCase().includes(valueFilter);
+      return keyMatch && valueMatch;
+    });
   }
 
   return Object.entries(labels).some(([key, value]) => {
-    const keyText = key.toLowerCase()
-    const valueText = value.toLowerCase()
-    return keyText.includes(filterText) || valueText.includes(filterText)
-  })
+    const keyText = key.toLowerCase();
+    const valueText = value.toLowerCase();
+    return keyText.includes(filterText) || valueText.includes(filterText);
+  });
 }
 
 function isTimeRange(value: string | null): value is TimeRange {
-  return value === "15m" || value === "30m" || value === "1h" || value === "6h" || value === "24h" || value === "7d" || value === "all" || value === "custom"
+  return (
+    value === "15m" ||
+    value === "30m" ||
+    value === "1h" ||
+    value === "6h" ||
+    value === "24h" ||
+    value === "7d" ||
+    value === "all" ||
+    value === "custom"
+  );
 }
 
 type MetricUnitKind =
@@ -79,181 +126,202 @@ type MetricUnitKind =
   | "seconds"
   | "temperature_c"
   | "count"
-  | "plain"
+  | "plain";
 
 function detectMetricUnit(metricName?: string): MetricUnitKind {
-  const name = (metricName || "").toLowerCase()
+  const name = (metricName || "").toLowerCase();
 
-  if (!name) return "plain"
-  if (/(percent|_pct|\.pct|cpu\.usage|memory\.usage|disk\.usage)/.test(name)) return "percent"
-  if (/(iops)/.test(name)) return "iops"
-  if (/(latency|duration)(_ms|\.ms)?|response_time_ms|_ms$|\.ms$/.test(name)) return "ms"
-  if (/(uptime|duration)(_secs|_seconds)?|_secs$|_seconds$|\.seconds$/.test(name)) return "seconds"
-  if (/(temp|temperature)/.test(name)) return "temperature_c"
-  if (/(bytes_per_sec|bytes\/s|network\.(bytes_recv|bytes_sent)|network_(in|out)_bytes)/.test(name)) return "bytes_per_sec"
-  if (/(bytes|_bytes|memory_used|disk_used|mem_used)/.test(name)) return "bytes"
-  if (/(connections|count|total|qps|rps|tps)/.test(name)) return "count"
+  if (!name) return "plain";
+  if (/(percent|_pct|\.pct|cpu\.usage|memory\.usage|disk\.usage)/.test(name))
+    return "percent";
+  if (/(iops)/.test(name)) return "iops";
+  if (/(latency|duration)(_ms|\.ms)?|response_time_ms|_ms$|\.ms$/.test(name))
+    return "ms";
+  if (
+    /(uptime|duration)(_secs|_seconds)?|_secs$|_seconds$|\.seconds$/.test(name)
+  )
+    return "seconds";
+  if (/(temp|temperature)/.test(name)) return "temperature_c";
+  if (
+    /(bytes_per_sec|bytes\/s|network\.(bytes_recv|bytes_sent)|network_(in|out)_bytes)/.test(
+      name,
+    )
+  )
+    return "bytes_per_sec";
+  if (/(bytes|_bytes|memory_used|disk_used|mem_used)/.test(name))
+    return "bytes";
+  if (/(connections|count|total|qps|rps|tps)/.test(name)) return "count";
 
-  return "plain"
+  return "plain";
 }
 
 function formatBinaryBytes(value: number, suffix = "") {
-  const abs = Math.abs(value)
-  if (abs === 0) return `0 B${suffix}`
-  const units = ["B", "KB", "MB", "GB", "TB", "PB"]
-  const exponent = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), units.length - 1)
-  const scaled = value / 1024 ** exponent
-  const digits = Math.abs(scaled) >= 100 ? 0 : Math.abs(scaled) >= 10 ? 1 : 2
-  return `${scaled.toLocaleString(undefined, { maximumFractionDigits: digits })} ${units[exponent]}${suffix}`
+  const abs = Math.abs(value);
+  if (abs === 0) return `0 B${suffix}`;
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const exponent = Math.min(
+    Math.floor(Math.log(abs) / Math.log(1024)),
+    units.length - 1,
+  );
+  const scaled = value / 1024 ** exponent;
+  const digits = Math.abs(scaled) >= 100 ? 0 : Math.abs(scaled) >= 10 ? 1 : 2;
+  return `${scaled.toLocaleString(undefined, { maximumFractionDigits: digits })} ${units[exponent]}${suffix}`;
 }
 
 function formatMetricValue(value: number, metricName?: string) {
   if (Number.isNaN(value)) {
-    return "-"
+    return "-";
   }
 
-  const unit = detectMetricUnit(metricName)
+  const unit = detectMetricUnit(metricName);
 
   if (unit === "percent") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
   }
 
   if (unit === "bytes") {
-    return formatBinaryBytes(value)
+    return formatBinaryBytes(value);
   }
 
   if (unit === "bytes_per_sec") {
-    return formatBinaryBytes(value, "/s")
+    return formatBinaryBytes(value, "/s");
   }
 
   if (unit === "iops") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} IOPS`
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} IOPS`;
   }
 
   if (unit === "ms") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ms`
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ms`;
   }
 
   if (unit === "seconds") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} s`
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} s`;
   }
 
   if (unit === "temperature_c") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} °C`
+    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} °C`;
   }
 
   if (unit === "count") {
-    return value.toLocaleString(undefined, { maximumFractionDigits: 0 })
+    return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
   }
 
   if (Math.abs(value) >= 1000) {
-    return value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
   }
 
-  return value.toLocaleString(undefined, { maximumFractionDigits: 4 })
+  return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
 function normalizeMetricName(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "")
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function buildMetricNameLabelMap(items: Array<{ dict_key: string; dict_label: string }>) {
-  const map: Record<string, string> = {}
+function buildMetricNameLabelMap(
+  items: Array<{ dict_key: string; dict_label: string }>,
+) {
+  const map: Record<string, string> = {};
   items.forEach((item) => {
-    const key = item.dict_key?.trim()
-    const label = item.dict_label?.trim()
+    const key = item.dict_key?.trim();
+    const label = item.dict_label?.trim();
     if (!key || !label) {
-      return
+      return;
     }
-    map[key] = label
-    map[normalizeMetricName(key)] = label
-  })
-  return map
+    map[key] = label;
+    map[normalizeMetricName(key)] = label;
+  });
+  return map;
 }
 
-function getMetricDisplayName(metricName: string, nameLabelMap: Record<string, string>) {
-  const exact = nameLabelMap[metricName]
+function getMetricDisplayName(
+  metricName: string,
+  nameLabelMap: Record<string, string>,
+) {
+  const exact = nameLabelMap[metricName];
   if (exact) {
-    return exact
+    return exact;
   }
 
-  const normalized = nameLabelMap[normalizeMetricName(metricName)]
+  const normalized = nameLabelMap[normalizeMetricName(metricName)];
   if (normalized) {
-    return normalized
+    return normalized;
   }
 
-  return metricName
+  return metricName;
 }
 
 function toIsoDateTime(value?: string) {
   if (!value) {
-    return undefined
+    return undefined;
   }
 
-  const date = new Date(value)
+  const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return undefined
+    return undefined;
   }
 
-  return date.toISOString()
+  return date.toISOString();
 }
 
-function getTimeBounds(range: TimeRange, customFrom?: string, customTo?: string): TimeBounds {
+function getTimeBounds(
+  range: TimeRange,
+  customFrom?: string,
+  customTo?: string,
+): TimeBounds {
   if (range === "all") {
-    return {}
+    return {};
   }
 
   if (range === "custom") {
     return {
       from: toIsoDateTime(customFrom),
       to: toIsoDateTime(customTo),
-    }
+    };
   }
 
-  const now = new Date()
-  const from = new Date(now)
+  const now = new Date();
+  const from = new Date(now);
 
-  if (range === "15m") from.setMinutes(from.getMinutes() - 15)
-  if (range === "30m") from.setMinutes(from.getMinutes() - 30)
-  if (range === "1h") from.setHours(from.getHours() - 1)
-  if (range === "6h") from.setHours(from.getHours() - 6)
-  if (range === "24h") from.setHours(from.getHours() - 24)
-  if (range === "7d") from.setDate(from.getDate() - 7)
+  if (range === "15m") from.setMinutes(from.getMinutes() - 15);
+  if (range === "30m") from.setMinutes(from.getMinutes() - 30);
+  if (range === "1h") from.setHours(from.getHours() - 1);
+  if (range === "6h") from.setHours(from.getHours() - 6);
+  if (range === "24h") from.setHours(from.getHours() - 24);
+  if (range === "7d") from.setDate(from.getDate() - 7);
 
   return {
     from: from.toISOString(),
     to: now.toISOString(),
-  }
+  };
 }
 
 function toCsvCell(value: unknown) {
-  const text = value === null || value === undefined ? "" : String(value)
+  const text = value === null || value === undefined ? "" : String(value);
 
   if (/[",\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
+    return `"${text.replace(/"/g, '""')}"`;
   }
 
-  return text
+  return text;
 }
 
 function MetricsPageContent() {
-  const { t } = useAppTranslations("pages")
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const { t } = useAppTranslations("pages");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const {
     data: filterOptions,
     loading: fetchingOptions,
     execute: executeFilterOptions,
-  } = useRequestState<MetricFilterOptionsData>(
-    {
-      agents: [],
-      metricNames: [],
-      metricNameLabelMap: {},
-    }
-  )
+  } = useRequestState<MetricFilterOptionsData>({
+    agents: [],
+    metricNames: [],
+    metricNameLabelMap: {},
+  });
 
   const {
     data: metricQueryResult,
@@ -266,87 +334,122 @@ function MetricsPageContent() {
     },
     {
       initialLoading: false,
-    }
-  )
+    },
+  );
 
-  const agents = filterOptions.agents
-  const metricNames = filterOptions.metricNames
-  const metricNameLabelMap = filterOptions.metricNameLabelMap
-  const dataPoints = metricQueryResult.dataPoints
-  const summary = metricQueryResult.summary
+  const agents = filterOptions.agents;
+  const metricNames = filterOptions.metricNames;
+  const metricNameLabelMap = filterOptions.metricNameLabelMap;
+  const dataPoints = metricQueryResult.dataPoints;
+  const summary = metricQueryResult.summary;
 
-  const [selectedAgent, setSelectedAgent] = useState(searchParams.get("agent_id") || "")
-  const [selectedMetric, setSelectedMetric] = useState(searchParams.get("metric_name") || "")
-  const [labelFilter, setLabelFilter] = useState(searchParams.get("label") || "")
+  const [selectedAgent, setSelectedAgent] = useState(
+    searchParams.get("agent_id") || "",
+  );
+  const [agentSearchKeyword, setAgentSearchKeyword] = useState("");
+  const [debouncedAgentSearchKeyword, setDebouncedAgentSearchKeyword] =
+    useState("");
+  const [selectedMetric, setSelectedMetric] = useState(
+    searchParams.get("metric_name") || "",
+  );
+  const [labelFilter, setLabelFilter] = useState(
+    searchParams.get("label") || "",
+  );
   const [timeRange, setTimeRange] = useState<TimeRange>(() => {
-    const rangeParam = searchParams.get("range")
+    const rangeParam = searchParams.get("range");
 
     if (isTimeRange(rangeParam)) {
-      return rangeParam
+      return rangeParam;
     }
 
     if (searchParams.get("from") || searchParams.get("to")) {
-      return "custom"
+      return "custom";
     }
 
-    return "24h"
-  })
-  const [customFrom, setCustomFrom] = useState(searchParams.get("from") || "")
-  const [customTo, setCustomTo] = useState(searchParams.get("to") || "")
+    return "24h";
+  });
+  const [customFrom, setCustomFrom] = useState(searchParams.get("from") || "");
+  const [customTo, setCustomTo] = useState(searchParams.get("to") || "");
 
-  const [autoQuery, setAutoQuery] = useState(true)
-  const [agentScopedMetricNames, setAgentScopedMetricNames] = useState<string[] | null>(null)
-  const [loadingAgentScopedMetricNames, setLoadingAgentScopedMetricNames] = useState(false)
+  const [autoQuery, setAutoQuery] = useState(true);
+  const [agentScopedMetricNames, setAgentScopedMetricNames] = useState<
+    string[] | null
+  >(null);
+  const [loadingAgentScopedMetricNames, setLoadingAgentScopedMetricNames] =
+    useState(false);
 
-  const [tablePageSize, setTablePageSize] = useState<TablePageSize>("20")
-  const [sortField, setSortField] = useState<SortField>("timestamp")
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
+  const [tablePageSize, setTablePageSize] = useState<TablePageSize>("20");
+  const [sortField, setSortField] = useState<SortField>("timestamp");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-  const hasCustomRange = timeRange !== "custom" || (Boolean(customFrom) && Boolean(customTo))
-  const hasQueryCondition = Boolean(selectedAgent && selectedMetric && hasCustomRange)
+  const hasCustomRange =
+    timeRange !== "custom" || (Boolean(customFrom) && Boolean(customTo));
+  const hasQueryCondition = Boolean(
+    selectedAgent && selectedMetric && hasCustomRange,
+  );
 
-  const effectiveMetricNames = agentScopedMetricNames ?? metricNames
+  const effectiveMetricNames = agentScopedMetricNames ?? metricNames;
 
   const handleCopyQueryLink = async () => {
     if (typeof window === "undefined") {
-      return
+      return;
     }
 
     try {
-      await navigator.clipboard.writeText(window.location.href)
-      toastCopied(t("metrics.toastCopyLinkSuccess"))
+      await navigator.clipboard.writeText(window.location.href);
+      toastCopied(t("metrics.toastCopyLinkSuccess"));
     } catch {
-      toast.error(t("metrics.toastCopyLinkError"))
+      toast.error(t("metrics.toastCopyLinkError"));
     }
-  }
+  };
 
   const handleResetFilters = () => {
-    setSelectedAgent(agents[0] || "")
-    setSelectedMetric(metricNames[0] || "")
-    setLabelFilter("")
-    setTimeRange("24h")
-    setCustomFrom("")
-    setCustomTo("")
-    toastActionSuccess(t("metrics.toastResetFiltersSuccess"))
-  }
+    setAgentSearchKeyword("");
+    setSelectedAgent(agents[0] || "");
+    setSelectedMetric(metricNames[0] || "");
+    setLabelFilter("");
+    setTimeRange("24h");
+    setCustomFrom("");
+    setCustomTo("");
+    toastActionSuccess(t("metrics.toastResetFiltersSuccess"));
+  };
 
   const handleTableSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
-      return
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
     }
 
-    setSortField(field)
-    setSortDirection("desc")
-  }
+    setSortField(field);
+    setSortDirection("desc");
+  };
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      setDebouncedAgentSearchKeyword(agentSearchKeyword.trim());
+    }, 320);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [agentSearchKeyword]);
 
   const handleExportCsv = () => {
     if (filteredDataPoints.length === 0) {
-      toast.error(t("metrics.toastNoDataToExport"))
-      return
+      toast.error(t("metrics.toastNoDataToExport"));
+      return;
     }
 
-    const headers = ["id", "timestamp", "created_at", "agent_id", "metric_name", "metric_label", "value", "labels"]
+    const headers = [
+      "id",
+      "timestamp",
+      "created_at",
+      "agent_id",
+      "metric_name",
+      "metric_label",
+      "value",
+      "labels",
+    ];
     const rows = filteredDataPoints.map((point) => [
       point.id,
       point.timestamp,
@@ -356,39 +459,41 @@ function MetricsPageContent() {
       getMetricDisplayName(point.metric_name, metricNameLabelMap),
       point.value,
       JSON.stringify(point.labels || {}),
-    ])
+    ]);
 
     const csvContent = [
       headers.join(","),
       ...rows.map((row) => row.map((cell) => toCsvCell(cell)).join(",")),
-    ].join("\n")
+    ].join("\n");
 
-    const csvWithBom = `\ufeff${csvContent}`
-    const blob = new Blob([csvWithBom], { type: "text/csv;charset=utf-8;" })
-    const downloadUrl = URL.createObjectURL(blob)
-    const safeAgent = selectedAgent || "all"
-    const safeMetric = selectedMetric || "all"
-    const filenameTime = new Date().toISOString().replace(/[.:]/g, "-")
-    const filename = `metrics-${safeAgent}-${safeMetric}-${filenameTime}.csv`
-    const link = document.createElement("a")
+    const csvWithBom = `\ufeff${csvContent}`;
+    const blob = new Blob([csvWithBom], { type: "text/csv;charset=utf-8;" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const safeAgent = selectedAgent || "all";
+    const safeMetric = selectedMetric || "all";
+    const filenameTime = new Date().toISOString().replace(/[.:]/g, "-");
+    const filename = `metrics-${safeAgent}-${safeMetric}-${filenameTime}.csv`;
+    const link = document.createElement("a");
 
-    link.href = downloadUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(downloadUrl)
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
 
-    toast.success(t("metrics.toastExportCsvSuccess", { count: filteredDataPoints.length }))
-  }
+    toast.success(
+      t("metrics.toastExportCsvSuccess", { count: filteredDataPoints.length }),
+    );
+  };
 
   const handleExportJson = () => {
     if (filteredDataPoints.length === 0) {
-      toast.error(t("metrics.toastNoDataToExport"))
-      return
+      toast.error(t("metrics.toastNoDataToExport"));
+      return;
     }
 
-    const bounds = getTimeBounds(timeRange, customFrom, customTo)
+    const bounds = getTimeBounds(timeRange, customFrom, customTo);
     const exportPayload = {
       query: {
         agent_id: selectedAgent,
@@ -402,51 +507,55 @@ function MetricsPageContent() {
       count: filteredDataPoints.length,
       points: filteredDataPoints,
       exported_at: new Date().toISOString(),
-    }
+    };
 
-    const jsonContent = JSON.stringify(exportPayload, null, 2)
-    const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" })
-    const downloadUrl = URL.createObjectURL(blob)
-    const safeAgent = selectedAgent || "all"
-    const safeMetric = selectedMetric || "all"
-    const filenameTime = new Date().toISOString().replace(/[.:]/g, "-")
-    const filename = `metrics-${safeAgent}-${safeMetric}-${filenameTime}.json`
-    const link = document.createElement("a")
+    const jsonContent = JSON.stringify(exportPayload, null, 2);
+    const blob = new Blob([jsonContent], {
+      type: "application/json;charset=utf-8;",
+    });
+    const downloadUrl = URL.createObjectURL(blob);
+    const safeAgent = selectedAgent || "all";
+    const safeMetric = selectedMetric || "all";
+    const filenameTime = new Date().toISOString().replace(/[.:]/g, "-");
+    const filename = `metrics-${safeAgent}-${safeMetric}-${filenameTime}.json`;
+    const link = document.createElement("a");
 
-    link.href = downloadUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(downloadUrl)
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
 
-    toast.success(t("metrics.toastExportJsonSuccess", { count: filteredDataPoints.length }))
-  }
+    toast.success(
+      t("metrics.toastExportJsonSuccess", { count: filteredDataPoints.length }),
+    );
+  };
 
   const queryMetrics = async (showToast = false) => {
     if (!selectedAgent || !selectedMetric) {
-      return
+      return;
     }
 
     if (timeRange === "custom") {
       if (!customFrom || !customTo) {
         if (showToast) {
-          toast.error(t("metrics.toastMissingCustomRange"))
+          toast.error(t("metrics.toastMissingCustomRange"));
         }
-        return
+        return;
       }
 
       if (new Date(customFrom).getTime() > new Date(customTo).getTime()) {
         if (showToast) {
-          toast.error(t("metrics.toastInvalidCustomRange"))
+          toast.error(t("metrics.toastInvalidCustomRange"));
         }
-        return
+        return;
       }
     }
 
     await executeMetricQuery(
       async () => {
-        const bounds = getTimeBounds(timeRange, customFrom, customTo)
+        const bounds = getTimeBounds(timeRange, customFrom, customTo);
 
         const [points, stats] = await Promise.all([
           api.queryAllMetrics({
@@ -463,166 +572,210 @@ function MetricsPageContent() {
             timestamp__gte: bounds.from,
             timestamp__lte: bounds.to,
           }),
-        ])
+        ]);
 
         const sortedPoints = [...points].sort((a, b) => {
-          const aTime = new Date(a.timestamp).getTime()
-          const bTime = new Date(b.timestamp).getTime()
-          return aTime - bTime
-        })
+          const aTime = new Date(a.timestamp).getTime();
+          const bTime = new Date(b.timestamp).getTime();
+          return aTime - bTime;
+        });
 
         return {
           dataPoints: sortedPoints,
           summary: stats,
-        }
+        };
       },
       {
         onSuccess: (result) => {
           if (showToast) {
-            toast.success(t("metrics.toastMetricsLoaded", { count: result.dataPoints.length }))
+            toast.success(
+              t("metrics.toastMetricsLoaded", {
+                count: result.dataPoints.length,
+              }),
+            );
           }
         },
         onError: (error) => {
-          toastApiError(error, t("metrics.toastMetricsFetchError"))
+          toastApiError(error, t("metrics.toastMetricsFetchError"));
         },
-      }
-    )
-  }
+      },
+    );
+  };
 
   useEffect(() => {
     if (timeRange === "custom") {
       if (!customFrom || !customTo) {
-        return
+        return;
       }
 
-      const fromTime = new Date(customFrom).getTime()
-      const toTime = new Date(customTo).getTime()
+      const fromTime = new Date(customFrom).getTime();
+      const toTime = new Date(customTo).getTime();
 
       if (Number.isNaN(fromTime) || Number.isNaN(toTime) || fromTime > toTime) {
-        return
+        return;
       }
     }
 
     const loadFilterOptions = async () => {
       await executeFilterOptions(
         async () => {
-          const bounds = getTimeBounds(timeRange, customFrom, customTo)
-          const [agentList, metricList] = await Promise.all([
-            api.getMetricAgents({
+          const bounds = getTimeBounds(timeRange, customFrom, customTo);
+          const [sourceList, metricList] = await Promise.all([
+            api.getMetricSources({
               timestamp__gte: bounds.from,
               timestamp__lte: bounds.to,
+              query__contains: debouncedAgentSearchKeyword || undefined,
+              limit: 200,
+              offset: 0,
             }),
             api.getMetricNames({
               timestamp__gte: bounds.from,
               timestamp__lte: bounds.to,
             }),
-          ])
-          let metricLabelItems: Array<{ dict_key: string; dict_label: string }> = []
+          ]);
+          let metricLabelItems: Array<{
+            dict_key: string;
+            dict_label: string;
+          }> = [];
 
           try {
-            metricLabelItems = await api.listDictionariesByType("metric_name", true)
+            metricLabelItems = await api.listDictionariesByType(
+              "metric_name",
+              true,
+            );
           } catch {
-            metricLabelItems = []
+            metricLabelItems = [];
           }
 
           return {
-            agents: agentList,
+            agents: sourceList.map((item) => item.id),
             metricNames: metricList,
             metricNameLabelMap: buildMetricNameLabelMap(metricLabelItems),
-          }
+          };
         },
         {
           onSuccess: (result) => {
             setSelectedAgent((current) => {
-              if (result.agents.length === 0) {
-                return ""
+              // 搜索模式下不自动变更选中项，避免“未点击就触发”
+              if (debouncedAgentSearchKeyword) {
+                return current;
               }
 
-              return result.agents.includes(current) ? current : result.agents[0]
-            })
+              if (result.agents.length === 0) {
+                return "";
+              }
+
+              if (current) {
+                return result.agents.includes(current)
+                  ? current
+                  : result.agents[0];
+              }
+
+              return result.agents[0];
+            });
 
             setSelectedMetric((current) => {
               if (result.metricNames.length === 0) {
-                return ""
+                return "";
               }
 
-              return result.metricNames.includes(current) ? current : result.metricNames[0]
-            })
+              return result.metricNames.includes(current)
+                ? current
+                : result.metricNames[0];
+            });
           },
           onError: (error) => {
-            toastApiError(error, t("metrics.toastFilterOptionsError"))
+            toastApiError(error, t("metrics.toastFilterOptionsError"));
           },
-        }
-      )
-    }
+        },
+      );
+    };
 
-    loadFilterOptions()
-  }, [executeFilterOptions, timeRange, customFrom, customTo])
+    loadFilterOptions();
+  }, [
+    executeFilterOptions,
+    timeRange,
+    customFrom,
+    customTo,
+    debouncedAgentSearchKeyword,
+  ]);
 
   useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams.toString())
+    const nextParams = new URLSearchParams(searchParams.toString());
 
-    if (selectedAgent) nextParams.set("agent_id", selectedAgent)
-    else nextParams.delete("agent_id")
+    if (selectedAgent) nextParams.set("agent_id", selectedAgent);
+    else nextParams.delete("agent_id");
 
-    if (selectedMetric) nextParams.set("metric_name", selectedMetric)
-    else nextParams.delete("metric_name")
+    if (selectedMetric) nextParams.set("metric_name", selectedMetric);
+    else nextParams.delete("metric_name");
 
-    if (labelFilter.trim()) nextParams.set("label", labelFilter)
-    else nextParams.delete("label")
+    if (labelFilter.trim()) nextParams.set("label", labelFilter);
+    else nextParams.delete("label");
 
-    nextParams.set("range", timeRange)
+    nextParams.set("range", timeRange);
 
     if (timeRange === "custom") {
-      if (customFrom) nextParams.set("from", customFrom)
-      else nextParams.delete("from")
+      if (customFrom) nextParams.set("from", customFrom);
+      else nextParams.delete("from");
 
-      if (customTo) nextParams.set("to", customTo)
-      else nextParams.delete("to")
+      if (customTo) nextParams.set("to", customTo);
+      else nextParams.delete("to");
     } else {
-      nextParams.delete("from")
-      nextParams.delete("to")
+      nextParams.delete("from");
+      nextParams.delete("to");
     }
 
-    const currentQuery = searchParams.toString()
-    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString();
+    const nextQuery = nextParams.toString();
 
     if (currentQuery === nextQuery) {
-      return
+      return;
     }
 
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
-  }, [pathname, router, searchParams, selectedAgent, selectedMetric, labelFilter, timeRange, customFrom, customTo])
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    });
+  }, [
+    pathname,
+    router,
+    searchParams,
+    selectedAgent,
+    selectedMetric,
+    labelFilter,
+    timeRange,
+    customFrom,
+    customTo,
+  ]);
 
   useEffect(() => {
     if (!selectedAgent) {
-      setAgentScopedMetricNames(null)
-      return
+      setAgentScopedMetricNames(null);
+      return;
     }
 
     if (timeRange === "custom") {
       if (!customFrom || !customTo) {
-        setAgentScopedMetricNames(null)
-        return
+        setAgentScopedMetricNames(null);
+        return;
       }
 
-      const fromTime = new Date(customFrom).getTime()
-      const toTime = new Date(customTo).getTime()
+      const fromTime = new Date(customFrom).getTime();
+      const toTime = new Date(customTo).getTime();
       if (Number.isNaN(fromTime) || Number.isNaN(toTime) || fromTime > toTime) {
-        setAgentScopedMetricNames(null)
-        return
+        setAgentScopedMetricNames(null);
+        return;
       }
     }
 
-    let cancelled = false
+    let cancelled = false;
 
     const loadAgentMetricNames = async () => {
-      setLoadingAgentScopedMetricNames(true)
+      setLoadingAgentScopedMetricNames(true);
       try {
-        const bounds = getTimeBounds(timeRange, customFrom, customTo)
-        const names = new Set<string>()
-        const pageSize = 500
-        let offset = 0
+        const bounds = getTimeBounds(timeRange, customFrom, customTo);
+        const names = new Set<string>();
+        const pageSize = 500;
+        let offset = 0;
 
         while (!cancelled) {
           const page = await api.queryAllMetrics({
@@ -631,117 +784,140 @@ function MetricsPageContent() {
             timestamp__lte: bounds.to,
             limit: pageSize,
             offset,
-          })
+          });
 
           page.forEach((point) => {
             if (point.metric_name) {
-              names.add(point.metric_name)
+              names.add(point.metric_name);
             }
-          })
+          });
 
           if (page.length < pageSize) {
-            break
+            break;
           }
 
-          offset += pageSize
+          offset += pageSize;
 
           // Defensive guard for very large ranges to avoid UI lockups.
           if (offset >= 20000) {
-            break
+            break;
           }
         }
 
         if (!cancelled) {
-          setAgentScopedMetricNames(Array.from(names).sort())
+          setAgentScopedMetricNames(Array.from(names).sort());
         }
       } catch {
         if (!cancelled) {
-          setAgentScopedMetricNames(null)
+          setAgentScopedMetricNames(null);
         }
       } finally {
         if (!cancelled) {
-          setLoadingAgentScopedMetricNames(false)
+          setLoadingAgentScopedMetricNames(false);
         }
       }
-    }
+    };
 
-    void loadAgentMetricNames()
+    void loadAgentMetricNames();
 
     return () => {
-      cancelled = true
-    }
-  }, [selectedAgent, timeRange, customFrom, customTo])
+      cancelled = true;
+    };
+  }, [selectedAgent, timeRange, customFrom, customTo]);
 
   useEffect(() => {
     if (effectiveMetricNames.length === 0) {
       if (selectedMetric) {
-        setSelectedMetric("")
+        setSelectedMetric("");
       }
-      return
+      return;
     }
 
     if (!effectiveMetricNames.includes(selectedMetric)) {
-      setSelectedMetric(effectiveMetricNames[0])
+      setSelectedMetric(effectiveMetricNames[0]);
     }
-  }, [effectiveMetricNames, selectedMetric])
+  }, [effectiveMetricNames, selectedMetric]);
 
   useEffect(() => {
-    if (!autoQuery || fetchingOptions || loadingAgentScopedMetricNames || !hasQueryCondition) {
-      return
+    if (
+      !autoQuery ||
+      fetchingOptions ||
+      loadingAgentScopedMetricNames ||
+      !hasQueryCondition
+    ) {
+      return;
     }
 
     const timerId = window.setTimeout(() => {
-      queryMetrics()
-    }, 300)
+      queryMetrics();
+    }, 300);
 
     return () => {
-      window.clearTimeout(timerId)
-    }
-  }, [autoQuery, fetchingOptions, loadingAgentScopedMetricNames, hasQueryCondition, selectedAgent, selectedMetric, labelFilter, timeRange, customFrom, customTo])
+      window.clearTimeout(timerId);
+    };
+  }, [
+    autoQuery,
+    fetchingOptions,
+    loadingAgentScopedMetricNames,
+    hasQueryCondition,
+    selectedAgent,
+    selectedMetric,
+    labelFilter,
+    timeRange,
+    customFrom,
+    customTo,
+  ]);
 
   const filteredDataPoints = useMemo(() => {
     if (!labelFilter.trim()) {
-      return dataPoints
+      return dataPoints;
     }
 
-    return dataPoints.filter((point) => matchLabelFilter(point.labels || {}, labelFilter))
-  }, [dataPoints, labelFilter])
+    return dataPoints.filter((point) =>
+      matchLabelFilter(point.labels || {}, labelFilter),
+    );
+  }, [dataPoints, labelFilter]);
 
   const chartData = useMemo(
     () =>
       filteredDataPoints.map((point) => {
-        const date = new Date(point.timestamp)
+        const date = new Date(point.timestamp);
         return {
           timestamp: date.toLocaleString(),
           time: date.toLocaleTimeString(),
           value: point.value,
-        }
+        };
       }),
-    [filteredDataPoints]
-  )
+    [filteredDataPoints],
+  );
 
   const sortedTableData = useMemo(() => {
-    const cloned = [...filteredDataPoints]
+    const cloned = [...filteredDataPoints];
 
     cloned.sort((left, right) => {
-      const diff = sortField === "timestamp"
-        ? new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime()
-        : left.value - right.value
+      const diff =
+        sortField === "timestamp"
+          ? new Date(left.timestamp).getTime() -
+            new Date(right.timestamp).getTime()
+          : left.value - right.value;
 
-      return sortDirection === "asc" ? diff : -diff
-    })
+      return sortDirection === "asc" ? diff : -diff;
+    });
 
-    return cloned
-  }, [filteredDataPoints, sortField, sortDirection])
+    return cloned;
+  }, [filteredDataPoints, sortField, sortDirection]);
 
-  const latestPoint = filteredDataPoints.length > 0 ? filteredDataPoints[filteredDataPoints.length - 1] : null
-  const pageSize = Number(tablePageSize)
-  const tablePaginationResetKey = `${selectedAgent}|${selectedMetric}|${labelFilter}|${timeRange}|${customFrom}|${customTo}|${tablePageSize}|${sortField}|${sortDirection}`
+  const latestPoint =
+    filteredDataPoints.length > 0
+      ? filteredDataPoints[filteredDataPoints.length - 1]
+      : null;
+  const pageSize = Number(tablePageSize);
+  const tablePaginationResetKey = `${selectedAgent}|${selectedMetric}|${labelFilter}|${timeRange}|${customFrom}|${customTo}|${tablePageSize}|${sortField}|${sortDirection}`;
   const tablePagination = useClientPagination({
     items: sortedTableData,
     pageSize,
     resetKey: tablePaginationResetKey,
-  })
+  });
 
   const queryToolbarTexts = useMemo(
     () => ({
@@ -770,30 +946,35 @@ function MetricsPageContent() {
       startTimeLabel: t("metrics.startTimeLabel"),
       endTimeLabel: t("metrics.endTimeLabel"),
     }),
-    [t]
-  )
+    [t],
+  );
 
   const metricOptions = useMemo(
     () =>
       effectiveMetricNames.map((metricName) => {
-        const displayName = getMetricDisplayName(metricName, metricNameLabelMap)
+        const displayName = getMetricDisplayName(
+          metricName,
+          metricNameLabelMap,
+        );
         return {
           value: metricName,
           label: displayName,
           subtitle: displayName === metricName ? undefined : metricName,
-        }
+        };
       }),
-    [effectiveMetricNames, metricNameLabelMap]
-  )
+    [effectiveMetricNames, metricNameLabelMap],
+  );
   const selectedMetricDisplayName = useMemo(
     () => getMetricDisplayName(selectedMetric, metricNameLabelMap),
-    [metricNameLabelMap, selectedMetric]
-  )
+    [metricNameLabelMap, selectedMetric],
+  );
 
   return (
     <div className="min-w-0 space-y-8 p-4 md:p-8">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">{t("metrics.title")}</h2>
+        <h2 className="text-3xl font-bold tracking-tight">
+          {t("metrics.title")}
+        </h2>
         <p className="text-muted-foreground">{t("metrics.description")}</p>
       </div>
 
@@ -803,12 +984,15 @@ function MetricsPageContent() {
             <Filter className="h-4 w-4" />
             {t("metrics.queryConditionsTitle")}
           </CardTitle>
-          <CardDescription>{t("metrics.queryConditionsDescription")}</CardDescription>
+          <CardDescription>
+            {t("metrics.queryConditionsDescription")}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <MetricsQueryToolbar
             texts={queryToolbarTexts}
             agents={agents}
+            agentSearchKeyword={agentSearchKeyword}
             metricOptions={metricOptions}
             selectedAgent={selectedAgent}
             selectedMetric={selectedMetric}
@@ -822,6 +1006,7 @@ function MetricsPageContent() {
             hasQueryCondition={hasQueryCondition}
             canExport={filteredDataPoints.length > 0}
             onSelectedAgentChange={setSelectedAgent}
+            onAgentSearchKeywordChange={setAgentSearchKeyword}
             onSelectedMetricChange={setSelectedMetric}
             onLabelFilterChange={setLabelFilter}
             onAutoQueryChange={setAutoQuery}
@@ -847,19 +1032,25 @@ function MetricsPageContent() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("metrics.statMin")}</CardDescription>
-            <CardTitle>{summary ? formatMetricValue(summary.min, selectedMetric) : "-"}</CardTitle>
+            <CardTitle>
+              {summary ? formatMetricValue(summary.min, selectedMetric) : "-"}
+            </CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("metrics.statAvg")}</CardDescription>
-            <CardTitle>{summary ? formatMetricValue(summary.avg, selectedMetric) : "-"}</CardTitle>
+            <CardTitle>
+              {summary ? formatMetricValue(summary.avg, selectedMetric) : "-"}
+            </CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("metrics.statMax")}</CardDescription>
-            <CardTitle>{summary ? formatMetricValue(summary.max, selectedMetric) : "-"}</CardTitle>
+            <CardTitle>
+              {summary ? formatMetricValue(summary.max, selectedMetric) : "-"}
+            </CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -897,25 +1088,54 @@ function MetricsPageContent() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between text-sm">
                     <div className="text-muted-foreground">
-                      {t("metrics.latestTime", { time: latestPoint ? new Date(latestPoint.timestamp).toLocaleString() : "-" })}
+                      {t("metrics.latestTime", {
+                        time: latestPoint
+                          ? new Date(latestPoint.timestamp).toLocaleString()
+                          : "-",
+                      })}
                     </div>
-                    <Badge variant="outline">{t("metrics.latestValue", { value: latestPoint ? formatMetricValue(latestPoint.value, selectedMetric) : "-" })}</Badge>
+                    <Badge variant="outline">
+                      {t("metrics.latestValue", {
+                        value: latestPoint
+                          ? formatMetricValue(latestPoint.value, selectedMetric)
+                          : "-",
+                      })}
+                    </Badge>
                   </div>
 
                   <div className="h-[320px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="time" tick={{ fontSize: 12 }} minTickGap={20} />
-                        <YAxis tick={{ fontSize: 12 }} width={100} tickFormatter={(value) => formatMetricValue(Number(value), selectedMetric)} />
+                        <XAxis
+                          dataKey="time"
+                          tick={{ fontSize: 12 }}
+                          minTickGap={20}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12 }}
+                          width={100}
+                          tickFormatter={(value) =>
+                            formatMetricValue(Number(value), selectedMetric)
+                          }
+                        />
                         <Tooltip
-                          formatter={(value) => formatMetricValue(Number(value), selectedMetric)}
+                          formatter={(value) =>
+                            formatMetricValue(Number(value), selectedMetric)
+                          }
                           labelFormatter={(label, payload) => {
-                            const point = payload?.[0]?.payload
-                            return point?.timestamp || label
+                            const point = payload?.[0]?.payload;
+                            return point?.timestamp || label;
                           }}
                         />
-                        <Area type="monotone" dataKey="value" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.2} strokeWidth={2} />
+                        <Area
+                          type="monotone"
+                          dataKey="value"
+                          stroke="var(--primary)"
+                          fill="var(--primary)"
+                          fillOpacity={0.2}
+                          strokeWidth={2}
+                        />
                         <Brush dataKey="time" height={22} travellerWidth={8} />
                       </AreaChart>
                     </ResponsiveContainer>
@@ -930,15 +1150,15 @@ function MetricsPageContent() {
           <Card>
             <CardHeader>
               <CardTitle>{t("metrics.rawPointsTitle")}</CardTitle>
-              <CardDescription>{t("metrics.rawPointsDescription")}</CardDescription>
+              <CardDescription>
+                {t("metrics.rawPointsDescription")}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>
-                      {t("metrics.tableColMetric")}
-                    </TableHead>
+                    <TableHead>{t("metrics.tableColMetric")}</TableHead>
                     <TableHead>
                       <button
                         type="button"
@@ -977,7 +1197,10 @@ function MetricsPageContent() {
                 <TableBody>
                   {sortedTableData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                      <TableCell
+                        colSpan={4}
+                        className="h-24 text-center text-muted-foreground"
+                      >
                         {t("metrics.tableEmpty")}
                       </TableCell>
                     </TableRow>
@@ -986,24 +1209,46 @@ function MetricsPageContent() {
                       <TableRow key={point.id || `${point.timestamp}-${index}`}>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span>{getMetricDisplayName(point.metric_name, metricNameLabelMap)}</span>
-                            {getMetricDisplayName(point.metric_name, metricNameLabelMap) !== point.metric_name ? (
-                              <span className="text-xs text-muted-foreground font-mono">{point.metric_name}</span>
+                            <span>
+                              {getMetricDisplayName(
+                                point.metric_name,
+                                metricNameLabelMap,
+                              )}
+                            </span>
+                            {getMetricDisplayName(
+                              point.metric_name,
+                              metricNameLabelMap,
+                            ) !== point.metric_name ? (
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {point.metric_name}
+                              </span>
                             ) : null}
                           </div>
                         </TableCell>
-                        <TableCell>{new Date(point.timestamp).toLocaleString()}</TableCell>
-                        <TableCell className="font-mono">{formatMetricValue(point.value, point.metric_name)}</TableCell>
+                        <TableCell>
+                          {new Date(point.timestamp).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-mono">
+                          {formatMetricValue(point.value, point.metric_name)}
+                        </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {Object.entries(point.labels || {}).length === 0 ? (
-                              <span className="text-muted-foreground text-xs">-</span>
+                              <span className="text-muted-foreground text-xs">
+                                -
+                              </span>
                             ) : (
-                              Object.entries(point.labels || {}).map(([key, value]) => (
-                                <Badge key={`${key}-${value}`} variant="secondary" className="text-xs">
-                                  {key}:{value}
-                                </Badge>
-                              ))
+                              Object.entries(point.labels || {}).map(
+                                ([key, value]) => (
+                                  <Badge
+                                    key={`${key}-${value}`}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    {key}:{value}
+                                  </Badge>
+                                ),
+                              )
                             )}
                           </div>
                         </TableCell>
@@ -1022,7 +1267,9 @@ function MetricsPageContent() {
                 })}
                 pageSize={pageSize}
                 pageSizeOptions={[20, 50, 100]}
-                onPageSizeChange={(value) => setTablePageSize(String(value) as TablePageSize)}
+                onPageSizeChange={(value) =>
+                  setTablePageSize(String(value) as TablePageSize)
+                }
                 pageSizePlaceholder={t("metrics.pageSizePlaceholder")}
                 prevLabel={t("metrics.prevPage")}
                 nextLabel={t("metrics.nextPage")}
@@ -1030,17 +1277,29 @@ function MetricsPageContent() {
                   current: tablePagination.currentPage,
                   total: tablePagination.totalPages,
                 })}
-                onPrevPage={() => tablePagination.setPage((prev) => Math.max(1, prev - 1))}
-                onNextPage={() => tablePagination.setPage((prev) => Math.min(tablePagination.totalPages, prev + 1))}
-                prevDisabled={tablePagination.currentPage <= 1 || tablePagination.totalRows === 0}
-                nextDisabled={tablePagination.currentPage >= tablePagination.totalPages || tablePagination.totalRows === 0}
+                onPrevPage={() =>
+                  tablePagination.setPage((prev) => Math.max(1, prev - 1))
+                }
+                onNextPage={() =>
+                  tablePagination.setPage((prev) =>
+                    Math.min(tablePagination.totalPages, prev + 1),
+                  )
+                }
+                prevDisabled={
+                  tablePagination.currentPage <= 1 ||
+                  tablePagination.totalRows === 0
+                }
+                nextDisabled={
+                  tablePagination.currentPage >= tablePagination.totalPages ||
+                  tablePagination.totalRows === 0
+                }
               />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
 
 function MetricsPageFallback() {
@@ -1048,7 +1307,7 @@ function MetricsPageFallback() {
     <div className="flex min-h-[40vh] items-center justify-center">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
     </div>
-  )
+  );
 }
 
 export default function MetricsPage() {
@@ -1056,5 +1315,5 @@ export default function MetricsPage() {
     <Suspense fallback={<MetricsPageFallback />}>
       <MetricsPageContent />
     </Suspense>
-  )
+  );
 }

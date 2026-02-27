@@ -202,6 +202,16 @@ export interface MetricCatalogQueryParams extends PaginationParams {
   timestamp__lte?: string;
 }
 
+export interface MetricSourceQueryParams extends PaginationParams {
+  timestamp__gte?: string;
+  timestamp__lte?: string;
+  source__eq?: "agent" | "cloud";
+  query__contains?: string;
+  provider__eq?: string;
+  region__eq?: string;
+  status__eq?: string;
+}
+
 export interface CertStatusQueryParams extends PaginationParams {
   domain__contains?: string;
   is_valid__eq?: boolean;
@@ -472,6 +482,18 @@ export interface MetricSummaryResponse {
   count: number;
   agent_id?: string;
   metric_name?: string;
+}
+
+export interface MetricSourceItemResponse {
+  id: string;
+  source: "agent" | "cloud";
+  display_name: string;
+  status: string;
+  provider?: string | null;
+  region?: string | null;
+  instance_id?: string | null;
+  account_config_key?: string | null;
+  last_seen?: string | null;
 }
 
 export interface CreateChannelRequest {
