@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import { api } from "@/lib/api"
@@ -181,6 +182,7 @@ function MetricRankingCard({
   rows,
   loading,
   emptyText,
+  axisHint,
   legendItems,
   getLevelLabel,
 }: {
@@ -188,6 +190,7 @@ function MetricRankingCard({
   rows: RankingRow[]
   loading: boolean
   emptyText: string
+  axisHint: string
   legendItems: Array<{ key: UtilizationLevel; label: string }>
   getLevelLabel: (level: UtilizationLevel) => string
 }) {
@@ -197,6 +200,7 @@ function MetricRankingCard({
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">{title}</CardTitle>
+        <p className="text-xs text-muted-foreground">{axisHint}</p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {legendItems.map((item) => (
             <span key={item.key} className="inline-flex items-center gap-1.5">
@@ -218,7 +222,7 @@ function MetricRankingCard({
         ) : rows.length === 0 ? (
           <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">{emptyText}</div>
         ) : (
-          <div className="max-h-[560px] overflow-y-auto rounded-md border px-2 py-2">
+          <div className="rounded-md border px-2 py-2">
             <div style={{ height: chartHeight }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 12, bottom: 8, left: 12 }}>
@@ -267,6 +271,7 @@ export default function CloudInstancesRankingPage() {
   const [regionFilter, setRegionFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sortOrder, setSortOrder] = useState<RankingSortOrder>("desc")
+  const [activeMetricTab, setActiveMetricTab] = useState<RankingMetricId>("memory")
   const [allInstancesSnapshot, setAllInstancesSnapshot] = useState<CloudInstanceResponse[] | null>(null)
   const [statusDictionaryOptions, setStatusDictionaryOptions] = useState<CloudInstanceStatusDictionaryOption[]>([])
   const {
@@ -440,8 +445,8 @@ export default function CloudInstancesRankingPage() {
           <CardDescription>{t("cloud.instancesRanking.filtersDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-2 flex-1 min-w-[200px]">
               <Label>{t("cloud.instances.filterProvider")}</Label>
               <Select value={providerFilter} onValueChange={setProviderFilter}>
                 <SelectTrigger>
@@ -456,7 +461,7 @@ export default function CloudInstancesRankingPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 min-w-[200px]">
               <Label>{t("cloud.instances.filterRegion")}</Label>
               <Select value={regionFilter} onValueChange={setRegionFilter}>
                 <SelectTrigger>
@@ -471,7 +476,7 @@ export default function CloudInstancesRankingPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 min-w-[200px]">
               <Label>{t("cloud.instances.filterStatus")}</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
@@ -485,10 +490,8 @@ export default function CloudInstancesRankingPage() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 flex-1 min-w-[200px]">
               <Label>{t("cloud.instancesRanking.sortLabel")}</Label>
               <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as RankingSortOrder)}>
                 <SelectTrigger>
@@ -501,8 +504,8 @@ export default function CloudInstancesRankingPage() {
               </Select>
             </div>
 
-            <div className="flex items-end md:col-span-1 md:col-start-4">
-              <Button type="button" variant="outline" className="w-full" onClick={handleResetFilters}>
+            <div className="flex-none">
+              <Button type="button" variant="outline" onClick={handleResetFilters}>
                 {t("cloud.instancesRanking.resetFiltersButton")}
               </Button>
             </div>
@@ -510,19 +513,34 @@ export default function CloudInstancesRankingPage() {
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
+      <Tabs value={activeMetricTab} onValueChange={(value) => setActiveMetricTab(value as RankingMetricId)}>
+        <TabsList className="grid h-11 w-full grid-cols-3 rounded-xl bg-muted/60 p-1">
+          {RANKING_METRICS.map((item) => (
+            <TabsTrigger
+              key={item.id}
+              value={item.id}
+              className="group rounded-lg transition-all duration-200 [&_.tab-dot]:bg-muted-foreground/40 data-[state=active]:-translate-y-0.5 data-[state=active]:border-primary/30 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-primary/20 data-[state=active]:[&_.tab-dot]:scale-110 data-[state=active]:[&_.tab-dot]:bg-primary"
+            >
+              <span className="tab-dot h-2 w-2 rounded-full transition-all duration-200" />
+              <span>{t(item.labelKey)}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
         {RANKING_METRICS.map((item) => (
-          <MetricRankingCard
-            key={item.id}
-            title={t(item.labelKey)}
-            rows={rowsByMetric[item.id]}
-            loading={loading}
-            emptyText={t("cloud.instancesRanking.chartEmpty")}
-            legendItems={legendItems}
-            getLevelLabel={getLevelLabel}
-          />
+          <TabsContent key={item.id} value={item.id} className="mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+            <MetricRankingCard
+              title={t(item.labelKey)}
+              rows={rowsByMetric[item.id]}
+              loading={loading}
+              emptyText={t("cloud.instancesRanking.chartEmpty")}
+              axisHint={t("cloud.instancesRanking.axisHint")}
+              legendItems={legendItems}
+              getLevelLabel={getLevelLabel}
+            />
+          </TabsContent>
         ))}
-      </div>
+      </Tabs>
     </div>
   )
 }

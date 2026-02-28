@@ -1411,6 +1411,7 @@
         "sortLabel": "Sort",
         "sortOptionDesc": "Highest to Lowest",
         "sortOptionAsc": "Lowest to Highest",
+        "axisHint": "X-axis: Utilization (%) · Y-axis: Instances",
         "legendNormal": "< 60% Normal",
         "legendAttention": "60% - 80% Watch",
         "legendAlert": "> 80% Alert",

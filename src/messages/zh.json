@@ -1411,6 +1411,7 @@
         "sortLabel": "排序",
         "sortOptionDesc": "指标值从高到低",
         "sortOptionAsc": "指标值从低到高",
+        "axisHint": "X 轴：使用率（%） · Y 轴：实例",
         "legendNormal": "< 60% 正常",
         "legendAttention": "60% - 80% 关注",
         "legendAlert": "> 80% 告警",
