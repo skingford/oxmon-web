@@ -130,7 +130,6 @@ export function AppSidebar({ supportedApiPaths }: AppSidebarProps) {
                           <CollapsibleTrigger asChild>
                             <SidebarMenuButton
                               isActive={false}
-                              tooltip={item.title}
                               className={childActive ? parentSelectedMarkerClass : undefined}
                             >
                               <item.icon />

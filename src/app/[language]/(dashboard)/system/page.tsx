@@ -95,6 +95,10 @@ import {
 } from "@/lib/system/system-config-form";
 import { withLocalePrefix } from "@/components/app-locale";
 import { motion } from "framer-motion";
+import { RuntimeConfigCard } from "@/components/pages/system/runtime-config-card";
+import { StorageManagementCard } from "@/components/pages/system/storage-management-card";
+import { SecuritySettingsCard } from "@/components/pages/system/security-settings-card";
+import { DictionaryQuickLinksCard } from "@/components/pages/system/dictionary-quick-links-card";
 
 type SystemConfigStatusFilter = "all" | "enabled" | "disabled";
 
@@ -528,235 +532,12 @@ export default function SystemPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Runtime Configuration */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Server className="h-5 w-5" />
-                {t("runtimeTitle")}
-              </CardTitle>
-              <CardDescription>{t("runtimeDescription")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldHttpPort")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={config?.http_port}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldGrpcPort")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={config?.grpc_port}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  {t("fieldDataDir")}
-                </Label>
-                <Input
-                  readOnly
-                  value={config?.data_dir || "N/A"}
-                  className="bg-muted font-mono"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldRetentionDays")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={config?.retention_days ?? "N/A"}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldAgentAuth")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={
-                      config?.require_agent_auth
-                        ? t("systemConfigFilterStatusEnabled")
-                        : t("systemConfigFilterStatusDisabled")
-                    }
-                    className="bg-muted"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldCertCheckEnabled")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={
-                      config?.cert_check_enabled
-                        ? t("systemConfigFilterStatusEnabled")
-                        : t("systemConfigFilterStatusDisabled")
-                    }
-                    className="bg-muted"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldCertCheckDefaultInterval")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={config?.cert_check_default_interval_secs ?? "N/A"}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldCertCheckTickSecs")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={config?.cert_check_tick_secs ?? "N/A"}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldCertCheckMaxConcurrent")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={config?.cert_check_max_concurrent ?? "N/A"}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldNotifyAggregationWindow")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={
-                      config?.notification_aggregation_window_secs ?? "N/A"
-                    }
-                    className="bg-muted font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldAlertRulesCount")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={config?.alert_rules_count ?? 0}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  {t("fieldNotificationChannelsCount")}
-                </Label>
-                <Input
-                  readOnly
-                  value={config?.notification_channels_count ?? 0}
-                  className="bg-muted font-mono"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                {/* Runtime Configuration */}
+        <RuntimeConfigCard config={config} />
 
         {/* Storage Management */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5" />
-                {t("storageTitle")}
-              </CardTitle>
-              <CardDescription>{t("storageDescription")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  {t("fieldTotalSize")}
-                </Label>
-                <Input
-                  readOnly
-                  value={
-                    storage ? formatBytes(storage.total_size_bytes) : "0 Bytes"
-                  }
-                  className="bg-muted font-mono"
-                />
-              </div>
+        <StorageManagementCard storage={storage} onCleanupClick={() => setIsCleanupDialogOpen(true)} />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldTotalPartitions")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={storage?.total_partitions || 0}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("fieldLatestPartitionDate")}
-                  </Label>
-                  <Input
-                    readOnly
-                    value={storage?.partitions?.[0]?.date || "-"}
-                    className="bg-muted font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setIsCleanupDialogOpen(true)}
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t("btnCleanup")}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -986,84 +767,11 @@ export default function SystemPage() {
           </Card>
         </motion.div>
 
-        {/* Security Settings */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="md:col-span-2"
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                {t("securityTitle")}
-              </CardTitle>
-              <CardDescription>{t("securityDescription")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-                <div>
-                  <p className="font-medium text-sm">{t("fieldPassword")}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("securityDescription")}
-                  </p>
-                </div>
-                <Button onClick={() => setIsPasswordDialogOpen(true)}>
-                  {t("btnChangePassword")}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                {/* Security Settings */}
+        <SecuritySettingsCard onChangePasswordClick={() => setIsPasswordDialogOpen(true)} />
 
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="md:col-span-2"
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookText className="h-5 w-5" />
-                {t("dictionaryQuickTitle")}
-              </CardTitle>
-              <CardDescription>
-                {t("dictionaryQuickDescription")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 md:grid-cols-2">
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-11 justify-start"
-                >
-                  <Link href={withLocalePrefix("/system/dictionaries", locale)}>
-                    <BookText className="mr-2 h-4 w-4" />
-                    {t("dictionaryQuickEntries")}
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-11 justify-start"
-                >
-                  <Link
-                    href={withLocalePrefix(
-                      "/system/dictionaries/types",
-                      locale,
-                    )}
-                  >
-                    <Tag className="mr-2 h-4 w-4" />
-                    {t("dictionaryQuickTypes")}
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Dictionary Quick Links */}
+        <DictionaryQuickLinksCard locale={locale} />
       </div>
 
       <Dialog
