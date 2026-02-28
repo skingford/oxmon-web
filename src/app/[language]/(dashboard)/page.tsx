@@ -17,6 +17,7 @@ export default function DashboardPage() {
     fetchOverview,
     onlineRate,
     cloudSummary,
+    certSummary,
     cloudEnabledAccountRate,
     uptimeText,
     storageSizeText,
@@ -45,6 +46,7 @@ export default function DashboardPage() {
           uptimeText={uptimeText}
           storageSizeText={storageSizeText}
           cloudSummary={cloudSummary}
+          certSummary={certSummary}
           cloudEnabledAccountRate={cloudEnabledAccountRate}
           alertsPath={alertsPath}
           certificatesPath={certificatesPath}

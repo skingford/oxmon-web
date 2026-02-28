@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest"
 import { useCertificateStatusQueryState } from "./use-certificate-status-query-state"
 
 function createSearchParams(query = "") {
-  return new URLSearchParams(query) as unknown as Readonly<URLSearchParams>
+  return new URLSearchParams(query) as unknown as import("next/navigation").ReadonlyURLSearchParams
 }
 
 describe("useCertificateStatusQueryState", () => {

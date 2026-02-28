@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest"
 import { useCertificateDomainsQueryState } from "./use-certificate-domains-query-state"
 
 function createSearchParams(query = "") {
-  return new URLSearchParams(query) as unknown as Readonly<URLSearchParams>
+  return new URLSearchParams(query) as unknown as import("next/navigation").ReadonlyURLSearchParams
 }
 
 describe("useCertificateDomainsQueryState", () => {

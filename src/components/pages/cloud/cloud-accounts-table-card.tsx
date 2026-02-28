@@ -120,6 +120,9 @@ export function CloudAccountsTableCard({
                     <TableCell>
                       <div className="space-y-1">
                         <div className="font-medium">{account.display_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {account.account_name}
+                        </div>
                         {account.description ? (
                           <div className="max-w-[320px] truncate text-xs text-muted-foreground">
                             {account.description}

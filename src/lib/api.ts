@@ -8,7 +8,7 @@ import {
   AlertRuleDetailResponse,
   AlertRuleResponse,
   AlertSummary,
-  ApiResponseEnvelope,
+  ApiError,
   CertStatusQueryParams,
   CertificateDetails,
   ChannelOverview,
@@ -94,9 +94,9 @@ function normalizeBaseUrl(value: string | undefined) {
   if (!value) {
     return "";
   }
-
   return value.trim().replace(/\/+$/, "");
 }
+
 const BASE_URL = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
 const OX_APP_ID = process.env.NEXT_PUBLIC_OX_APP_ID?.trim() || "";
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
@@ -143,7 +143,7 @@ function buildQueryString(
   const paramsRecord = params as Record<string, unknown>;
 
   Object.entries(paramsRecord).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
+    if (value !== undefined && value !== null && value !== "") {
       query.append(key, String(value));
     }
   });
@@ -156,11 +156,9 @@ function getApiErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiRequestError) {
     return error.message;
   }
-
   if (error instanceof Error && error.message) {
     return error.message;
   }
-
   return fallback;
 }
 
@@ -170,7 +168,6 @@ function getRequiredAppId() {
       "缺少 NEXT_PUBLIC_OX_APP_ID 配置，无法发起 API 请求",
     );
   }
-
   return OX_APP_ID;
 }
 
@@ -189,7 +186,6 @@ async function requestAllPages<T>(
     if (page.length < limit) {
       break;
     }
-
     offset += limit;
   }
 
@@ -210,118 +206,75 @@ function toPageFetchConfig(
   };
 }
 
-function toObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function toStringValue(value: unknown, fallback = "") {
-  return typeof value === "string" ? value : fallback;
-}
-
-function toNullableStringValue(value: unknown) {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  return String(value);
-}
-
-function toNumberValue(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number(value);
-
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  return fallback;
-}
-
-const LIST_KEYS = [
-  "items",
-  "agents",
-  "results",
-  "rows",
-  "list",
-  "records",
-] as const;
-
-function extractListPayload(payload: unknown): unknown[] {
+function extractListItems<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) {
-    return payload;
+    return payload as T[];
   }
 
-  const record = toObject(payload);
-
-  if (!record) {
+  const record = payload as any;
+  if (!record || typeof record !== "object") {
     return [];
   }
 
-  for (const key of LIST_KEYS) {
-    const candidate = record[key];
-
-    if (Array.isArray(candidate)) {
-      return candidate;
-    }
+  if (Array.isArray(record.items)) {
+    return record.items;
   }
 
-  const nestedData = toObject(record.data);
-
-  if (!nestedData) {
-    return [];
+  if (Array.isArray(record.data)) {
+    return record.data;
   }
 
-  for (const key of LIST_KEYS) {
-    const candidate = nestedData[key];
-
-    if (Array.isArray(candidate)) {
-      return candidate;
-    }
+  if (Array.isArray(record.data?.items)) {
+    return record.data.items;
   }
 
   return [];
 }
 
-function toStringList(payload: unknown): string[] {
-  return extractListPayload(payload).map((item) => String(item));
+type ApiResponseEnvelopeLike = {
+  err_code?: number;
+  err_msg?: string;
+  trace_id?: string;
+  data: unknown;
+};
+
+function getEnvelopePayload(payload: unknown): ApiResponseEnvelopeLike | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (!("data" in record)) {
+    return null;
+  }
+
+  const keys = Object.keys(record);
+  const envelopeKeys = new Set(["data", "err_code", "err_msg", "trace_id"]);
+  const isEnvelopeShape = keys.every((key) => envelopeKeys.has(key));
+
+  if (!isEnvelopeShape) {
+    return null;
+  }
+
+  return record as ApiResponseEnvelopeLike;
 }
 
 function normalizeListResponse<T>(
   payload: unknown,
   options: { fallbackLimit?: number; fallbackOffset?: number } = {},
 ): ListResponse<T> {
-  const items = extractListPayload(payload) as T[];
-  const record = toObject(payload);
-  const nestedData = record ? toObject(record.data) : null;
-  const source = nestedData || record;
-  const fallbackLimit = options.fallbackLimit ?? items.length;
-  const fallbackOffset = options.fallbackOffset ?? 0;
+  const record = payload as any;
+  let items: T[] = extractListItems<T>(payload);
+  let total = 0;
 
-  const total = Math.max(
-    0,
-    Math.trunc(toNumberValue(source?.total, items.length)),
-  );
-  const limit = Math.max(
-    0,
-    Math.trunc(toNumberValue(source?.limit, fallbackLimit)),
-  );
-  const offset = Math.max(
-    0,
-    Math.trunc(toNumberValue(source?.offset, fallbackOffset)),
-  );
+  if (Array.isArray(payload)) {
+    total = items.length;
+  } else if (record && typeof record === 'object') {
+    total = record.total ?? record.data?.total ?? record.data?.length ?? items.length;
+  }
+
+  const limit = options.fallbackLimit ?? items.length;
+  const offset = options.fallbackOffset ?? 0;
 
   return {
     items,
@@ -329,226 +282,6 @@ function normalizeListResponse<T>(
     limit,
     offset,
   };
-}
-
-function normalizeCertDomainsSummary(payload: unknown): CertDomainsSummary {
-  const record = toObject(payload);
-  const nestedData = record ? toObject(record.data) : null;
-  const source = nestedData || record;
-
-  const total = Math.max(
-    0,
-    Math.trunc(toNumberValue(source?.total ?? source?.total_domains, 0)),
-  );
-  const enabled = Math.max(
-    0,
-    Math.trunc(toNumberValue(source?.enabled ?? source?.enabled_domains, 0)),
-  );
-  const disabledFromPayload = Math.trunc(
-    toNumberValue(source?.disabled ?? source?.disabled_domains, Number.NaN),
-  );
-  const disabled = Number.isFinite(disabledFromPayload)
-    ? Math.max(0, disabledFromPayload)
-    : Math.max(0, total - enabled);
-
-  return {
-    total,
-    enabled,
-    disabled,
-  };
-}
-
-function normalizeCertStatusSummary(payload: unknown): CertStatusSummary {
-  const record = toObject(payload);
-  const nestedData = record ? toObject(record.data) : null;
-  const source = nestedData || record;
-
-  const total = Math.max(0, Math.trunc(toNumberValue(source?.total, 0)));
-  const healthy = Math.max(
-    0,
-    Math.trunc(toNumberValue(source?.healthy ?? source?.valid, 0)),
-  );
-  const failed = Math.max(
-    0,
-    Math.trunc(toNumberValue(source?.failed ?? source?.invalid, 0)),
-  );
-  const expiringSoon = Math.max(
-    0,
-    Math.trunc(toNumberValue(source?.expiring_soon ?? source?.expiringSoon, 0)),
-  );
-
-  return {
-    total,
-    healthy,
-    failed,
-    expiring_soon: expiringSoon,
-  };
-}
-
-function normalizeAlertEvent(value: unknown): AlertEventResponse | null {
-  const record = toObject(value);
-
-  if (!record) {
-    return null;
-  }
-
-  const id = toStringValue(record.id);
-  const ruleId = toStringValue(record.rule_id);
-  const agentId = toStringValue(record.agent_id);
-  const metricName = toStringValue(record.metric_name);
-  const severity = toStringValue(record.severity);
-  const message = toStringValue(record.message);
-  const timestamp = toStringValue(record.timestamp);
-
-  if (
-    !id ||
-    !ruleId ||
-    !agentId ||
-    !metricName ||
-    !severity ||
-    !message ||
-    !timestamp
-  ) {
-    return null;
-  }
-
-  const rawStatus = Math.trunc(toNumberValue(record.status, 1));
-  const status = [1, 2, 3].includes(rawStatus) ? rawStatus : 1;
-
-  return {
-    id,
-    rule_id: ruleId,
-    agent_id: agentId,
-    metric_name: metricName,
-    severity,
-    message,
-    value: toNumberValue(record.value, 0),
-    threshold: toNumberValue(record.threshold, 0),
-    timestamp,
-    predicted_breach: toNullableStringValue(record.predicted_breach),
-    status,
-  };
-}
-
-function normalizeSilenceWindow(value: unknown): SilenceWindow | null {
-  const record = toObject(value);
-
-  if (!record) {
-    return null;
-  }
-
-  const id = toStringValue(record.id);
-  const startTime = toStringValue(record.start_time);
-  const endTime = toStringValue(record.end_time);
-
-  if (!id || !startTime || !endTime) {
-    return null;
-  }
-
-  return {
-    id,
-    start_time: startTime,
-    end_time: endTime,
-    recurrence: toNullableStringValue(record.recurrence),
-    created_at: toNullableStringValue(record.created_at) || undefined,
-    updated_at: toNullableStringValue(record.updated_at) || undefined,
-    name: toNullableStringValue(record.name) || undefined,
-    agent_pattern: toNullableStringValue(record.agent_pattern) || undefined,
-    metric_pattern: toNullableStringValue(record.metric_pattern) || undefined,
-  };
-}
-
-function normalizeAlertRuleDetail(
-  value: unknown,
-): AlertRuleDetailResponse | null {
-  const record = toObject(value);
-
-  if (!record) {
-    return null;
-  }
-
-  const id = toStringValue(record.id);
-  const name = toStringValue(record.name);
-  const ruleType = toStringValue(record.rule_type);
-  const metric = toStringValue(record.metric);
-  const agentPattern = toStringValue(record.agent_pattern);
-  const severity = toStringValue(record.severity);
-  const source = toStringValue(record.source, "manual");
-  const createdAt = toStringValue(record.created_at);
-  const updatedAt = toStringValue(record.updated_at);
-
-  if (!id || !name || !ruleType || !metric || !agentPattern || !severity) {
-    return null;
-  }
-
-  return {
-    id,
-    name,
-    rule_type: ruleType,
-    metric,
-    agent_pattern: agentPattern,
-    severity,
-    enabled: Boolean(record.enabled),
-    config_json: toStringValue(record.config_json, "{}"),
-    silence_secs: Math.max(
-      0,
-      Math.trunc(toNumberValue(record.silence_secs, 0)),
-    ),
-    source,
-    created_at: createdAt || "",
-    updated_at: updatedAt || "",
-  };
-}
-
-function normalizeAlertRule(value: unknown): AlertRuleResponse | null {
-  const record = toObject(value);
-
-  if (!record) {
-    return null;
-  }
-
-  const id = toStringValue(record.id);
-  const name = toStringValue(record.name);
-  const ruleType = toStringValue(record.rule_type);
-  const metric = toStringValue(record.metric);
-  const agentPattern = toStringValue(record.agent_pattern);
-  const severity = toStringValue(record.severity);
-
-  if (!id || !name || !ruleType || !metric || !agentPattern || !severity) {
-    return null;
-  }
-
-  return {
-    id,
-    name,
-    rule_type: ruleType,
-    metric,
-    agent_pattern: agentPattern,
-    severity,
-    enabled: Boolean(record.enabled),
-  };
-}
-
-function resolveEnvelopeData<T>(payload: unknown, status: number): T {
-  if (!payload || typeof payload !== "object") {
-    throw new ApiRequestError("Invalid API response format", { status });
-  }
-
-  const envelope = payload as Partial<ApiResponseEnvelope<T>>;
-
-  if (typeof envelope.err_code === "number") {
-    if (envelope.err_code !== 0) {
-      throw new ApiRequestError(envelope.err_msg || "Request failed", {
-        status,
-        errCode: envelope.err_code,
-        traceId: envelope.trace_id,
-      });
-    }
-
-    return envelope.data as T;
-  }
-
-  return payload as T;
 }
 
 async function request<T>(
@@ -597,7 +330,6 @@ async function request<T>(
       if (typeof window !== "undefined") {
         clearAuthToken();
         clearGlobalConfigCache();
-
         const currentPathname = window.location.pathname;
         const locale = resolveAppLocale(currentPathname);
         const loginPath = withLocalePrefix("/login", locale);
@@ -606,7 +338,6 @@ async function request<T>(
           window.location.replace(loginPath);
         }
       }
-
       throw new ApiRequestError("认证已过期，请重新登录", { status: 401 });
     }
 
@@ -633,20 +364,18 @@ async function request<T>(
 
     if (!response.ok) {
       if (payload && typeof payload === "object") {
-        const envelope = payload as Partial<ApiResponseEnvelope<unknown>>;
+        const err = payload as ApiError;
         throw new ApiRequestError(
-          envelope.err_msg ||
-            `Request failed: ${response.status} ${response.statusText}`,
+          err.err_msg || (err as any).message || `Request failed: ${response.status} ${response.statusText}`,
           {
             status: response.status,
-            errCode: envelope.err_code,
-            traceId: envelope.trace_id,
+            errCode: err.err_code,
+            traceId: err.trace_id,
           },
         );
       }
 
       const plainTextErrorMessage = responseText.trim();
-
       if (plainTextErrorMessage) {
         throw new ApiRequestError(plainTextErrorMessage, {
           status: response.status,
@@ -665,13 +394,28 @@ async function request<T>(
       if (allowEmptyResponse) {
         return {} as T;
       }
-
       throw new ApiRequestError("Invalid API response format", {
         status: response.status,
       });
     }
 
-    return resolveEnvelopeData<T>(payload, response.status);
+    const envelope = getEnvelopePayload(payload);
+    if (envelope) {
+      if (
+        typeof envelope.err_code === "number" &&
+        envelope.err_code !== 0
+      ) {
+        throw new ApiRequestError(envelope.err_msg || "API 请求失败", {
+          status: response.status,
+          errCode: envelope.err_code,
+          traceId: envelope.trace_id,
+        });
+      }
+
+      return envelope.data as T;
+    }
+
+    return payload as T;
   };
 
   if (!dedupeKey) {
@@ -679,7 +423,6 @@ async function request<T>(
   }
 
   const existingPromise = inFlightGetRequests.get(dedupeKey);
-
   if (existingPromise) {
     return existingPromise as Promise<T>;
   }
@@ -689,7 +432,6 @@ async function request<T>(
   }) as Promise<unknown>;
 
   inFlightGetRequests.set(dedupeKey, requestPromise);
-
   return requestPromise as Promise<T>;
 }
 
@@ -715,19 +457,10 @@ export const api = {
 
   getActiveAlerts: (params: ActiveAlertQueryParams = {}) =>
     request<unknown>(`/v1/alerts/active${buildQueryString(params)}`).then(
-      (payload) => {
-        const page = normalizeListResponse<unknown>(payload, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        });
-
-        return {
-          ...page,
-          items: page.items
-            .map((item) => normalizeAlertEvent(item))
-            .filter((item): item is AlertEventResponse => Boolean(item)),
-        };
-      },
+      (payload) => normalizeListResponse<AlertEventResponse>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
     ),
 
   getAlertHistory: (
@@ -739,33 +472,14 @@ export const api = {
     } = {},
   ) =>
     request<unknown>(`/v1/alerts/history${buildQueryString(params)}`).then(
-      (payload) => {
-        const page = normalizeListResponse<unknown>(payload, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        });
-
-        return {
-          ...page,
-          items: page.items
-            .map((item) => normalizeAlertEvent(item))
-            .filter((item): item is AlertEventResponse => Boolean(item)),
-        };
-      },
+      (payload) => normalizeListResponse<AlertEventResponse>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
     ),
 
   getAlertHistoryById: (id: string) =>
-    request<unknown>(`/v1/alerts/history/${id}`).then((item) => {
-      const normalized = normalizeAlertEvent(item);
-
-      if (!normalized) {
-        throw new ApiRequestError("Invalid alert event response format", {
-          status: 200,
-        });
-      }
-
-      return normalized;
-    }),
+    request<AlertEventResponse>(`/v1/alerts/history/${id}`),
 
   acknowledgeAlert: (id: string, token?: string) =>
     request<IdResponse>(`/v1/alerts/history/${id}/acknowledge`, {
@@ -783,11 +497,7 @@ export const api = {
     if (hasExplicitPaginationParams(params)) {
       return request<unknown>(
         `/v1/alerts/rules${buildQueryString(params || {})}`,
-      ).then((items) =>
-        extractListPayload(items)
-          .map((item) => normalizeAlertRule(item))
-          .filter((item): item is AlertRuleResponse => Boolean(item)),
-      );
+      ).then((items) => (Array.isArray(items) ? items : ((items as any).items || (items as any).data || (items as any).data?.items || [])) as AlertRuleResponse[]);
     }
 
     const queryParams = {
@@ -798,25 +508,19 @@ export const api = {
       enabled__eq: params?.enabled__eq,
     };
 
-    return requestAllPages<unknown>((page) =>
+    return requestAllPages<AlertRuleResponse>((page) =>
       request<unknown>(
         `/v1/alerts/rules${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => extractListPayload(payload)),
-    ).then((items) =>
-      items
-        .map((item) => normalizeAlertRule(item))
-        .filter((item): item is AlertRuleResponse => Boolean(item)),
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as AlertRuleResponse[])
     );
   },
 
   createAlertRule: (data: CreateAlertRuleRequest) =>
     request<IdResponse>("/v1/alerts/rules", { method: "POST", body: data }),
 
-  // Dashboard
   getDashboardOverview: () =>
     request<DashboardOverview>("/v1/dashboard/overview"),
 
-  // Certificates
   getCertificates: (
     params: PaginationParams & {
       not_after__lte?: number;
@@ -825,22 +529,20 @@ export const api = {
     } = {},
   ) =>
     request<unknown>(`/v1/certificates${buildQueryString(params)}`).then(
-      (payload) =>
-        normalizeListResponse<CertificateDetails>(payload, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+      (payload) => normalizeListResponse<CertificateDetails>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
     ),
 
   getCertificate: (id: string) =>
     request<CertificateDetails>(`/v1/certificates/${id}`),
 
-  // Notifications
   listChannels: (params?: NotificationChannelQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
       return request<unknown>(
         `/v1/notifications/channels${buildQueryString(params || {})}`,
-      ).then((payload) => extractListPayload(payload) as ChannelOverview[]);
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as ChannelOverview[]);
     }
 
     const queryParams = {
@@ -853,33 +555,29 @@ export const api = {
     return requestAllPages<ChannelOverview>((page) =>
       request<unknown>(
         `/v1/notifications/channels${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => extractListPayload(payload) as ChannelOverview[]),
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as ChannelOverview[])
     );
   },
 
   getChannelById: (id: string) =>
     request<ChannelOverview>(`/v1/notifications/channels/${id}`),
 
-  // Cloud
   listCloudAccounts: (params?: CloudAccountQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
       return request<unknown>(
         `/v1/cloud/accounts${buildQueryString(params || {})}`,
-      ).then(
-        (payload) => extractListPayload(payload) as CloudAccountResponse[],
-      );
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CloudAccountResponse[]);
     }
 
     const queryParams = {
+      provider: params?.provider,
       enabled: params?.enabled,
     };
 
     return requestAllPages<CloudAccountResponse>((page) =>
       request<unknown>(
         `/v1/cloud/accounts${buildQueryString({ ...queryParams, ...page })}`,
-      ).then(
-        (payload) => extractListPayload(payload) as CloudAccountResponse[],
-      ),
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CloudAccountResponse[])
     );
   },
 
@@ -918,9 +616,7 @@ export const api = {
     if (hasExplicitPaginationParams(params)) {
       return request<unknown>(
         `/v1/cloud/instances${buildQueryString(params || {})}`,
-      ).then(
-        (payload) => extractListPayload(payload) as CloudInstanceResponse[],
-      );
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CloudInstanceResponse[]);
     }
 
     const queryParams = {
@@ -933,28 +629,24 @@ export const api = {
     return requestAllPages<CloudInstanceResponse>((page) =>
       request<unknown>(
         `/v1/cloud/instances${buildQueryString({ ...queryParams, ...page })}`,
-      ).then(
-        (payload) => extractListPayload(payload) as CloudInstanceResponse[],
-      ),
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CloudInstanceResponse[])
     );
   },
 
   listCloudInstancesPage: (params: CloudInstanceQueryParams = {}) =>
     request<unknown>(`/v1/cloud/instances${buildQueryString(params)}`).then(
-      (payload) =>
-        normalizeListResponse<CloudInstanceResponse>(payload, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+      (payload) => normalizeListResponse<CloudInstanceResponse>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
     ),
 
   getCloudInstanceDetail: (id: string) =>
     request<CloudInstanceDetailResponse>(`/v1/cloud/instances/${id}`),
 
-  // AI
   listAIAccounts: () =>
     request<unknown>("/v1/ai/accounts").then(
-      (payload) => extractListPayload(payload) as AIAccountResponse[],
+      (payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as AIAccountResponse[],
     ),
 
   getAIAccountById: (id: string) =>
@@ -980,12 +672,11 @@ export const api = {
 
   listAIReports: () =>
     request<unknown>("/v1/ai/reports").then(
-      (payload) => extractListPayload(payload) as AIReportListItem[],
+      (payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as AIReportListItem[],
     ),
 
   getAIReportById: (id: string) => request<AIReportRow>(`/v1/ai/reports/${id}`),
 
-  // System
   getSystemConfig: () => request<RuntimeConfig>("/v1/system/config"),
 
   getStorageInfo: () => request<StorageInfo>("/v1/system/storage"),
@@ -1000,9 +691,7 @@ export const api = {
     if (hasExplicitPaginationParams(params)) {
       return request<unknown>(
         `/v1/system/configs${buildQueryString(params || {})}`,
-      ).then(
-        (payload) => extractListPayload(payload) as SystemConfigResponse[],
-      );
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as SystemConfigResponse[]);
     }
 
     const queryParams = {
@@ -1014,9 +703,7 @@ export const api = {
     return requestAllPages<SystemConfigResponse>((page) =>
       request<unknown>(
         `/v1/system/configs${buildQueryString({ ...queryParams, ...page })}`,
-      ).then(
-        (payload) => extractListPayload(payload) as SystemConfigResponse[],
-      ),
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as SystemConfigResponse[])
     );
   },
 
@@ -1035,14 +722,11 @@ export const api = {
   deleteSystemConfig: (id: string) =>
     request<IdResponse>(`/v1/system/configs/${id}`, { method: "DELETE" }),
 
-  // Dictionaries
   listDictionaryTypes: (params?: DictionaryTypeQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
       return request<unknown>(
         `/v1/dictionaries/types${buildQueryString(params || {})}`,
-      ).then(
-        (payload) => extractListPayload(payload) as DictionaryTypeSummary[],
-      );
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as DictionaryTypeSummary[]);
     }
 
     const queryParams = {
@@ -1052,9 +736,7 @@ export const api = {
     return requestAllPages<DictionaryTypeSummary>((page) =>
       request<unknown>(
         `/v1/dictionaries/types${buildQueryString({ ...queryParams, ...page })}`,
-      ).then(
-        (payload) => extractListPayload(payload) as DictionaryTypeSummary[],
-      ),
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as DictionaryTypeSummary[])
     );
   },
 
@@ -1103,7 +785,7 @@ export const api = {
           label__contains: filters?.label__contains,
           ...page,
         })}`,
-      ).then((payload) => extractListPayload(payload) as DictionaryItem[]);
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as DictionaryItem[]);
 
     if (params) {
       return requestDictionaryPage({
@@ -1130,7 +812,6 @@ export const api = {
   deleteDictionary: (id: string) =>
     request<IdResponse>(`/v1/dictionaries/${id}`, { method: "DELETE" }),
 
-  // Auth - Security
   changePassword: (data: ChangePasswordRequest) =>
     request("/v1/auth/password", {
       method: "POST",
@@ -1138,13 +819,12 @@ export const api = {
       allowEmptyResponse: true,
     }),
 
-  // Certificates - Advanced
   getCertificateChain: (id: string) =>
     request<CertificateChainInfo>(`/v1/certificates/${id}/chain`),
 
   checkAllDomains: () =>
     request<unknown>("/v1/certs/check", { method: "POST" }).then(
-      (payload) => extractListPayload(payload) as CertCheckResult[],
+      (payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CertCheckResult[],
     ),
 
   listDomains: (
@@ -1154,17 +834,14 @@ export const api = {
     } = {},
   ) =>
     request<unknown>(`/v1/certs/domains${buildQueryString(params)}`).then(
-      (payload) =>
-        normalizeListResponse<CertDomain>(payload, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+      (payload) => normalizeListResponse<CertDomain>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
     ),
 
   getCertDomainsSummary: () =>
-    request<unknown>("/v1/certs/domains/summary").then((payload) =>
-      normalizeCertDomainsSummary(payload),
-    ),
+    request<CertDomainsSummary>("/v1/certs/domains/summary"),
 
   createDomain: (data: CreateDomainRequest) =>
     request<IdResponse>("/v1/certs/domains", { method: "POST", body: data }),
@@ -1173,7 +850,7 @@ export const api = {
     request<unknown>("/v1/certs/domains/batch", {
       method: "POST",
       body: data,
-    }).then((payload) => extractListPayload(payload) as IdResponse[]),
+    }).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as IdResponse[]),
 
   getDomain: (id: string) => request<CertDomain>(`/v1/certs/domains/${id}`),
 
@@ -1194,30 +871,28 @@ export const api = {
   getCertCheckHistory: (id: string, params: PaginationParams = {}) =>
     request<unknown>(
       `/v1/certs/domains/${id}/history${buildQueryString(params)}`,
-    ).then((payload) => extractListPayload(payload) as CertCheckResult[]),
+    ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CertCheckResult[]),
 
   getCertStatusAll: (params: CertStatusQueryParams = {}) =>
     request<unknown>(`/v1/certs/status${buildQueryString(params)}`).then(
-      (payload) =>
-        normalizeListResponse<CertCheckResult>(payload, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+      (payload) => normalizeListResponse<CertCheckResult>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
     ),
 
   getCertStatusSummary: (
     params: Omit<CertStatusQueryParams, "limit" | "offset"> = {},
   ) =>
-    request<unknown>(
+    request<CertStatusSummary>(
       `/v1/certs/status/summary${buildQueryString(params)}`,
-    ).then((payload) => normalizeCertStatusSummary(payload)),
+    ),
 
   getCertStatusByDomain: (domain: string) =>
     request<CertCheckResult>(`/v1/certs/status/${encodeURIComponent(domain)}`),
 
   getCertSummary: () => request<CertSummary>("/v1/certs/summary"),
 
-  // Metrics - Explorer
   queryAllMetrics: (
     params: PaginationParams & {
       agent_id__eq?: string;
@@ -1227,7 +902,7 @@ export const api = {
     } = {},
   ) =>
     request<unknown>(`/v1/metrics${buildQueryString(params)}`).then(
-      (payload) => extractListPayload(payload) as MetricDataPointResponse[],
+      (payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as MetricDataPointResponse[],
     ),
 
   getMetricAgents: (params?: MetricCatalogQueryParams) => {
@@ -1238,7 +913,7 @@ export const api = {
           timestamp__lte: params?.timestamp__lte,
           ...page,
         })}`,
-      ).then((payload) => toStringList(payload));
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as string[]);
 
     if (hasExplicitPaginationParams(params)) {
       return requestMetricAgentPage(toPageFetchConfig(params));
@@ -1262,9 +937,7 @@ export const api = {
           status__eq: params?.status__eq,
           ...page,
         })}`,
-      ).then(
-        (payload) => extractListPayload(payload) as MetricSourceItemResponse[],
-      );
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as MetricSourceItemResponse[]);
 
     if (hasExplicitPaginationParams(params)) {
       return requestMetricSourcePage(toPageFetchConfig(params));
@@ -1291,7 +964,7 @@ export const api = {
           timestamp__lte: params?.timestamp__lte,
           ...page,
         })}`,
-      ).then((payload) => toStringList(payload));
+      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as string[]);
 
     if (hasExplicitPaginationParams(params)) {
       return requestMetricNamePage(toPageFetchConfig(params));
@@ -1359,11 +1032,7 @@ export const api = {
   listSilenceWindows: (params: SilenceWindowQueryParams = {}) =>
     request<unknown>(
       `/v1/notifications/silence-windows${buildQueryString(params)}`,
-    ).then((items) =>
-      extractListPayload(items)
-        .map((item) => normalizeSilenceWindow(item))
-        .filter((item): item is SilenceWindow => Boolean(item)),
-    ),
+    ).then((items) => (Array.isArray(items) ? items : ((items as any).items || (items as any).data || (items as any).data?.items || [])) as SilenceWindow[]),
 
   getNotificationLogs: (params: NotificationLogQueryParams = {}) =>
     request<NotificationLogListResponse>(
@@ -1390,17 +1059,7 @@ export const api = {
     }),
 
   getSilenceWindowById: (id: string) =>
-    request<unknown>(`/v1/notifications/silence-windows/${id}`).then((item) => {
-      const normalized = normalizeSilenceWindow(item);
-
-      if (!normalized) {
-        throw new ApiRequestError("Invalid silence window response format", {
-          status: 200,
-        });
-      }
-
-      return normalized;
-    }),
+    request<SilenceWindow>(`/v1/notifications/silence-windows/${id}`),
 
   updateSilenceWindow: (id: string, data: UpdateSilenceWindowRequest) =>
     request<IdResponse>(`/v1/notifications/silence-windows/${id}`, {
@@ -1415,17 +1074,7 @@ export const api = {
     }),
 
   getAlertRule: (id: string) =>
-    request<unknown>(`/v1/alerts/rules/${id}`).then((result) => {
-      const normalized = normalizeAlertRuleDetail(result);
-
-      if (!normalized) {
-        throw new ApiRequestError("Invalid alert rule response format", {
-          status: 200,
-        });
-      }
-
-      return normalized;
-    }),
+    request<AlertRuleDetailResponse>(`/v1/alerts/rules/${id}`),
 
   updateAlertRule: (id: string, data: UpdateAlertRuleRequest) =>
     request<IdResponse>(`/v1/alerts/rules/${id}`, {

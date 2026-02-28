@@ -43,263 +43,19 @@ export interface AgentApiModule {
   getAgentLatestMetrics: (id: string, token?: string) => Promise<LatestMetric[]>
 }
 
-function toObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null
-  }
-
-  return value as Record<string, unknown>
-}
-
-function toNullableString(value: unknown): string | null {
-  if (typeof value === "string") {
-    return value
-  }
-
-  if (value === null || value === undefined) {
-    return null
-  }
-
-  return String(value)
-}
-
-function normalizeAgent(value: unknown): AgentResponse | null {
-  const record = toObject(value)
-
-  if (!record) {
-    return null
-  }
-
-  const agentId = toNullableString(record.agent_id)?.trim()
-  const status = toNullableString(record.status)?.trim()
-
-  if (!agentId || !status) {
-    return null
-  }
-
-  const rawInterval = record.collection_interval_secs
-  let collectionIntervalSecs: number | null | undefined
-
-  if (typeof rawInterval === "number" && Number.isFinite(rawInterval)) {
-    collectionIntervalSecs = rawInterval
-  } else if (typeof rawInterval === "string") {
-    const parsed = Number(rawInterval)
-    collectionIntervalSecs = Number.isFinite(parsed) ? parsed : null
-  } else if (rawInterval === null || rawInterval === undefined) {
-    collectionIntervalSecs = rawInterval as null | undefined
-  } else {
-    collectionIntervalSecs = null
-  }
-
-  return {
-    id: toNullableString(record.id),
-    agent_id: agentId,
-    status,
-    last_seen: toNullableString(record.last_seen),
-    created_at: toNullableString(record.created_at) || undefined,
-    collection_interval_secs: collectionIntervalSecs,
-  }
-}
-
-function normalizeAgentList(payload: unknown): AgentResponse[] {
-  if (Array.isArray(payload)) {
-    return payload
-      .map((item) => normalizeAgent(item))
-      .filter((item): item is AgentResponse => Boolean(item))
-  }
-
-  const record = toObject(payload)
-
-  if (!record) {
-    return []
-  }
-
-  const candidates = [record.items, record.agents, record.results, record.rows, record.list]
-  const source = candidates.find((value) => Array.isArray(value))
-
-  if (Array.isArray(source)) {
-    return source
-      .map((item) => normalizeAgent(item))
-      .filter((item): item is AgentResponse => Boolean(item))
-  }
-
-  const nestedData = toObject(record.data)
-
-  if (!nestedData) {
-    return []
-  }
-
-  const nestedCandidates = [
-    nestedData.items,
-    nestedData.agents,
-    nestedData.results,
-    nestedData.rows,
-    nestedData.list,
-  ]
-  const nestedSource = nestedCandidates.find((value) => Array.isArray(value))
-
-  if (!Array.isArray(nestedSource)) {
-    return []
-  }
-
-  return nestedSource
-    .map((item) => normalizeAgent(item))
-    .filter((item): item is AgentResponse => Boolean(item))
-}
-
-function toNullableNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-
-  return null
-}
-
-function normalizeWhitelistAgent(value: unknown): AgentWhitelistDetail | null {
-  const record = toObject(value)
-
-  if (!record) {
-    return null
-  }
-
-  const id = toNullableString(record.id)?.trim()
-  const agentId = toNullableString(record.agent_id)?.trim()
-
-  if (!id || !agentId) {
-    return null
-  }
-
-  return {
-    id,
-    agent_id: agentId,
-    created_at: toNullableString(record.created_at) || "",
-    updated_at: toNullableString(record.updated_at) || "",
-    description: toNullableString(record.description),
-    token: toNullableString(record.token),
-    collection_interval_secs: toNullableNumber(record.collection_interval_secs),
-    last_seen: toNullableString(record.last_seen),
-    status: toNullableString(record.status) || "unknown",
-  }
-}
-
-function normalizeWhitelistList(payload: unknown): AgentWhitelistDetail[] {
-  if (Array.isArray(payload)) {
-    return payload
-      .map((item) => normalizeWhitelistAgent(item))
-      .filter((item): item is AgentWhitelistDetail => Boolean(item))
-  }
-
-  const record = toObject(payload)
-
-  if (!record) {
-    return []
-  }
-
-  const candidates = [record.items, record.agents, record.results, record.rows, record.list]
-  const source = candidates.find((value) => Array.isArray(value))
-
-  if (Array.isArray(source)) {
-    return source
-      .map((item) => normalizeWhitelistAgent(item))
-      .filter((item): item is AgentWhitelistDetail => Boolean(item))
-  }
-
-  const nestedData = toObject(record.data)
-
-  if (!nestedData) {
-    return []
-  }
-
-  const nestedCandidates = [
-    nestedData.items,
-    nestedData.agents,
-    nestedData.results,
-    nestedData.rows,
-    nestedData.list,
-  ]
-  const nestedSource = nestedCandidates.find((value) => Array.isArray(value))
-
-  if (!Array.isArray(nestedSource)) {
-    return []
-  }
-
-  return nestedSource
-    .map((item) => normalizeWhitelistAgent(item))
-    .filter((item): item is AgentWhitelistDetail => Boolean(item))
-}
-
-function normalizeListMeta(payload: unknown, fallbackLimit = 0, fallbackOffset = 0) {
-  const record = toObject(payload)
-  const nestedData = record ? toObject(record.data) : null
-  const source = nestedData || record
-
-  const total = toNullableNumber(source?.total)
-  const limit = toNullableNumber(source?.limit)
-  const offset = toNullableNumber(source?.offset)
-
-  return {
-    total: total === null ? 0 : Math.max(0, Math.trunc(total)),
-    limit: limit === null ? Math.max(0, fallbackLimit) : Math.max(0, Math.trunc(limit)),
-    offset: offset === null ? Math.max(0, fallbackOffset) : Math.max(0, Math.trunc(offset)),
-  }
-}
-
-const LIST_KEYS = ["items", "agents", "results", "rows", "list", "records"] as const
-
-function extractListPayload(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) {
-    return payload
-  }
-
-  const record = toObject(payload)
-
-  if (!record) {
-    return []
-  }
-
-  for (const key of LIST_KEYS) {
-    const candidate = record[key]
-
-    if (Array.isArray(candidate)) {
-      return candidate
-    }
-  }
-
-  const nestedData = toObject(record.data)
-
-  if (!nestedData) {
-    return []
-  }
-
-  for (const key of LIST_KEYS) {
-    const candidate = nestedData[key]
-
-    if (Array.isArray(candidate)) {
-      return candidate
-    }
-  }
-
-  return []
-}
-
 export function createAgentApiModule({ request, buildQueryString }: AgentApiModuleDeps): AgentApiModule {
   const getAgents = (params: AgentListQueryParams = {}) =>
-    request<unknown>(`/v1/agents${buildQueryString(params)}`).then((result) => {
-      const items = normalizeAgentList(result)
-      const fallbackLimit = params.limit ?? items.length
-      const fallbackOffset = params.offset ?? 0
-      const meta = normalizeListMeta(result, fallbackLimit, fallbackOffset)
-
+    request<AgentResponse[]>(`/v1/agents${buildQueryString(params)}`).then((result) => {
+      const items = Array.isArray(result)
+        ? result
+        : ((result as any).items || (result as any).data || (result as any).data?.items || []);
+      const fallbackLimit = params.limit ?? items.length;
+      const fallbackOffset = params.offset ?? 0;
       return {
         items,
-        total: meta.total || items.length,
-        limit: meta.limit || fallbackLimit,
-        offset: meta.offset || fallbackOffset,
+        total: (result as any).total ?? (result as any).data?.total ?? items.length,
+        limit: (result as any).limit ?? fallbackLimit,
+        offset: (result as any).offset ?? fallbackOffset,
       }
     })
 
@@ -320,17 +76,17 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     })
 
   const getWhitelist = (params: AgentWhitelistQueryParams = {}) =>
-    request<unknown>(`/v1/agents/whitelist${buildQueryString(params)}`).then((result) => {
-      const items = normalizeWhitelistList(result)
-      const fallbackLimit = params.limit ?? items.length
-      const fallbackOffset = params.offset ?? 0
-      const meta = normalizeListMeta(result, fallbackLimit, fallbackOffset)
-
+    request<AgentWhitelistDetail[]>(`/v1/agents/whitelist${buildQueryString(params)}`).then((result) => {
+      const items = Array.isArray(result)
+        ? result
+        : ((result as any).items || (result as any).data || (result as any).data?.items || []);
+      const fallbackLimit = params.limit ?? items.length;
+      const fallbackOffset = params.offset ?? 0;
       return {
         items,
-        total: meta.total || items.length,
-        limit: meta.limit || fallbackLimit,
-        offset: meta.offset || fallbackOffset,
+        total: (result as any).total ?? (result as any).data?.total ?? items.length,
+        limit: (result as any).limit ?? fallbackLimit,
+        offset: (result as any).offset ?? fallbackOffset,
       }
     })
 
@@ -364,8 +120,10 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     })
 
   const getAgentLatestMetrics = (id: string, token?: string) =>
-    request<unknown>(`/v1/agents/${encodeURIComponent(id)}/latest`, { token }).then((payload) =>
-      extractListPayload(payload) as LatestMetric[]
+    request<LatestMetric[]>(`/v1/agents/${encodeURIComponent(id)}/latest`, { token }).then((result) => 
+      Array.isArray(result)
+        ? result
+        : ((result as any).items || (result as any).data || (result as any).data?.items || [])
     )
 
   return {

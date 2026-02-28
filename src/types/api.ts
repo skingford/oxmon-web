@@ -236,6 +236,7 @@ export interface SystemConfigQueryParams extends PaginationParams {
 }
 
 export interface CloudAccountQueryParams extends PaginationParams {
+  provider?: string;
   enabled?: boolean;
 }
 
@@ -667,7 +668,11 @@ export interface CloudAccountResponse {
   provider: string;
   display_name: string;
   description: string | null;
-  config: unknown;
+  account_name: string;
+  secret_id: string;
+  secret_key: string;
+  regions: string[];
+  collection_interval_secs: number;
   enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -716,13 +721,21 @@ export interface CreateCloudAccountRequest {
   provider: string;
   display_name: string;
   description?: string | null;
-  config: unknown;
+  account_name: string;
+  secret_id: string;
+  secret_key: string;
+  regions: string[];
+  collection_interval_secs?: number | null;
 }
 
 export interface UpdateCloudAccountRequest {
   display_name?: string | null;
   description?: string | null;
-  config?: unknown;
+  account_name?: string | null;
+  secret_id?: string | null;
+  secret_key?: string | null;
+  regions?: string[] | null;
+  collection_interval_secs?: number | null;
   enabled?: boolean | null;
 }
 

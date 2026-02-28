@@ -16,6 +16,13 @@ const EMPTY_CLOUD_SUMMARY: DashboardOverview["cloud_summary"] = {
   unknown_instances: 0,
 }
 
+const EMPTY_CERT_SUMMARY: DashboardOverview["cert_summary"] = {
+  total_domains: 0,
+  valid: 0,
+  invalid: 0,
+  expiring_soon: 0,
+}
+
 function formatUptime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return "-"
@@ -89,6 +96,7 @@ export function useDashboardOverview() {
 
   const onlineRate = overview ? formatPercent(overview.active_agents, overview.total_agents) : 0
   const cloudSummary = overview?.cloud_summary ?? EMPTY_CLOUD_SUMMARY
+  const certSummary = overview?.cert_summary ?? EMPTY_CERT_SUMMARY
   const cloudEnabledAccountRate = formatPercent(cloudSummary.enabled_accounts, cloudSummary.total_accounts)
   const uptimeText = overview ? formatUptime(overview.uptime_secs) : "-"
   const storageSizeText = overview ? formatBytes(overview.storage_total_bytes) : "-"
@@ -128,6 +136,7 @@ export function useDashboardOverview() {
     fetchOverview,
     onlineRate,
     cloudSummary,
+    certSummary,
     cloudEnabledAccountRate,
     uptimeText,
     storageSizeText,

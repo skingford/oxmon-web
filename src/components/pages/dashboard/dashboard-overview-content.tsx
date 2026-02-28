@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import type { DashboardOverview } from "@/types/api"
+import type { DashboardOverview, CertSummary, CloudSummary } from "@/types/api"
 import { DashboardChartCardSkeleton } from "@/components/pages/dashboard/dashboard-chart-card-skeleton"
 import { DashboardQuickLinksCard } from "@/components/pages/dashboard/dashboard-quick-links-card"
 import { DashboardTopStatsCards } from "@/components/pages/dashboard/dashboard-top-stats-cards"
@@ -36,7 +36,8 @@ type DashboardOverviewContentProps = {
   severityStats: Array<[string, number]>
   uptimeText: string
   storageSizeText: string
-  cloudSummary: DashboardOverview["cloud_summary"]
+  cloudSummary: CloudSummary
+  certSummary: CertSummary
   cloudEnabledAccountRate: number
   alertsPath: string
   certificatesPath: string
@@ -52,6 +53,7 @@ export function DashboardOverviewContent({
   uptimeText,
   storageSizeText,
   cloudSummary,
+  certSummary,
   cloudEnabledAccountRate,
   alertsPath,
   certificatesPath,
@@ -74,7 +76,7 @@ export function DashboardOverviewContent({
         onMouseEnter={preloadDashboardCharts}
         onFocusCapture={preloadDashboardCharts}
       >
-        <DashboardCertSummaryChartCard certSummary={overview.cert_summary} />
+        <DashboardCertSummaryChartCard certSummary={certSummary} />
         <DashboardCloudSummaryChartCard
           cloudSummary={cloudSummary}
           cloudEnabledAccountRate={cloudEnabledAccountRate}
@@ -86,7 +88,7 @@ export function DashboardOverviewContent({
           cloudInstancesPath={cloudInstancesPath}
           systemPath={systemPath}
           alerts24h={overview.alerts_24h}
-          totalDomains={overview.cert_summary.total_domains}
+          totalDomains={certSummary.total_domains}
           enabledCloudAccounts={cloudSummary.enabled_accounts}
           runningCloudInstances={cloudSummary.running_instances}
           storageSizeText={storageSizeText}
