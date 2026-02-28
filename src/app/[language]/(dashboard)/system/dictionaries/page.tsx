@@ -839,21 +839,22 @@ export default function SystemDictionaryEntriesPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteTarget(item)}
-                          title={
-                            item.is_system
-                              ? t("dictionaryToastSystemItemUndeletable")
-                              : t("dictionaryActionDelete")
-                          }
-                          disabled={item.is_system}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {item.is_system ? (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            {t("dictionaryActionDeleteDisabled")}
+                          </Badge>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteTarget(item)}
+                            title={t("dictionaryActionDelete")}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1035,7 +1036,7 @@ export default function SystemDictionaryEntriesPage() {
       </Dialog>
 
       <AlertDialog
-        open={Boolean(deleteTarget)}
+        open={Boolean(deleteTarget) && !deleteTarget?.is_system}
         onOpenChange={(open) => {
           if (!open) {
             setDeleteTarget(null);

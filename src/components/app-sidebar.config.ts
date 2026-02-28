@@ -193,6 +193,23 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
     labelKey: "groupMonitoring",
     items: [
       {
+        titleKey: "itemCloud",
+        url: "/cloud",
+        icon: Cloud,
+        children: [
+          {
+            titleKey: "itemCloudAccounts",
+            url: "/cloud",
+            exact: true,
+          },
+          {
+            titleKey: "itemCloudInstances",
+            url: "/cloud/instances",
+            exact: true,
+          },
+        ],
+      },
+      {
         titleKey: "itemAgents",
         url: "/agents",
         icon: Server,
@@ -271,23 +288,6 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
           {
             titleKey: "itemSilenceWindows",
             url: "/notifications/silence",
-            exact: true,
-          },
-        ],
-      },
-      {
-        titleKey: "itemCloud",
-        url: "/cloud",
-        icon: Cloud,
-        children: [
-          {
-            titleKey: "itemCloudAccounts",
-            url: "/cloud",
-            exact: true,
-          },
-          {
-            titleKey: "itemCloudInstances",
-            url: "/cloud/instances",
             exact: true,
           },
         ],

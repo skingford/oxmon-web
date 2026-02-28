@@ -1,3 +1,28 @@
+import NProgress from "nprogress";
+
+if (typeof window !== "undefined") {
+  NProgress.configure({ showSpinner: false, minimum: 0.1, speed: 300 });
+}
+
+let activeRequests = 0;
+
+function startProgress() {
+  if (typeof window === "undefined") return;
+  if (activeRequests === 0) {
+    NProgress.start();
+  }
+  activeRequests++;
+}
+
+function finishProgress() {
+  if (typeof window === "undefined") return;
+  activeRequests--;
+  if (activeRequests <= 0) {
+    activeRequests = 0;
+    NProgress.done();
+  }
+}
+
 import {
   AIAccountResponse,
   AIReportListItem,
@@ -418,13 +443,15 @@ async function request<T>(
     return payload as T;
   };
 
+  startProgress();
+
   if (!dedupeKey) {
-    return executeRequest();
+    return executeRequest().finally(finishProgress);
   }
 
   const existingPromise = inFlightGetRequests.get(dedupeKey);
   if (existingPromise) {
-    return existingPromise as Promise<T>;
+    return (existingPromise as Promise<T>).finally(finishProgress);
   }
 
   const requestPromise = executeRequest().finally(() => {
@@ -432,7 +459,7 @@ async function request<T>(
   }) as Promise<unknown>;
 
   inFlightGetRequests.set(dedupeKey, requestPromise);
-  return requestPromise as Promise<T>;
+  return (requestPromise as Promise<T>).finally(finishProgress);
 }
 
 const agentApi = createAgentApiModule({

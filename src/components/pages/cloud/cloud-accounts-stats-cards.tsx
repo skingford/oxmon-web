@@ -25,25 +25,25 @@ export function CloudAccountsStatsCards({ stats, texts }: CloudAccountsStatsCard
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>{texts.total}</CardDescription>
-          <CardTitle className="text-2xl">{stats.total}</CardTitle>
+          <CardTitle className="text-3xl">{stats.total}</CardTitle>
         </CardHeader>
       </Card>
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>{texts.enabled}</CardDescription>
-          <CardTitle className="text-2xl">{stats.enabled}</CardTitle>
+          <CardTitle className="text-3xl text-emerald-600">{stats.enabled}</CardTitle>
         </CardHeader>
       </Card>
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>{texts.disabled}</CardDescription>
-          <CardTitle className="text-2xl">{stats.disabled}</CardTitle>
+          <CardTitle className="text-3xl text-red-600">{stats.disabled}</CardTitle>
         </CardHeader>
       </Card>
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>{texts.providers}</CardDescription>
-          <CardTitle className="text-2xl">{stats.providers}</CardTitle>
+          <CardTitle className="text-3xl text-amber-600">{stats.providers}</CardTitle>
         </CardHeader>
       </Card>
     </div>

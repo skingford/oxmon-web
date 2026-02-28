@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
+import { ClientOnly } from "@/components/client-only"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { GlobalConfigProvider } from "@/contexts/global-config-context"
 
@@ -11,11 +12,19 @@ export default function DashboardLayout({
   return (
     <SidebarProvider className="overflow-x-hidden">
       <GlobalConfigProvider>
-        <AppSidebar />
-        <main className="flex min-h-svh min-w-0 w-full flex-col overflow-x-hidden">
-          <AppHeader />
-          <div className="flex-1 min-w-0 overflow-x-hidden">{children}</div>
-        </main>
+        <ClientOnly
+          fallback={
+            <main className="flex min-h-svh min-w-0 w-full flex-col overflow-x-hidden">
+              <div className="flex-1 min-w-0 overflow-x-hidden">{children}</div>
+            </main>
+          }
+        >
+          <AppSidebar />
+          <main className="flex min-h-svh min-w-0 w-full flex-col overflow-x-hidden">
+            <AppHeader />
+            <div className="flex-1 min-w-0 overflow-x-hidden">{children}</div>
+          </main>
+        </ClientOnly>
       </GlobalConfigProvider>
     </SidebarProvider>
   )

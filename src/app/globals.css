@@ -1,4 +1,19 @@
 @import "tailwindcss";
+@import "nprogress/nprogress.css";
+
+#nprogress .bar {
+  background: var(--primary) !important;
+  height: 3px !important;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px var(--primary), 0 0 5px var(--primary) !important;
+}
+
+#nprogress .spinner-icon {
+  border-top-color: var(--primary) !important;
+  border-left-color: var(--primary) !important;
+}
 
 @theme {
   --font-sans: var(--font-geist-sans);
@@ -126,4 +141,57 @@
 
 .text-glow {
   text-shadow: 0 0 15px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* Toast colors */
+.toaster [data-sonner-toast] {
+  border-width: 1px;
+}
+
+.toaster [data-sonner-toast][data-type="success"] {
+  background: #ecfdf3;
+  border-color: #86efac;
+  color: #14532d;
+}
+
+.toaster [data-sonner-toast][data-type="info"] {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1e3a8a;
+}
+
+.toaster [data-sonner-toast][data-type="warning"] {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.toaster [data-sonner-toast][data-type="error"] {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.dark .toaster [data-sonner-toast][data-type="success"] {
+  background: #052e16;
+  border-color: #15803d;
+  color: #bbf7d0;
+}
+
+.dark .toaster [data-sonner-toast][data-type="info"] {
+  background: #172554;
+  border-color: #2563eb;
+  color: #bfdbfe;
+}
+
+.dark .toaster [data-sonner-toast][data-type="warning"] {
+  background: #451a03;
+  border-color: #d97706;
+  color: #fde68a;
+}
+
+.dark .toaster [data-sonner-toast][data-type="error"] {
+  background: #450a0a;
+  border-color: #dc2626;
+  color: #fecaca;
 }

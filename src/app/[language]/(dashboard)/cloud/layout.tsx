@@ -37,18 +37,18 @@ export default function CloudLayout({
       <Tabs value={currentTabValue} className="min-w-0 space-y-6">
         <div className="w-full max-w-full overflow-x-auto">
           <TabsList className="glass h-12 min-w-max bg-muted/50 p-1">
-            <Link href={withLocalePrefix("/cloud", locale)}>
-              <TabsTrigger value="/cloud" className="flex h-full items-center gap-2 px-6">
+            <TabsTrigger asChild value="/cloud" className="flex h-full items-center gap-2 px-6">
+              <Link href={withLocalePrefix("/cloud", locale)}>
                 <Database className="h-4 w-4" />
                 {t("cloud.tabsAccounts")}
-              </TabsTrigger>
-            </Link>
-            <Link href={withLocalePrefix("/cloud/instances", locale)}>
-              <TabsTrigger value="/cloud/instances" className="flex h-full items-center gap-2 px-6">
+              </Link>
+            </TabsTrigger>
+            <TabsTrigger asChild value="/cloud/instances" className="flex h-full items-center gap-2 px-6">
+              <Link href={withLocalePrefix("/cloud/instances", locale)}>
                 <Server className="h-4 w-4" />
                 {t("cloud.tabsInstances")}
-              </TabsTrigger>
-            </Link>
+              </Link>
+            </TabsTrigger>
           </TabsList>
         </div>
 

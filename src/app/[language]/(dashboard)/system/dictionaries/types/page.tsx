@@ -37,18 +37,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
-import { toast, toastApiError, toastCreated, toastDeleted, toastSaved, toastStatusError } from "@/lib/toast"
+import { Loader2, Pencil, Plus, RefreshCw } from "lucide-react"
+import { toast, toastApiError, toastCreated, toastSaved, toastStatusError } from "@/lib/toast"
 
 type DictionaryTypeSortMode =
   | "count_desc"
@@ -90,9 +80,6 @@ export default function SystemDictionaryTypesPage() {
   const [editForm, setEditForm] = useState<DictionaryTypeFormState>(() =>
     getInitialDictionaryTypeForm()
   )
-
-  const [deleteTarget, setDeleteTarget] = useState<DictionaryTypeSummary | null>(null)
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
   const handleTypeFetchError = useCallback(
     (error: unknown) => {
@@ -285,44 +272,6 @@ export default function SystemDictionaryTypesPage() {
     }
   }
 
-  const handleDeleteDictionaryType = async () => {
-    if (!deleteTarget) {
-      return
-    }
-
-    if (deleteTarget.count > 0) {
-      toast.error(t("dictionaryTypeToastDeleteConflict"))
-      return
-    }
-
-    const dictType = deleteTarget.dict_type
-
-    setDeleteSubmitting(true)
-
-    try {
-      await api.deleteDictionaryType(dictType)
-      toastDeleted(t("dictionaryTypeToastDeleteSuccess"))
-      setDeleteTarget(null)
-
-      const latestTypes = await fetchDictionaryTypes(true)
-      const targetType =
-        selectedType === dictType
-          ? latestTypes[0]?.dict_type || ""
-          : latestTypes.some((item) => item.dict_type === selectedType)
-            ? selectedType
-            : latestTypes[0]?.dict_type || ""
-
-      setSelectedType(targetType)
-    } catch (error) {
-      toastStatusError(error, t("dictionaryTypeToastDeleteError"), {
-        404: t("dictionaryTypeToastDeleteNotFound"),
-        409: t("dictionaryTypeToastDeleteConflict"),
-      })
-    } finally {
-      setDeleteSubmitting(false)
-    }
-  }
-
   return (
     <div className="space-y-6 px-8 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -411,7 +360,6 @@ export default function SystemDictionaryTypesPage() {
               ) : (
                 filteredTypeSummaries.map((typeSummary) => {
                   const isCurrent = selectedType === typeSummary.dict_type
-                  const deleteDisabled = typeSummary.count > 0
 
                   return (
                     <TableRow
@@ -425,7 +373,7 @@ export default function SystemDictionaryTypesPage() {
                       </TableCell>
                       <TableCell>{typeSummary.count}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end">
                           <Button
                             type="button"
                             variant="ghost"
@@ -437,24 +385,6 @@ export default function SystemDictionaryTypesPage() {
                             title={t("dictionaryTypeActionEdit")}
                           >
                             <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setDeleteTarget(typeSummary)
-                            }}
-                            disabled={deleteDisabled}
-                            title={
-                              deleteDisabled
-                                ? t("dictionaryTypeDeleteDisabledWithItems", { count: typeSummary.count })
-                                : t("dictionaryTypeActionDelete")
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -569,40 +499,6 @@ export default function SystemDictionaryTypesPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
-        open={Boolean(deleteTarget)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleteTarget(null)
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("dictionaryTypeDeleteDialogTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("dictionaryTypeDeleteDialogDescription", {
-                type: deleteTarget
-                  ? `${deleteTarget.dict_type_label} (${deleteTarget.dict_type})`
-                  : "-",
-              })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteSubmitting}>
-              {t("dictionaryDialogCancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteDictionaryType}
-              disabled={deleteSubmitting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleteSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t("dictionaryTypeDeleteDialogConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
