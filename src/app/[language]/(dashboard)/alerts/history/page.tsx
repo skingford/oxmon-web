@@ -31,7 +31,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 type AlertHistoryParams = {
   limit: number
@@ -309,6 +309,7 @@ export default function AlertHistoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                  <AnimatePresence mode="popLayout">
                 {loading ? (
                   <>
                     {[1, 2, 3, 4, 5].map((i) => (
@@ -360,7 +361,8 @@ export default function AlertHistoryPage() {
                     )
                   })
                 )}
-              </TableBody>
+                </AnimatePresence>
+                </TableBody>
             </Table>
           </div>
 

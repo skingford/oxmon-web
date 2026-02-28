@@ -10,6 +10,7 @@ import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
 import { withLocalePrefix } from "@/components/app-locale"
+import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -300,6 +301,7 @@ export default function AgentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                  <AnimatePresence mode="popLayout">
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={4} className="h-40 text-center text-muted-foreground">
@@ -348,7 +350,8 @@ export default function AgentsPage() {
                     )
                   })
                 )}
-              </TableBody>
+                </AnimatePresence>
+                </TableBody>
             </Table>
           </div>
 

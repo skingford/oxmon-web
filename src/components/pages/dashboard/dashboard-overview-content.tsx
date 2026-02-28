@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import { motion } from "framer-motion"
 import type { DashboardOverview, CertSummary, CloudSummary } from "@/types/api"
 import { DashboardChartCardSkeleton } from "@/components/pages/dashboard/dashboard-chart-card-skeleton"
 import { DashboardQuickLinksCard } from "@/components/pages/dashboard/dashboard-quick-links-card"
@@ -63,37 +64,60 @@ export function DashboardOverviewContent({
 }: DashboardOverviewContentProps) {
   return (
     <>
-      <DashboardTopStatsCards
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <DashboardTopStatsCards
         overview={overview}
         onlineRate={onlineRate}
         severityStats={severityStats}
         uptimeText={uptimeText}
         storageSizeText={storageSizeText}
       />
+      </motion.div>
 
-      <div
+      <motion.div
         className="grid gap-4 lg:grid-cols-3"
+        initial="hidden"
+        animate="show"
+        variants={{
+          hidden: { opacity: 0 },
+          show: {
+            opacity: 1,
+            transition: {
+              staggerChildren: 0.1
+            }
+          }
+        }}
         onMouseEnter={preloadDashboardCharts}
         onFocusCapture={preloadDashboardCharts}
       >
-        <DashboardCertSummaryChartCard certSummary={certSummary} />
-        <DashboardCloudSummaryChartCard
-          cloudSummary={cloudSummary}
-          cloudEnabledAccountRate={cloudEnabledAccountRate}
-        />
-        <DashboardQuickLinksCard
-          alertsPath={alertsPath}
-          certificatesPath={certificatesPath}
-          cloudAccountsPath={cloudAccountsPath}
-          cloudInstancesPath={cloudInstancesPath}
-          systemPath={systemPath}
-          alerts24h={overview.alerts_24h}
-          totalDomains={certSummary.total_domains}
-          enabledCloudAccounts={cloudSummary.enabled_accounts}
-          runningCloudInstances={cloudSummary.running_instances}
-          storageSizeText={storageSizeText}
-        />
-      </div>
+        <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}>
+          <DashboardCertSummaryChartCard certSummary={certSummary} />
+        </motion.div>
+        <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}>
+          <DashboardCloudSummaryChartCard
+            cloudSummary={cloudSummary}
+            cloudEnabledAccountRate={cloudEnabledAccountRate}
+          />
+        </motion.div>
+        <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}>
+          <DashboardQuickLinksCard
+            alertsPath={alertsPath}
+            certificatesPath={certificatesPath}
+            cloudAccountsPath={cloudAccountsPath}
+            cloudInstancesPath={cloudInstancesPath}
+            systemPath={systemPath}
+            alerts24h={overview.alerts_24h}
+            totalDomains={certSummary.total_domains}
+            enabledCloudAccounts={cloudSummary.enabled_accounts}
+            runningCloudInstances={cloudSummary.running_instances}
+            storageSizeText={storageSizeText}
+          />
+        </motion.div>
+      </motion.div>
     </>
   )
 }

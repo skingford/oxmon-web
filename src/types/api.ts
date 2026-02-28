@@ -247,6 +247,19 @@ export interface CloudInstanceQueryParams extends PaginationParams {
   search?: string;
 }
 
+export interface CloudInstancesChartQueryParams {
+  provider?: string;
+  region?: string;
+  status?: string;
+  metrics?: string;
+}
+
+export interface CloudInstanceMetricsQueryParams {
+  from?: string;
+  to?: string;
+  metrics?: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;
@@ -678,6 +691,18 @@ export interface CloudAccountResponse {
   updated_at: string;
 }
 
+export interface BatchCreateCloudAccountsRequest {
+  provider: string;
+  text: string;
+  collection_interval_secs?: number | null;
+}
+
+export interface BatchCreateCloudAccountsResponse {
+  created: number;
+  skipped: number;
+  errors: string[];
+}
+
 export interface CloudInstanceResponse {
   id: string;
   instance_id: string;
@@ -688,6 +713,7 @@ export interface CloudInstanceResponse {
   public_ip?: string | null;
   private_ip?: string | null;
   os?: string | null;
+  normalized_status?: string | null;
   status?: string | null;
   last_seen_at: string;
   created_at: string;
@@ -696,6 +722,36 @@ export interface CloudInstanceResponse {
   cpu_cores?: number | null;
   memory_gb?: number | null;
   disk_gb?: number | null;
+  security_group_ids?: string[] | null;
+  ipv6_addresses?: string[] | null;
+  tags?: Record<string, string> | null;
+}
+
+export interface CloudInstanceChartMeta {
+  id: string;
+  instance_id: string;
+  instance_name?: string | null;
+  provider: string;
+  region: string;
+  status?: string | null;
+  normalized_status?: string | null;
+}
+
+export interface CloudInstancesChartResponse {
+  labels: string[];
+  instances: CloudInstanceChartMeta[];
+  series: Record<string, Array<number | null> | null | undefined>;
+}
+
+export interface CloudInstanceMetricPoint {
+  timestamp: string;
+  value: number;
+}
+
+export interface CloudInstanceMetricsResponse {
+  instance_id: string;
+  instance_name?: string | null;
+  series: Record<string, CloudInstanceMetricPoint[] | null | undefined>;
 }
 
 export interface MetricLatestValue {

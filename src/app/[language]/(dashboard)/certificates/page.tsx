@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
+import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
 import { CopyCurlDropdown } from "@/components/ui/copy-curl-dropdown"

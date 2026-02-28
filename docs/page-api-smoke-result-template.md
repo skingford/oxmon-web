@@ -3,7 +3,7 @@
 测试日期：`YYYY-MM-DD`  
 测试环境：`dev / staging / prod`  
 前端分支：`<branch>`  
-后端版本：`openapi 0.1.4`  
+后端版本：`openapi 0.1.5`  
 测试人：`<name>`
 
 参考清单：`docs/page-api-smoke-checklist.md`
@@ -66,21 +66,28 @@
 - 结果说明：`...`
 - 缺陷记录：`...`
 
-### 8. Notifications（渠道/详情/日志/静默窗口）
+### 8. Cloud（账户 / 实例 / 实例详情）
+
+- 页面：`/[language]/cloud`、`/[language]/cloud/instances`、`/[language]/cloud/instances/[id]`
+- 状态：`通过 / 失败 / 未测`
+- 结果说明：`...`
+- 缺陷记录：`...`
+
+### 9. Notifications（渠道/详情/日志/静默窗口）
 
 - 页面：`/[language]/notifications`、`/[language]/notifications/[id]`、`/[language]/notifications/logs`、`/[language]/notifications/silence`
 - 状态：`通过 / 失败 / 未测`
 - 结果说明：`...`
 - 缺陷记录：`...`
 
-### 9. System & Dictionaries
+### 10. System & Dictionaries
 
 - 页面：`/[language]/system`、`/[language]/system/dictionaries`、`/[language]/system/dictionaries/types`
 - 状态：`通过 / 失败 / 未测`
 - 结果说明：`...`
 - 缺陷记录：`...`
 
-### 10. Metrics
+### 11. Metrics
 
 - 页面：`/[language]/metrics`
 - 状态：`通过 / 失败 / 未测`
@@ -123,4 +130,3 @@
 - 响应样例：`...`
 - 关联日志/截图：`...`
 - 结论：`待修复 / 已修复待回归 / 已关闭`
-

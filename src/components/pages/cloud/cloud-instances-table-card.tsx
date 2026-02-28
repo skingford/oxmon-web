@@ -4,8 +4,8 @@ import Link from "next/link"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   getCloudInstanceStatusBadgeVariant,
-  normalizeCloudInstanceStatus,
   resolveCloudInstanceName,
+  resolveCloudInstanceStatus,
   type CloudInstanceStatusKey,
 } from "@/components/pages/cloud/cloud-instance-list-utils"
 import { Badge } from "@/components/ui/badge"
@@ -100,7 +100,7 @@ export function CloudInstancesTableCard({
                 </TableRow>
               ) : (
                 instances.map((instance) => {
-                  const normalizedStatus = normalizeCloudInstanceStatus(instance.status)
+                  const normalizedStatus = resolveCloudInstanceStatus(instance)
 
                   return (
                     <TableRow key={instance.id}>

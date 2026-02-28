@@ -3,9 +3,9 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
-import { Cloud, Database, Server } from "lucide-react"
+import { BarChart3, Cloud, Database, Server } from "lucide-react"
 import { stripLocalePrefix, withLocalePrefix } from "@/components/app-locale"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 
 export default function CloudLayout({
@@ -16,9 +16,11 @@ export default function CloudLayout({
   const pathname = usePathname()
   const { locale, t } = useAppTranslations("pages")
   const normalizedPathname = stripLocalePrefix(pathname)
-  const currentTabValue = normalizedPathname.startsWith("/cloud/instances")
-    ? "/cloud/instances"
-    : "/cloud"
+  const currentTabValue = normalizedPathname.startsWith("/cloud/instances/ranking")
+    ? "/cloud/instances/ranking"
+    : normalizedPathname.startsWith("/cloud/instances")
+      ? "/cloud/instances"
+      : "/cloud"
 
   return (
     <motion.div
@@ -34,22 +36,46 @@ export default function CloudLayout({
         <p className="text-sm text-muted-foreground">{t("cloud.layoutDescription")}</p>
       </div>
 
-      <Tabs value={currentTabValue} className="min-w-0 space-y-6">
+      <div className="min-w-0 space-y-6">
         <div className="w-full max-w-full overflow-x-auto">
-          <TabsList className="glass h-12 min-w-max bg-muted/50 p-1">
-            <TabsTrigger asChild value="/cloud" className="flex h-full items-center gap-2 px-6">
-              <Link href={withLocalePrefix("/cloud", locale)}>
-                <Database className="h-4 w-4" />
-                {t("cloud.tabsAccounts")}
-              </Link>
-            </TabsTrigger>
-            <TabsTrigger asChild value="/cloud/instances" className="flex h-full items-center gap-2 px-6">
-              <Link href={withLocalePrefix("/cloud/instances", locale)}>
-                <Server className="h-4 w-4" />
-                {t("cloud.tabsInstances")}
-              </Link>
-            </TabsTrigger>
-          </TabsList>
+          <div className="glass inline-flex h-12 min-w-max items-center rounded-lg bg-muted/50 p-1">
+            <Link
+              href={withLocalePrefix("/cloud", locale)}
+              className={cn(
+                "inline-flex h-full items-center gap-2 rounded-md px-6 text-sm transition-colors",
+                currentTabValue === "/cloud"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-foreground/60 hover:text-foreground"
+              )}
+            >
+              <Database className="h-4 w-4" />
+              {t("cloud.tabsAccounts")}
+            </Link>
+            <Link
+              href={withLocalePrefix("/cloud/instances", locale)}
+              className={cn(
+                "inline-flex h-full items-center gap-2 rounded-md px-6 text-sm transition-colors",
+                currentTabValue === "/cloud/instances"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-foreground/60 hover:text-foreground"
+              )}
+            >
+              <Server className="h-4 w-4" />
+              {t("cloud.tabsInstances")}
+            </Link>
+            <Link
+              href={withLocalePrefix("/cloud/instances/ranking", locale)}
+              className={cn(
+                "inline-flex h-full items-center gap-2 rounded-md px-6 text-sm transition-colors",
+                currentTabValue === "/cloud/instances/ranking"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-foreground/60 hover:text-foreground"
+              )}
+            >
+              <BarChart3 className="h-4 w-4" />
+              {t("cloud.tabsInstanceRanking")}
+            </Link>
+          </div>
         </div>
 
         <AnimatePresence mode="wait">
@@ -63,7 +89,7 @@ export default function CloudLayout({
             {children}
           </motion.div>
         </AnimatePresence>
-      </Tabs>
+      </div>
     </motion.div>
   )
 }

@@ -1,6 +1,6 @@
-# 页面联调清单（基于 OpenAPI 0.1.4）
+# 页面联调清单（基于 OpenAPI 0.1.5）
 
-最后更新时间：2026-02-15  
+最后更新时间：2026-02-28  
 接口文档：`http://localhost:8080/v1/openapi.json`
 
 ## 使用方式
@@ -106,6 +106,29 @@
   - 批量导入冲突/成功提示正确。
   - 状态页分页与批量检测刷新正确。
 
+## Cloud（账户 / 实例 / 实例详情）
+
+- 页面：`/[language]/cloud`、`/[language]/cloud/instances`、`/[language]/cloud/instances/[id]`
+- 接口：
+  - `GET /v1/cloud/accounts`
+  - `POST /v1/cloud/accounts`
+  - `POST /v1/cloud/accounts/batch`
+  - `GET /v1/cloud/accounts/{id}`
+  - `PUT /v1/cloud/accounts/{id}`
+  - `DELETE /v1/cloud/accounts/{id}`
+  - `POST /v1/cloud/accounts/{id}/test`
+  - `POST /v1/cloud/accounts/{id}/collect`
+  - `GET /v1/cloud/instances`
+  - `GET /v1/cloud/instances/chart`
+  - `GET /v1/cloud/instances/{id}`
+  - `GET /v1/cloud/instances/{id}/metrics`
+- 检查：
+  - 云账户批量导入支持“按行”与“`|` 分隔”两种文本格式；部分成功时提示 created/skipped/errors。
+  - 云账户启停、测试连接、触发采集后提示与列表刷新正确。
+  - 云实例列表筛选与分页正确，状态优先使用 `normalized_status` 渲染。
+  - 云实例列表图表支持指标切换，空数据/错误态提示正确。
+  - 云实例详情历史趋势支持指标与时间范围切换，`from/to/metrics` 参数生效。
+
 ## Notifications（渠道/详情/日志/静默窗口）
 
 - 页面：`/[language]/notifications`、`/[language]/notifications/[id]`、`/[language]/notifications/logs`、`/[language]/notifications/silence`
@@ -174,4 +197,3 @@
 - 登录：`POST /v1/auth/login`
 - 修改密码：`POST /v1/auth/password`
 - 健康检查（可选）：`GET /v1/health`
-

@@ -7,9 +7,15 @@ import { api, getApiErrorMessage } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
-import type { CloudAccountResponse, CreateCloudAccountRequest, UpdateCloudAccountRequest } from "@/types/api"
+import type {
+  BatchCreateCloudAccountsRequest,
+  CloudAccountResponse,
+  CreateCloudAccountRequest,
+  UpdateCloudAccountRequest,
+} from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { CloudAccountsFiltersCard } from "@/components/pages/cloud/cloud-accounts-filters-card"
+import { CloudAccountBatchImportDialog } from "@/components/pages/cloud/cloud-account-batch-import-dialog"
 import { CloudAccountDialog, type CloudAccountFormState } from "@/components/pages/cloud/cloud-account-dialog"
 import { CloudAccountsStatsCards } from "@/components/pages/cloud/cloud-accounts-stats-cards"
 import { CloudAccountsTableCard } from "@/components/pages/cloud/cloud-accounts-table-card"
@@ -119,6 +125,11 @@ export default function CloudAccountsPage() {
   const [form, setForm] = useState<CloudAccountFormState>(DEFAULT_FORM_STATE)
   const [formSubmitting, setFormSubmitting] = useState(false)
   const [editingDialogLoading, setEditingDialogLoading] = useState(false)
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false)
+  const [batchProvider, setBatchProvider] = useState<(typeof BUILT_IN_CLOUD_PROVIDERS)[number]>("tencent")
+  const [batchCollectionIntervalSecs, setBatchCollectionIntervalSecs] = useState("300")
+  const [batchText, setBatchText] = useState("")
+  const [batchSubmitting, setBatchSubmitting] = useState(false)
 
   const [testingId, setTestingId] = useState<string | null>(null)
   const [collectingId, setCollectingId] = useState<string | null>(null)
@@ -206,10 +217,25 @@ export default function CloudAccountsPage() {
     setEditingAccount(null)
   }, [])
 
+  const resetBatchForm = useCallback(() => {
+    setBatchProvider("tencent")
+    setBatchCollectionIntervalSecs("300")
+    setBatchText("")
+    setBatchSubmitting(false)
+  }, [])
+
   const openCreateDialog = useCallback(() => {
     resetForm()
     setDialogOpen(true)
   }, [resetForm])
+
+  const handleBatchDialogOpenChange = useCallback((open: boolean) => {
+    setBatchDialogOpen(open)
+
+    if (!open) {
+      resetBatchForm()
+    }
+  }, [resetBatchForm])
 
   const openEditDialog = useCallback(async (account: CloudAccountResponse) => {
     setEditingDialogLoading(true)
@@ -383,6 +409,71 @@ export default function CloudAccountsPage() {
     }
   }, [editingAccount, fetchAccounts, form, locale, t])
 
+  const handleBatchImport = useCallback(async () => {
+    const normalizedProvider = normalizeCloudProvider(batchProvider)
+    const text = batchText.trim()
+
+    if (!text) {
+      toast.error(t("cloud.accounts.toastBatchTextRequired"))
+      return
+    }
+
+    const intervalText = batchCollectionIntervalSecs.trim()
+    let collectionIntervalSecs: number | null = null
+
+    if (intervalText) {
+      const parsedValue = Number(intervalText)
+
+      if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+        toast.error(t("cloud.accounts.toastBatchIntervalInvalid"))
+        return
+      }
+
+      collectionIntervalSecs = Math.floor(parsedValue)
+    }
+
+    setBatchSubmitting(true)
+
+    try {
+      const payload: BatchCreateCloudAccountsRequest = {
+        provider: normalizedProvider,
+        text,
+        collection_interval_secs: collectionIntervalSecs,
+      }
+      const result = await api.batchCreateCloudAccounts(payload)
+      const errorCount = result.errors.length
+
+      if (errorCount > 0) {
+        toast.warning(
+          t("cloud.accounts.toastBatchPartial", {
+            created: result.created,
+            skipped: result.skipped,
+            errors: errorCount,
+          })
+        )
+        const previewMessage = result.errors.slice(0, 3).join("；")
+        if (previewMessage) {
+          toast.error(previewMessage)
+        }
+      } else {
+        toast.success(
+          t("cloud.accounts.toastBatchSuccess", {
+            created: result.created,
+            skipped: result.skipped,
+          })
+        )
+      }
+
+      setBatchDialogOpen(false)
+      resetBatchForm()
+      await fetchAccounts(true)
+    } catch (error) {
+      toastApiError(error, t("cloud.accounts.toastBatchError"))
+    } finally {
+      setBatchSubmitting(false)
+    }
+  }, [batchCollectionIntervalSecs, batchProvider, batchText, fetchAccounts, resetBatchForm, t])
+
   const handleToggleEnabled = useCallback(async (account: CloudAccountResponse) => {
     setTogglingId(account.id)
     try {
@@ -515,6 +606,31 @@ export default function CloudAccountsPage() {
             {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {t("cloud.accounts.refreshButton")}
           </Button>
+          <CloudAccountBatchImportDialog
+            open={batchDialogOpen}
+            onOpenChange={handleBatchDialogOpenChange}
+            provider={batchProvider}
+            onProviderChange={(value) => setBatchProvider(value as (typeof BUILT_IN_CLOUD_PROVIDERS)[number])}
+            collectionIntervalSecs={batchCollectionIntervalSecs}
+            onCollectionIntervalSecsChange={setBatchCollectionIntervalSecs}
+            textValue={batchText}
+            onTextValueChange={setBatchText}
+            submitting={batchSubmitting}
+            onSubmit={handleBatchImport}
+            texts={{
+              trigger: t("cloud.accounts.batchButton"),
+              title: t("cloud.accounts.batchDialogTitle"),
+              description: t("cloud.accounts.batchDialogDescription"),
+              fieldProvider: t("cloud.accounts.batchFieldProvider"),
+              fieldCollectionInterval: t("cloud.accounts.batchFieldCollectionInterval"),
+              fieldCollectionIntervalPlaceholder: t("cloud.accounts.batchFieldCollectionIntervalPlaceholder"),
+              fieldText: t("cloud.accounts.batchFieldText"),
+              fieldTextHint: t("cloud.accounts.batchFieldTextHint"),
+              fieldTextPlaceholder: t("cloud.accounts.batchFieldTextPlaceholder"),
+              cancel: t("cloud.accounts.batchDialogCancel"),
+              submit: t("cloud.accounts.batchDialogSubmit"),
+            }}
+          />
           <Button type="button" onClick={openCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
             {t("cloud.accounts.createButton")}

@@ -4,13 +4,22 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 import { toast, toastApiError, toastCopied } from "@/lib/toast"
 import { ApiRequestError, api } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   getCloudInstanceStatusBadgeVariant,
-  normalizeCloudInstanceStatus,
+  resolveCloudInstanceStatus,
   type CloudInstanceStatusKey,
 } from "@/components/pages/cloud/cloud-instance-list-utils"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -21,7 +30,21 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CopyCurlDropdown } from "@/components/ui/copy-curl-dropdown"
 import { HttpMethodBadge } from "@/components/ui/http-method-badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+
+const INSTANCE_METRIC_OPTIONS = [
+  "cloud.cpu.usage",
+  "cloud.memory.usage",
+  "cloud.disk.usage",
+  "cloud.network.in_bytes",
+  "cloud.network.out_bytes",
+  "cloud.disk.iops_read",
+  "cloud.disk.iops_write",
+  "cloud.connections",
+] as const
+
+const HISTORY_RANGE_OPTIONS = ["1h", "6h", "24h", "7d"] as const
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   if (!value) {
@@ -36,6 +59,22 @@ function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
 
   return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
     hour12: false,
+  })
+}
+
+function formatChartTime(value: string, locale: "zh" | "en") {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    hour12: false,
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   })
 }
 
@@ -114,7 +153,7 @@ function formatMetricValue(metric: MetricLatestValue | null | undefined, metricK
     return "-"
   }
 
-  if (/network_(in|out)_bytes/.test(metricKey)) {
+  if (/(network_(in|out)_bytes|network\.(in_bytes|out_bytes))/.test(metricKey)) {
     return formatBytesPerSecond(metric.value)
   }
 
@@ -124,15 +163,69 @@ function formatMetricValue(metric: MetricLatestValue | null | undefined, metricK
     return `${value}%`
   }
 
-  if (/disk_iops_/.test(metricKey)) {
+  if (/(disk_iops_|disk\.iops_)/.test(metricKey)) {
     return `${value} IOPS`
   }
 
-  if (metricKey === "connections") {
+  if (metricKey === "connections" || metricKey === "cloud.connections") {
     return `${value}`
   }
 
   return value
+}
+
+function resolveHistoryRangeStart(range: (typeof HISTORY_RANGE_OPTIONS)[number]) {
+  const now = Date.now()
+
+  if (range === "1h") {
+    return new Date(now - 60 * 60 * 1000).toISOString()
+  }
+
+  if (range === "6h") {
+    return new Date(now - 6 * 60 * 60 * 1000).toISOString()
+  }
+
+  if (range === "24h") {
+    return new Date(now - 24 * 60 * 60 * 1000).toISOString()
+  }
+
+  return new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
+}
+
+function normalizeHistoryPoints(
+  value: unknown,
+  locale: "zh" | "en"
+) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null
+      }
+
+      const point = item as { timestamp?: unknown; collected_at?: unknown; value?: unknown }
+      const timestamp = typeof point.timestamp === "string"
+        ? point.timestamp
+        : typeof point.collected_at === "string"
+          ? point.collected_at
+          : ""
+      const numericValue = Number(point.value)
+
+      if (!timestamp || !Number.isFinite(numericValue)) {
+        return null
+      }
+
+      return {
+        timestamp,
+        time: formatChartTime(timestamp, locale),
+        value: numericValue,
+      }
+    })
+    .filter((item): item is { timestamp: string; time: string; value: number } => Boolean(item))
+    .sort((left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime())
 }
 
 function getMetricValueClass(metric: MetricLatestValue | null | undefined, metricKey: string) {
@@ -239,6 +332,8 @@ export default function CloudInstanceDetailPage() {
   const { t, locale } = useAppTranslations("pages")
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
   const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null)
+  const [historyMetric, setHistoryMetric] = useState<(typeof INSTANCE_METRIC_OPTIONS)[number]>("cloud.cpu.usage")
+  const [historyRange, setHistoryRange] = useState<(typeof HISTORY_RANGE_OPTIONS)[number]>("24h")
   const {
     data: instance,
     loading,
@@ -246,6 +341,12 @@ export default function CloudInstanceDetailPage() {
     error,
     execute,
   } = useRequestState<CloudInstanceDetailResponse | null>(null)
+  const {
+    data: historyPoints,
+    loading: historyLoading,
+    error: historyError,
+    execute: executeHistoryRequest,
+  } = useRequestState<Array<{ timestamp: string; time: string; value: number }>>([], { initialLoading: false })
 
   const fetchDetail = useCallback(async (silent = false) => {
     if (!instanceId) {
@@ -288,6 +389,26 @@ export default function CloudInstanceDetailPage() {
     }
   }, [autoRefreshEnabled, fetchDetail, instanceId])
 
+  const fetchHistory = useCallback(async () => {
+    if (!instanceId) {
+      return
+    }
+
+    await executeHistoryRequest(async () => {
+      const payload = await api.getCloudInstanceMetrics(instanceId, {
+        from: resolveHistoryRangeStart(historyRange),
+        to: new Date().toISOString(),
+        metrics: historyMetric,
+      })
+
+      return normalizeHistoryPoints(payload.series?.[historyMetric], locale)
+    })
+  }, [executeHistoryRequest, historyMetric, historyRange, instanceId, locale])
+
+  useEffect(() => {
+    fetchHistory()
+  }, [fetchHistory])
+
   const metricCards = useMemo(() => {
     if (!instance) {
       return []
@@ -304,6 +425,15 @@ export default function CloudInstanceDetailPage() {
       { key: "connections", label: t("cloud.instances.detailMetricConnections"), metric: instance.connections },
     ]
   }, [instance, t])
+
+  const historyMetricOptions = useMemo(
+    () =>
+      INSTANCE_METRIC_OPTIONS.map((metric) => ({
+        value: metric,
+        label: t(`cloud.instances.chartMetricLabel_${metric.replace(/\./g, "_")}`),
+      })),
+    [t]
+  )
 
   const handleCopyApiCurl = useCallback(async (insecure = false) => {
     try {
@@ -418,8 +548,17 @@ export default function CloudInstanceDetailPage() {
             tooltip={t("cloud.instances.detailCopyApiCurlHint")}
             insecureBadgeLabel={t("cloud.instances.detailCopyApiCurlInsecureBadge")}
           />
-          <Button type="button" variant="outline" onClick={() => fetchDetail(true)} disabled={refreshing}>
-            {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              await Promise.all([fetchDetail(true), fetchHistory()])
+            }}
+            disabled={refreshing || historyLoading}
+          >
+            {refreshing || historyLoading
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              : <RefreshCw className="mr-2 h-4 w-4" />}
             {t("cloud.instances.detailRefreshButton")}
           </Button>
         </div>
@@ -438,8 +577,8 @@ export default function CloudInstanceDetailPage() {
           <FieldItem label={t("cloud.instances.detailFieldRegion")} value={instance.region} />
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">{t("cloud.instances.detailFieldStatus")}</p>
-            <Badge variant={getCloudInstanceStatusBadgeVariant(normalizeCloudInstanceStatus(instance.status))}>
-              {getStatusLabel(normalizeCloudInstanceStatus(instance.status), t)}
+            <Badge variant={getCloudInstanceStatusBadgeVariant(resolveCloudInstanceStatus(instance))}>
+              {getStatusLabel(resolveCloudInstanceStatus(instance), t)}
             </Badge>
           </div>
           <FieldItem label={t("cloud.instances.detailFieldOs")} value={instance.os || "-"} />
@@ -517,6 +656,101 @@ export default function CloudInstanceDetailPage() {
               })()}
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <CardTitle>{t("cloud.instances.detailHistoryTitle")}</CardTitle>
+            <CardDescription>{t("cloud.instances.detailHistoryDescription")}</CardDescription>
+          </div>
+          <div className="grid w-full gap-2 sm:grid-cols-2 md:w-auto">
+            <Select value={historyMetric} onValueChange={(value) => {
+              setHistoryMetric(value as (typeof INSTANCE_METRIC_OPTIONS)[number])
+            }}>
+              <SelectTrigger className="w-full md:w-[220px]">
+                <SelectValue placeholder={t("cloud.instances.detailHistoryMetricPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                {historyMetricOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={historyRange} onValueChange={(value) => {
+              setHistoryRange(value as (typeof HISTORY_RANGE_OPTIONS)[number])
+            }}>
+              <SelectTrigger className="w-full md:w-[160px]">
+                <SelectValue placeholder={t("cloud.instances.detailHistoryRangePlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1h">{t("cloud.instances.detailHistoryRange_1h")}</SelectItem>
+                <SelectItem value="6h">{t("cloud.instances.detailHistoryRange_6h")}</SelectItem>
+                <SelectItem value="24h">{t("cloud.instances.detailHistoryRange_24h")}</SelectItem>
+                <SelectItem value="7d">{t("cloud.instances.detailHistoryRange_7d")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {historyLoading ? (
+            <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {t("cloud.instances.detailHistoryLoading")}
+            </div>
+          ) : historyError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {historyError || t("cloud.instances.detailHistoryError")}
+            </div>
+          ) : historyPoints.length === 0 ? (
+            <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+              {t("cloud.instances.detailHistoryEmpty")}
+            </div>
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={historyPoints} margin={{ top: 10, right: 18, bottom: 8, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="time" tick={{ fontSize: 12 }} minTickGap={24} />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    width={94}
+                    tickFormatter={(value) => formatMetricValue(
+                      {
+                        metric_name: historyMetric,
+                        value: Number(value),
+                        collected_at: "",
+                      },
+                      historyMetric
+                    )}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => formatMetricValue(
+                      {
+                        metric_name: historyMetric,
+                        value,
+                        collected_at: "",
+                      },
+                      historyMetric
+                    )}
+                    labelFormatter={(label, payload) => payload?.[0]?.payload?.timestamp || String(label)}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

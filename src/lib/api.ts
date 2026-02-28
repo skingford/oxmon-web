@@ -39,11 +39,17 @@ import {
   ChannelOverview,
   DictionaryByTypeQueryParams,
   DictionaryTypeQueryParams,
+  BatchCreateCloudAccountsRequest,
+  BatchCreateCloudAccountsResponse,
   CloudAccountQueryParams,
   CloudAccountResponse,
+  CloudInstanceMetricsQueryParams,
+  CloudInstanceMetricsResponse,
   CloudInstanceQueryParams,
   CloudInstanceDetailResponse,
   CloudInstanceResponse,
+  CloudInstancesChartQueryParams,
+  CloudInstancesChartResponse,
   CreateCloudAccountRequest,
   CreateAIAccountRequest,
   NotificationLogItem,
@@ -162,7 +168,9 @@ function buildQueryString(
   params:
     | Record<string, unknown>
     | PaginationParams
-    | NotificationLogSummaryQueryParams,
+    | NotificationLogSummaryQueryParams
+    | CloudInstancesChartQueryParams
+    | CloudInstanceMetricsQueryParams,
 ) {
   const query = new URLSearchParams();
   const paramsRecord = params as Record<string, unknown>;
@@ -617,6 +625,12 @@ export const api = {
       body: data,
     }),
 
+  batchCreateCloudAccounts: (data: BatchCreateCloudAccountsRequest) =>
+    request<BatchCreateCloudAccountsResponse>("/v1/cloud/accounts/batch", {
+      method: "POST",
+      body: data,
+    }),
+
   updateCloudAccount: (id: string, data: UpdateCloudAccountRequest) =>
     request<CloudAccountResponse>(`/v1/cloud/accounts/${id}`, {
       method: "PUT",
@@ -670,6 +684,19 @@ export const api = {
 
   getCloudInstanceDetail: (id: string) =>
     request<CloudInstanceDetailResponse>(`/v1/cloud/instances/${id}`),
+
+  getCloudInstancesChart: (params?: CloudInstancesChartQueryParams) =>
+    request<CloudInstancesChartResponse>(
+      `/v1/cloud/instances/chart${buildQueryString(params || {})}`,
+    ),
+
+  getCloudInstanceMetrics: (
+    id: string,
+    params?: CloudInstanceMetricsQueryParams,
+  ) =>
+    request<CloudInstanceMetricsResponse>(
+      `/v1/cloud/instances/${id}/metrics${buildQueryString(params || {})}`,
+    ),
 
   listAIAccounts: () =>
     request<unknown>("/v1/ai/accounts").then(

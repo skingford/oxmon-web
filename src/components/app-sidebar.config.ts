@@ -163,8 +163,9 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/notifications": ["/v1/notifications/channels"],
   "/notifications/logs": ["/v1/notifications/logs"],
   "/notifications/silence": ["/v1/notifications/silence-windows"],
-  "/cloud": ["/v1/cloud/accounts"],
-  "/cloud/instances": ["/v1/cloud/instances"],
+  "/cloud": ["/v1/cloud/accounts", "/v1/cloud/accounts/batch"],
+  "/cloud/instances": ["/v1/cloud/instances", "/v1/cloud/instances/chart", "/v1/cloud/instances/{id}/metrics"],
+  "/cloud/instances/ranking": ["/v1/cloud/instances", "/v1/cloud/instances/chart"],
   "/ai": ["/v1/ai/accounts"],
   "/ai/reports": ["/v1/ai/reports"],
   "/ai/reports/": ["/v1/ai/reports"],
@@ -205,6 +206,11 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
           {
             titleKey: "itemCloudInstances",
             url: "/cloud/instances",
+            exact: true,
+          },
+          {
+            titleKey: "itemCloudInstanceRanking",
+            url: "/cloud/instances/ranking",
             exact: true,
           },
         ],

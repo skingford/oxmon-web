@@ -37,6 +37,10 @@ export function normalizeCloudInstanceStatus(status: string | null | undefined):
   return "unknown"
 }
 
+export function resolveCloudInstanceStatus(instance: Pick<CloudInstanceResponse, "status" | "normalized_status">) {
+  return normalizeCloudInstanceStatus(instance.normalized_status || instance.status)
+}
+
 export function getCloudInstanceStatusBadgeVariant(
   status: CloudInstanceStatusKey
 ): "default" | "secondary" | "outline" | "destructive" {

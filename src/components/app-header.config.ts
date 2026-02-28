@@ -84,6 +84,10 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "itemCloudInstances",
     descriptionKey: "cloudInstancesDescription",
   },
+  "/cloud/instances/ranking": {
+    titleKey: "itemCloudInstanceRanking",
+    descriptionKey: "cloudInstanceRankingDescription",
+  },
   "/ai": {
     titleKey: "itemAIAccounts",
     descriptionKey: "aiAccountsDescription",

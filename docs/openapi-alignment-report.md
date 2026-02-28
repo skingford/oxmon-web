@@ -1,7 +1,7 @@
 # OpenAPI 对齐清单
 
-最后更新时间：2026-02-17
-接口文档：`http://localhost:8080/v1/openapi.json`（OpenAPI 3.1.0, version 0.1.4）
+最后更新时间：2026-02-28
+接口文档：`http://localhost:8080/v1/openapi.json`（OpenAPI 3.1.0, version 0.1.5）
 
 ## 已完成对齐
 
@@ -37,6 +37,11 @@
   - 改密成功后清除本地 token 并跳转登录页（与后端“需重新登录”语义一致）。
 - 域名批量创建响应对齐：
   - `POST /v1/certs/domains/batch` 前端返回类型修正为 `IdResponse[]`（与 OpenAPI 201 响应一致）。
+- 云模块接口补齐：
+  - 云账户页接入 `POST /v1/cloud/accounts/batch`（批量导入）。
+  - 云实例列表页接入 `GET /v1/cloud/instances/chart`（最新指标排行图表）。
+  - 云实例详情页接入 `GET /v1/cloud/instances/{id}/metrics`（历史指标趋势）。
+  - 云实例状态渲染优先使用 `normalized_status`，兼容旧字段 `status`。
 
 ## 已移除/废弃
 
