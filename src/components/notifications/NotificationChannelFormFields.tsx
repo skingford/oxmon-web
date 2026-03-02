@@ -1,10 +1,8 @@
 "use client"
 
-import { Dispatch, SetStateAction, useState } from "react"
-import { Eye, EyeOff } from "lucide-react"
+import { Dispatch, SetStateAction } from "react"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -257,7 +255,6 @@ type ConfigFieldInputProps = {
 
 function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldInputProps) {
   const inputId = `${idPrefix}-config-${field.key}`
-  const [showPassword, setShowPassword] = useState(false)
   const shouldTakeFullRow = field.key === "webhook_url" || field.key === "secret"
   const fieldContainerClassName = shouldTakeFullRow ? "min-w-0 space-y-2 sm:col-span-2" : "min-w-0 space-y-2"
 
@@ -301,27 +298,13 @@ function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldIn
     return (
       <div className={fieldContainerClassName}>
         <Label htmlFor={inputId}>{t(field.labelKey)}</Label>
-        <div className="relative">
-          <Input
-            id={inputId}
-            type={showPassword ? "text" : "password"}
-            value={typeof value === "string" ? value : ""}
-            onChange={(event) => onChange(field.key, event.target.value)}
-            placeholder={t(field.placeholderKey)}
-            className="pr-10"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2"
-            onClick={() => setShowPassword((previous) => !previous)}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-            aria-pressed={showPassword}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        </div>
+        <Input
+          id={inputId}
+          type="text"
+          value={typeof value === "string" ? value : ""}
+          onChange={(event) => onChange(field.key, event.target.value)}
+          placeholder={t(field.placeholderKey)}
+        />
       </div>
     )
   }

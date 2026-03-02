@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { JsonTextarea } from "@/components/ui/json-textarea";
-import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -51,7 +50,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2, Plus, RefreshCw } from "lucide-react";
-import { Eye, EyeOff } from "lucide-react";
 
 type FormState = {
   config_key: string;
@@ -120,6 +118,27 @@ function applyConfigInputsToJson(
   return stringifyConfigObject(next);
 }
 
+function normalizeJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeJsonValue(item));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.keys(value as Record<string, unknown>)
+    .sort()
+    .reduce<Record<string, unknown>>((result, key) => {
+      result[key] = normalizeJsonValue((value as Record<string, unknown>)[key]);
+      return result;
+    }, {});
+}
+
+function isJsonValueEqual(left: unknown, right: unknown) {
+  return JSON.stringify(normalizeJsonValue(left)) === JSON.stringify(normalizeJsonValue(right));
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
   const d = new Date(value);
@@ -134,11 +153,12 @@ export default function AIAccountsPage() {
   const [deleting, setDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<AIAccountResponse | null>(null);
+  const [editingLoadingId, setEditingLoadingId] = useState<string | null>(null);
+  const [editingOriginalConfig, setEditingOriginalConfig] = useState<unknown>(null);
   const [deleteTarget, setDeleteTarget] = useState<AIAccountResponse | null>(
     null,
   );
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [showConfigApiKey, setShowConfigApiKey] = useState(false);
 
   const sortedItems = useMemo(
     () =>
@@ -167,26 +187,34 @@ export default function AIAccountsPage() {
 
   const openCreate = () => {
     setEditing(null);
+    setEditingOriginalConfig(null);
     setForm(EMPTY_FORM);
-    setShowConfigApiKey(false);
     setDialogOpen(true);
   };
 
-  const openEdit = (item: AIAccountResponse) => {
-    const configJson = JSON.stringify(item.config_json ?? {}, null, 2);
-    const configFields = configInputFieldsFromJson(configJson);
-    setEditing(item);
-    setForm({
-      config_key: item.config_key,
-      provider: item.provider || "",
-      display_name: item.display_name,
-      description: item.description || "",
-      enabled: item.enabled,
-      ...configFields,
-      configJson,
-    });
-    setShowConfigApiKey(false);
-    setDialogOpen(true);
+  const openEdit = async (item: AIAccountResponse) => {
+    setEditingLoadingId(item.id);
+    try {
+      const detail = await api.getAIAccountById(item.id);
+      const configJson = JSON.stringify(detail.config_json ?? {}, null, 2);
+      const configFields = configInputFieldsFromJson(configJson);
+      setEditing(detail);
+      setEditingOriginalConfig(detail.config_json ?? {});
+      setForm({
+        config_key: detail.config_key,
+        provider: detail.provider || "",
+        display_name: detail.display_name,
+        description: detail.description || "",
+        enabled: detail.enabled,
+        ...configFields,
+        configJson,
+      });
+      setDialogOpen(true);
+    } catch (error) {
+      toastApiError(error, t("accounts.toastFetchError"));
+    } finally {
+      setEditingLoadingId(null);
+    }
   };
 
   const submit = async () => {
@@ -219,12 +247,22 @@ export default function AIAccountsPage() {
     setSubmitting(true);
     try {
       if (editing) {
-        await api.updateAIAccount(editing.id, {
+        const payload: {
+          display_name: string;
+          description: string | null;
+          enabled: boolean;
+          config?: unknown;
+        } = {
           display_name: form.display_name.trim(),
           description: form.description.trim() || null,
           enabled: form.enabled,
-          config: parsedConfig,
-        });
+        };
+
+        if (!isJsonValueEqual(parsedConfig, editingOriginalConfig)) {
+          payload.config = parsedConfig;
+        }
+
+        await api.updateAIAccount(editing.id, payload);
         toastSaved(t("accounts.toastUpdateSuccess"));
       } else {
         await api.createAIAccount({
@@ -238,6 +276,7 @@ export default function AIAccountsPage() {
         toastCreated(t("accounts.toastCreateSuccess"));
       }
       setDialogOpen(false);
+      setEditingOriginalConfig(null);
       await fetchData();
     } catch (error) {
       toastApiError(
@@ -365,8 +404,12 @@ export default function AIAccountsPage() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => openEdit(item)}
+                          onClick={() => void openEdit(item)}
+                          disabled={editingLoadingId === item.id}
                         >
+                          {editingLoadingId === item.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
                           {t("accounts.actionEdit")}
                         </Button>
                         <Button
@@ -481,44 +524,27 @@ export default function AIAccountsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t("accounts.fieldConfigApiKey")}</Label>
-                  <div className="relative">
-                    <Input
-                      type={showConfigApiKey ? "text" : "password"}
-                      value={form.configApiKey}
-                      className="pr-10"
-                      onChange={(e) =>
-                        setForm((s) => {
-                          const configApiKey = e.target.value;
-                          const nextInputs = {
-                            configBaseUrl: s.configBaseUrl,
-                            configApiKey,
-                            configModel: s.configModel,
-                          };
-                          return {
-                            ...s,
-                            ...nextInputs,
-                            configJson: applyConfigInputsToJson(
-                              s.configJson,
-                              nextInputs,
-                            ),
-                          };
-                        })
-                      }
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 p-0"
-                      onClick={() => setShowConfigApiKey((v) => !v)}
-                    >
-                      {showConfigApiKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
+                  <Input
+                    value={form.configApiKey}
+                    onChange={(e) =>
+                      setForm((s) => {
+                        const configApiKey = e.target.value;
+                        const nextInputs = {
+                          configBaseUrl: s.configBaseUrl,
+                          configApiKey,
+                          configModel: s.configModel,
+                        };
+                        return {
+                          ...s,
+                          ...nextInputs,
+                          configJson: applyConfigInputsToJson(
+                            s.configJson,
+                            nextInputs,
+                          ),
+                        };
+                      })
+                    }
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("accounts.fieldConfigModel")}</Label>

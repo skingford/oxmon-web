@@ -206,15 +206,14 @@ function normalizeHistoryPoints(
         return null
       }
 
-      const point = item as { timestamp?: unknown; collected_at?: unknown; value?: unknown }
-      const timestamp = typeof point.timestamp === "string"
-        ? point.timestamp
-        : typeof point.collected_at === "string"
-          ? point.collected_at
-          : ""
-      const numericValue = Number(point.value)
+      const point = item as {
+        t?: unknown
+        v?: unknown
+      }
+      const timestamp = normalizeMetricPointTimestamp(point.t)
+      const numericValue = normalizeMetricPointValue(point.v)
 
-      if (!timestamp || !Number.isFinite(numericValue)) {
+      if (!timestamp || numericValue === null) {
         return null
       }
 
@@ -226,6 +225,44 @@ function normalizeHistoryPoints(
     })
     .filter((item): item is { timestamp: string; time: string; value: number } => Boolean(item))
     .sort((left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime())
+}
+
+function normalizeMetricPointTimestamp(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const timestamp = value >= 1e12 ? value : value * 1000
+    return new Date(timestamp).toISOString()
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+
+    if (!trimmed) {
+      return ""
+    }
+
+    if (/^[+-]?\d+(?:\.\d+)?$/.test(trimmed)) {
+      const numeric = Number(trimmed)
+
+      if (Number.isFinite(numeric)) {
+        const timestamp = numeric >= 1e12 ? numeric : numeric * 1000
+        return new Date(timestamp).toISOString()
+      }
+    }
+
+    const parsed = new Date(trimmed)
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString()
+    }
+
+    return trimmed
+  }
+
+  return ""
+}
+
+function normalizeMetricPointValue(value: unknown) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
 }
 
 function getMetricValueClass(metric: MetricLatestValue | null | undefined, metricKey: string) {

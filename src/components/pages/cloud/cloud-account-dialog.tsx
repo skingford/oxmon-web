@@ -1,7 +1,7 @@
 "use client"
 
-import { memo, useCallback, useState, type FormEvent } from "react"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { memo, useCallback, type FormEvent } from "react"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -61,17 +61,11 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
   setForm,
   t,
 }: CloudAccountDialogProps) {
-  const [showSecretKey, setShowSecretKey] = useState(false)
-
   const handleOpenChange = useCallback((nextOpen: boolean) => {
-    if (!nextOpen) {
-      setShowSecretKey(false)
-    }
     onOpenChange(nextOpen)
   }, [onOpenChange])
 
   const handleCancel = useCallback(() => {
-    setShowSecretKey(false)
     onCancel()
   }, [onCancel])
 
@@ -234,29 +228,12 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
                   <Label htmlFor="cloud-secret-key">
                     {locale === "zh" ? "SecretKey / AccessKey Secret" : "SecretKey / AccessKey Secret"}
                   </Label>
-                  <div className="relative">
-                    <Input
-                      id="cloud-secret-key"
-                      type={showSecretKey ? "text" : "password"}
-                      value={form.secretKey}
-                      onChange={(event) => setForm((prev) => ({ ...prev, secretKey: event.target.value }))}
-                      placeholder={locale === "zh" ? "请输入密钥 Secret" : "Enter key secret"}
-                      className="pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2"
-                      onClick={() => setShowSecretKey((prev) => !prev)}
-                      aria-label={showSecretKey
-                        ? locale === "zh" ? "隐藏密钥" : "Hide secret"
-                        : locale === "zh" ? "显示密钥" : "Show secret"}
-                      aria-pressed={showSecretKey}
-                    >
-                      {showSecretKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
+                  <Input
+                    id="cloud-secret-key"
+                    value={form.secretKey}
+                    onChange={(event) => setForm((prev) => ({ ...prev, secretKey: event.target.value }))}
+                    placeholder={locale === "zh" ? "请输入密钥 Secret" : "Enter key secret"}
+                  />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="cloud-regions">

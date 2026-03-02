@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { toast, toastCopied } from "@/lib/toast"
-import { User, Copy, Shield, LogOut, Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react"
+import { toastCopied } from "@/lib/toast"
+import { User, Copy, Shield, LogOut, Loader2, AlertTriangle } from "lucide-react"
 import { motion } from "framer-motion"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
@@ -27,9 +27,6 @@ export default function ProfilePage() {
   const locale = useAppLocale()
   const appId = (process.env.NEXT_PUBLIC_OX_APP_ID || "").trim()
   const [token, setToken] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [showAppId, setShowAppId] = useState(false)
-  const [showToken, setShowToken] = useState(false)
   const [user, setUser] = useState<JwtPayload | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -55,9 +52,7 @@ export default function ProfilePage() {
   const handleCopy = () => {
     if (token) {
       navigator.clipboard.writeText(token)
-      setCopied(true)
       toastCopied(t("toastTokenCopied"))
-      setTimeout(() => setCopied(false), 2000)
     }
   }
 
@@ -131,24 +126,10 @@ export default function ProfilePage() {
                 <div className="relative">
                   <Input
                     readOnly
-                    type={showAppId ? "text" : "password"}
                     value={appId}
-                    className="bg-muted font-mono text-xs pr-24"
+                    className="bg-muted font-mono text-xs pr-12"
                   />
                   <div className="absolute right-1 top-1 flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowAppId(!showAppId)}
-                      className="h-8 w-8 p-0"
-                      disabled={!appId}
-                    >
-                      {showAppId ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -209,23 +190,10 @@ export default function ProfilePage() {
               <div className="relative">
                 <Input
                   readOnly
-                  type={showToken ? "text" : "password"}
                   value={token || ""}
-                  className="font-mono text-xs pr-24 bg-muted"
+                  className="font-mono text-xs pr-12 bg-muted"
                 />
                 <div className="absolute right-1 top-1 flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setShowToken(!showToken)}
-                    className="h-8 w-8 p-0"
-                  >
-                    {showToken ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"

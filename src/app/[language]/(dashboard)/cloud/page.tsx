@@ -556,9 +556,6 @@ export default function CloudAccountsPage() {
         path: `/v1/cloud/accounts/${account.id}`,
         method: "PUT",
         insecure,
-        redactBodySecrets: {
-          keepPaths: [],
-        },
         body: {
           display_name: account.display_name,
           description: account.description,
