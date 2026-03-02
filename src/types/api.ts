@@ -810,11 +810,18 @@ export interface TriggerCollectionResponse {
 export interface AIAccountResponse {
   id: string;
   config_key: string;
-  provider?: string | null;
+  provider: string;
   display_name: string;
   description?: string | null;
+  api_key: string;
+  model?: string | null;
+  base_url?: string | null;
+  api_mode?: string | null;
+  timeout_secs?: number | null;
+  max_tokens?: number | null;
+  temperature?: number | null;
+  collection_interval_secs?: number | null;
   enabled: boolean;
-  config_json: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -824,15 +831,29 @@ export interface CreateAIAccountRequest {
   provider: string;
   display_name: string;
   description?: string | null;
+  api_key: string;
+  model?: string | null;
+  base_url?: string | null;
+  api_mode?: string | null;
+  timeout_secs?: number | null;
+  max_tokens?: number | null;
+  temperature?: number | null;
+  collection_interval_secs?: number | null;
   enabled: boolean;
-  config: unknown;
 }
 
 export interface UpdateAIAccountRequest {
   display_name?: string | null;
   description?: string | null;
+  api_key?: string | null;
+  model?: string | null;
+  base_url?: string | null;
+  api_mode?: string | null;
+  timeout_secs?: number | null;
+  max_tokens?: number | null;
+  temperature?: number | null;
+  collection_interval_secs?: number | null;
   enabled?: boolean | null;
-  config?: unknown;
 }
 
 export interface AIReportListItem {

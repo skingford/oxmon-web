@@ -558,9 +558,11 @@ export const api = {
 
   getCertificates: (
     params: PaginationParams & {
+      domain__contains?: string;
       not_after__lte?: number;
       ip_address__contains?: string;
       issuer__contains?: string;
+      is_valid__eq?: boolean;
     } = {},
   ) =>
     request<unknown>(`/v1/certificates${buildQueryString(params)}`).then(
@@ -698,10 +700,29 @@ export const api = {
       `/v1/cloud/instances/${id}/metrics${buildQueryString(params || {})}`,
     ),
 
-  listAIAccounts: () =>
-    request<unknown>("/v1/ai/accounts").then(
-      (payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as AIAccountResponse[],
-    ),
+  listAIAccounts: (
+    params: PaginationParams & {
+      provider?: string;
+      enabled?: boolean;
+    } = {},
+  ) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(
+        `/v1/ai/accounts${buildQueryString(params || {})}`,
+      ).then((payload) => extractListItems<AIAccountResponse>(payload));
+    }
+
+    const queryParams = {
+      provider: params?.provider,
+      enabled: params?.enabled,
+    };
+
+    return requestAllPages<AIAccountResponse>((page) =>
+      request<unknown>(
+        `/v1/ai/accounts${buildQueryString({ ...queryParams, ...page })}`,
+      ).then((payload) => extractListItems<AIAccountResponse>(payload))
+    );
+  },
 
   getAIAccountById: (id: string) =>
     request<AIAccountResponse>(`/v1/ai/accounts/${id}`),

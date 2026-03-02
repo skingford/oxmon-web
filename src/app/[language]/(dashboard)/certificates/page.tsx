@@ -19,7 +19,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
@@ -35,6 +34,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Copy,
   Loader2,
@@ -51,6 +51,8 @@ type CertificatesQueryState = {
   certsPage: ListResponse<CertificateDetails>
   summary: CertSummary | null
 }
+
+type CertificateStatusFilter = "all" | "valid" | "invalid"
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
 function isValidNonNegativeIntegerText(value: string) {
@@ -146,6 +148,9 @@ export default function CertificatesPage() {
   const issuerParamValue = searchParams.get("issuer") || ""
   const ipParamValue = searchParams.get("ip") || ""
   const expiryParamValue = searchParams.get("expiry") || ""
+  const statusParamValue = (searchParams.get("status") || "all") as CertificateStatusFilter
+  const normalizedStatusParamValue: CertificateStatusFilter =
+    statusParamValue === "valid" || statusParamValue === "invalid" ? statusParamValue : "all"
   const rawOffset = Number(searchParams.get("offset") || "0")
   const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
 
@@ -153,9 +158,12 @@ export default function CertificatesPage() {
   const [issuerKeyword, setIssuerKeyword] = useState(issuerParamValue)
   const [ipKeyword, setIpKeyword] = useState(ipParamValue)
   const [expiryDays, setExpiryDays] = useState(expiryParamValue)
+  const [statusFilter, setStatusFilter] = useState<CertificateStatusFilter>(normalizedStatusParamValue)
+  const [domainKeywordDraft, setDomainKeywordDraft] = useState(domainParamValue)
   const [issuerKeywordDraft, setIssuerKeywordDraft] = useState(issuerParamValue)
   const [ipKeywordDraft, setIpKeywordDraft] = useState(ipParamValue)
   const [expiryDaysDraft, setExpiryDaysDraft] = useState(expiryParamValue)
+  const [statusFilterDraft, setStatusFilterDraft] = useState<CertificateStatusFilter>(normalizedStatusParamValue)
   const [offset, setOffset] = useState(initialOffset)
 
   const [chainDialogOpen, setChainDialogOpen] = useState(false)
@@ -205,9 +213,14 @@ export default function CertificatesPage() {
             api.getCertificates({
               limit: PAGE_LIMIT,
               offset,
+              domain__contains: domainKeyword.trim() || undefined,
               issuer__contains: issuerKeyword.trim() || undefined,
               ip_address__contains: ipKeyword.trim() || undefined,
               not_after__lte: expiryLimit,
+              is_valid__eq:
+                statusFilter === "all"
+                  ? undefined
+                  : statusFilter === "valid",
             }),
             api.getCertSummary(),
           ])
@@ -225,7 +238,7 @@ export default function CertificatesPage() {
         }
       )
     },
-    [execute, expiryLimit, ipKeyword, issuerKeyword, offset, t]
+    [domainKeyword, execute, expiryLimit, ipKeyword, issuerKeyword, offset, statusFilter, t]
   )
 
   useEffect(() => {
@@ -237,6 +250,11 @@ export default function CertificatesPage() {
     const nextIssuer = searchParams.get("issuer") || ""
     const nextIp = searchParams.get("ip") || ""
     const nextExpiry = searchParams.get("expiry") || ""
+    const nextStatusParam = (searchParams.get("status") || "all") as CertificateStatusFilter
+    const nextStatus: CertificateStatusFilter =
+      nextStatusParam === "valid" || nextStatusParam === "invalid"
+        ? nextStatusParam
+        : "all"
     const nextRawOffset = Number(searchParams.get("offset") || "0")
     const nextOffset = Number.isFinite(nextRawOffset) && nextRawOffset > 0
       ? Math.floor(nextRawOffset)
@@ -246,9 +264,12 @@ export default function CertificatesPage() {
     setIssuerKeyword((previous) => (previous === nextIssuer ? previous : nextIssuer))
     setIpKeyword((previous) => (previous === nextIp ? previous : nextIp))
     setExpiryDays((previous) => (previous === nextExpiry ? previous : nextExpiry))
+    setStatusFilter((previous) => (previous === nextStatus ? previous : nextStatus))
+    setDomainKeywordDraft((previous) => (previous === nextDomain ? previous : nextDomain))
     setIssuerKeywordDraft((previous) => (previous === nextIssuer ? previous : nextIssuer))
     setIpKeywordDraft((previous) => (previous === nextIp ? previous : nextIp))
     setExpiryDaysDraft((previous) => (previous === nextExpiry ? previous : nextExpiry))
+    setStatusFilterDraft((previous) => (previous === nextStatus ? previous : nextStatus))
     setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
   }, [searchParams])
 
@@ -279,6 +300,12 @@ export default function CertificatesPage() {
       nextParams.delete("expiry")
     }
 
+    if (statusFilter !== "all") {
+      nextParams.set("status", statusFilter)
+    } else {
+      nextParams.delete("status")
+    }
+
     if (offset > 0) {
       nextParams.set("offset", String(offset))
     } else {
@@ -295,17 +322,7 @@ export default function CertificatesPage() {
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
       scroll: false,
     })
-  }, [domainKeyword, expiryDays, ipKeyword, issuerKeyword, offset, pathname, router, searchParams])
-
-  const filteredCerts = useMemo(() => {
-    const keyword = domainKeyword.trim().toLowerCase()
-
-    if (!keyword) {
-      return certs
-    }
-
-    return certs.filter((cert) => cert.domain.toLowerCase().includes(keyword))
-  }, [certs, domainKeyword])
+  }, [domainKeyword, expiryDays, ipKeyword, issuerKeyword, offset, pathname, router, searchParams, statusFilter])
 
   const pagination = useServerOffsetPagination({
     offset,
@@ -314,30 +331,32 @@ export default function CertificatesPage() {
     totalItems: certsPage.total,
   })
   const hasAppliedApiFilters = Boolean(
-    issuerKeyword.trim() || ipKeyword.trim() || expiryDays.trim()
+    domainKeyword.trim() ||
+    issuerKeyword.trim() ||
+    ipKeyword.trim() ||
+    expiryDays.trim() ||
+    statusFilter !== "all"
   )
-  const hasLocalDomainFilter = Boolean(domainKeyword.trim())
   const hasPendingApiFilterChanges =
+    domainKeywordDraft.trim() !== domainKeyword.trim() ||
     issuerKeywordDraft.trim() !== issuerKeyword.trim() ||
     ipKeywordDraft.trim() !== ipKeyword.trim() ||
-    expiryDaysDraft.trim() !== expiryDays.trim()
+    expiryDaysDraft.trim() !== expiryDays.trim() ||
+    statusFilterDraft !== statusFilter
   const isExpiryDaysDraftValid = isValidNonNegativeIntegerText(expiryDaysDraft)
-
-  const handleDomainKeywordChange = (value: string) => {
-    setDomainKeyword(value)
-    setOffset((previous) => (previous === 0 ? previous : 0))
-  }
 
   const handleApplyApiFilters = useCallback(() => {
     if (!isExpiryDaysDraftValid) {
       return
     }
 
+    setDomainKeyword(domainKeywordDraft)
     setIssuerKeyword(issuerKeywordDraft)
     setIpKeyword(ipKeywordDraft)
     setExpiryDays(expiryDaysDraft)
+    setStatusFilter(statusFilterDraft)
     setOffset(0)
-  }, [expiryDaysDraft, ipKeywordDraft, isExpiryDaysDraftValid, issuerKeywordDraft])
+  }, [domainKeywordDraft, expiryDaysDraft, ipKeywordDraft, isExpiryDaysDraftValid, issuerKeywordDraft, statusFilterDraft])
 
   const handleApiFilterKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter") {
@@ -353,9 +372,12 @@ export default function CertificatesPage() {
     setIssuerKeyword("")
     setIpKeyword("")
     setExpiryDays("")
+    setStatusFilter("all")
+    setDomainKeywordDraft("")
     setIssuerKeywordDraft("")
     setIpKeywordDraft("")
     setExpiryDaysDraft("")
+    setStatusFilterDraft("all")
     setOffset(0)
   }
 
@@ -386,6 +408,10 @@ export default function CertificatesPage() {
   const handleCopyApiCurl = async (insecure = false) => {
     const query = new URLSearchParams()
 
+    if (domainKeyword.trim()) {
+      query.set("domain__contains", domainKeyword.trim())
+    }
+
     if (issuerKeyword.trim()) {
       query.set("issuer__contains", issuerKeyword.trim())
     }
@@ -396,6 +422,10 @@ export default function CertificatesPage() {
 
     if (expiryLimit !== undefined) {
       query.set("not_after__lte", String(expiryLimit))
+    }
+
+    if (statusFilter !== "all") {
+      query.set("is_valid__eq", String(statusFilter === "valid"))
     }
 
     try {
@@ -463,108 +493,121 @@ export default function CertificatesPage() {
               {t("certificates.overview.openapiMappingTitle")}
             </summary>
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-              <p>{t("certificates.overview.openapiMappingDomainLocal")}</p>
+              <p>{t("certificates.overview.openapiMappingDomain")}</p>
+              <p>{t("certificates.overview.openapiMappingStatus")}</p>
               <p>{t("certificates.overview.openapiMappingIssuer")}</p>
               <p>{t("certificates.overview.openapiMappingIp")}</p>
               <p>{t("certificates.overview.openapiMappingExpiry")}</p>
             </div>
           </details>
-          <div className="grid gap-3 lg:grid-cols-[1.1fr_1.9fr]">
-            <div className="space-y-3 rounded-lg border p-3">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{t("certificates.overview.filterDomainLabel")}</p>
-                <p className="text-xs text-muted-foreground">{t("certificates.overview.filterLocalHint")}</p>
-              </div>
-              <FilterToolbar
-                className="md:grid-cols-1 xl:grid-cols-1"
-                search={{
-                  value: domainKeyword,
-                  onValueChange: handleDomainKeywordChange,
-                  placeholder: t("certificates.overview.filterDomainPlaceholder"),
-                  inputClassName: "h-10",
-                }}
-              />
+          <div className="space-y-3 rounded-lg border p-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">{t("certificates.overview.apiFiltersTitle")}</p>
+              <p className="text-xs text-muted-foreground">{t("certificates.overview.filterApiHint")}</p>
             </div>
 
-            <div className="space-y-3 rounded-lg border p-3">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{t("certificates.overview.apiFiltersTitle")}</p>
-                <p className="text-xs text-muted-foreground">{t("certificates.overview.filterApiHint")}</p>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="space-y-2">
+                <Label htmlFor="cert-overview-domain">{t("certificates.overview.filterDomainLabel")}</Label>
+                <Input
+                  id="cert-overview-domain"
+                  value={domainKeywordDraft}
+                  onChange={(event) => setDomainKeywordDraft(event.target.value)}
+                  onKeyDown={handleApiFilterKeyDown}
+                  placeholder={t("certificates.overview.filterDomainPlaceholder")}
+                  className="h-10"
+                />
               </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cert-overview-issuer">{t("certificates.overview.filterIssuerLabel")}</Label>
+              <div className="space-y-2">
+                <Label htmlFor="cert-overview-status">{t("certificates.overview.filterStatusLabel")}</Label>
+                <Select
+                  value={statusFilterDraft}
+                  onValueChange={(value) => setStatusFilterDraft(value as CertificateStatusFilter)}
+                >
+                  <SelectTrigger id="cert-overview-status" className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("certificates.overview.filterStatusAll")}</SelectItem>
+                    <SelectItem value="valid">{t("certificates.overview.filterStatusValid")}</SelectItem>
+                    <SelectItem value="invalid">{t("certificates.overview.filterStatusInvalid")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cert-overview-issuer">{t("certificates.overview.filterIssuerLabel")}</Label>
+                <Input
+                  id="cert-overview-issuer"
+                  value={issuerKeywordDraft}
+                  onChange={(event) => setIssuerKeywordDraft(event.target.value)}
+                  onKeyDown={handleApiFilterKeyDown}
+                  placeholder={t("certificates.overview.filterIssuerPlaceholder")}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cert-overview-ip">{t("certificates.overview.filterIpLabel")}</Label>
+                <Input
+                  id="cert-overview-ip"
+                  value={ipKeywordDraft}
+                  onChange={(event) => setIpKeywordDraft(event.target.value)}
+                  onKeyDown={handleApiFilterKeyDown}
+                  placeholder={t("certificates.overview.filterIpPlaceholder")}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cert-overview-expiry-days">{t("certificates.overview.filterExpiryDaysLabel")}</Label>
+                <div className="space-y-1">
                   <Input
-                    id="cert-overview-issuer"
-                    value={issuerKeywordDraft}
-                    onChange={(event) => setIssuerKeywordDraft(event.target.value)}
+                    id="cert-overview-expiry-days"
+                    value={expiryDaysDraft}
+                    onChange={(event) => setExpiryDaysDraft(event.target.value)}
                     onKeyDown={handleApiFilterKeyDown}
-                    placeholder={t("certificates.overview.filterIssuerPlaceholder")}
+                    placeholder={t("certificates.overview.filterExpiryDaysPlaceholder")}
+                    inputMode="numeric"
+                    aria-invalid={!isExpiryDaysDraftValid}
                     className="h-10"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cert-overview-ip">{t("certificates.overview.filterIpLabel")}</Label>
-                  <Input
-                    id="cert-overview-ip"
-                    value={ipKeywordDraft}
-                    onChange={(event) => setIpKeywordDraft(event.target.value)}
-                    onKeyDown={handleApiFilterKeyDown}
-                    placeholder={t("certificates.overview.filterIpPlaceholder")}
-                    className="h-10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cert-overview-expiry-days">{t("certificates.overview.filterExpiryDaysLabel")}</Label>
-                  <div className="space-y-1">
-                    <Input
-                      id="cert-overview-expiry-days"
-                      value={expiryDaysDraft}
-                      onChange={(event) => setExpiryDaysDraft(event.target.value)}
-                      onKeyDown={handleApiFilterKeyDown}
-                      placeholder={t("certificates.overview.filterExpiryDaysPlaceholder")}
-                      inputMode="numeric"
-                      aria-invalid={!isExpiryDaysDraftValid}
-                      className="h-10"
-                    />
-                    {!isExpiryDaysDraftValid ? (
-                      <p className="text-xs text-destructive">
-                        {t("certificates.overview.filterExpiryDaysInvalid")}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex items-end gap-2">
-                  <Button
-                    type="button"
-                    onClick={handleApplyApiFilters}
-                    className="h-10"
-                    disabled={!hasPendingApiFilterChanges || !isExpiryDaysDraftValid}
-                  >
-                    {t("certificates.overview.applyFilters")}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={handleClearFilters} className="h-10">
-                    {t("certificates.overview.clearFilters")}
-                  </Button>
+                  {!isExpiryDaysDraftValid ? (
+                    <p className="text-xs text-destructive">
+                      {t("certificates.overview.filterExpiryDaysInvalid")}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>{t("certificates.overview.appliedLocalFiltersLabel")}</span>
-            {hasLocalDomainFilter ? (
-              <Badge variant="secondary">
-                {t("certificates.overview.appliedDomain", { value: domainKeyword.trim() })}
-              </Badge>
-            ) : (
-              <span>{t("certificates.overview.appliedLocalFiltersEmpty")}</span>
-            )}
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={handleApplyApiFilters}
+                className="h-10"
+                disabled={!hasPendingApiFilterChanges || !isExpiryDaysDraftValid}
+              >
+                {t("certificates.overview.applyFilters")}
+              </Button>
+              <Button type="button" variant="outline" onClick={handleClearFilters} className="h-10">
+                {t("certificates.overview.clearFilters")}
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>{t("certificates.overview.appliedApiFiltersLabel")}</span>
             {hasAppliedApiFilters ? (
               <>
+                {domainKeyword.trim() ? (
+                  <Badge variant="secondary">
+                    {t("certificates.overview.appliedDomain", { value: domainKeyword.trim() })}
+                  </Badge>
+                ) : null}
+                {statusFilter !== "all" ? (
+                  <Badge variant="secondary">
+                    {statusFilter === "valid"
+                      ? t("certificates.overview.appliedStatusValid")
+                      : t("certificates.overview.appliedStatusInvalid")}
+                  </Badge>
+                ) : null}
                 {issuerKeyword.trim() ? (
                   <Badge variant="secondary">
                     {t("certificates.overview.appliedIssuer", { value: issuerKeyword.trim() })}
@@ -611,16 +654,11 @@ export default function CertificatesPage() {
           <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>
               {t("certificates.overview.tableResultSummary", {
-                filtered: filteredCerts.length,
+                filtered: certs.length,
                 page: certs.length,
                 total: certsPage.total,
               })}
             </span>
-            {hasLocalDomainFilter ? (
-              <Badge variant="outline">
-                {t("certificates.overview.tableResultSummaryLocalFiltered")}
-              </Badge>
-            ) : null}
             {hasPendingApiFilterChanges ? (
               <Badge variant="outline">
                 {t("certificates.overview.tableResultSummaryPendingApiFilters")}
@@ -646,25 +684,25 @@ export default function CertificatesPage() {
                       {t("certificates.overview.tableLoading")}
                     </TableCell>
                   </TableRow>
-                ) : filteredCerts.length === 0 ? (
+                ) : certs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                       <div className="space-y-1">
                         <p>
-                          {certs.length === 0
-                            ? t("certificates.overview.tableEmpty")
-                            : t("certificates.overview.tableEmptyFiltered")}
+                          {hasAppliedApiFilters
+                            ? t("certificates.overview.tableEmptyFiltered")
+                            : t("certificates.overview.tableEmpty")}
                         </p>
                         <p className="text-xs text-muted-foreground/80">
-                          {certs.length === 0
-                            ? t("certificates.overview.tableEmptyHint")
-                            : t("certificates.overview.tableEmptyFilteredHint")}
+                          {hasAppliedApiFilters
+                            ? t("certificates.overview.tableEmptyFilteredHint")
+                            : t("certificates.overview.tableEmptyHint")}
                         </p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCerts.map((cert) => {
+                  certs.map((cert) => {
                     const statusMeta = getCertificateStatusMeta(cert, t)
                     const StatusIcon = statusMeta.icon
                     const daysUntilExpiry = getDaysUntilExpiry(cert.not_after)

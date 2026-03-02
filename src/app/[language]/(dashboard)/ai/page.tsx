@@ -20,7 +20,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { JsonTextarea } from "@/components/ui/json-textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -49,18 +48,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Plus, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, Loader2, Plus, RefreshCw } from "lucide-react";
 
 type FormState = {
   config_key: string;
   provider: string;
   display_name: string;
   description: string;
+  api_key: string;
+  model: string;
+  base_url: string;
+  api_mode: string;
+  timeout_secs: string;
+  max_tokens: string;
+  temperature: string;
+  collection_interval_secs: string;
   enabled: boolean;
-  configBaseUrl: string;
-  configApiKey: string;
-  configModel: string;
-  configJson: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -68,75 +71,50 @@ const EMPTY_FORM: FormState = {
   provider: "",
   display_name: "",
   description: "",
+  api_key: "",
+  model: "",
+  base_url: "",
+  api_mode: "",
+  timeout_secs: "",
+  max_tokens: "",
+  temperature: "",
+  collection_interval_secs: "",
   enabled: true,
-  configBaseUrl: "",
-  configApiKey: "",
-  configModel: "",
-  configJson: "{}",
 };
 
-function parseConfigObject(value: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(value || "{}");
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+function normalizeNullableString(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
-function configInputFieldsFromJson(value: string) {
-  const parsed = parseConfigObject(value);
-  return {
-    configBaseUrl: typeof parsed?.base_url === "string" ? parsed.base_url : "",
-    configApiKey: typeof parsed?.api_key === "string" ? parsed.api_key : "",
-    configModel: typeof parsed?.model === "string" ? parsed.model : "",
-  };
-}
+function parseOptionalInteger(value: string) {
+  const trimmed = value.trim();
 
-function stringifyConfigObject(value: Record<string, unknown>) {
-  return JSON.stringify(value, null, 2);
-}
-
-function applyConfigInputsToJson(
-  currentJson: string,
-  inputs: Pick<FormState, "configBaseUrl" | "configApiKey" | "configModel">,
-) {
-  const next = parseConfigObject(currentJson) ?? {};
-
-  if (inputs.configBaseUrl.trim()) next.base_url = inputs.configBaseUrl.trim();
-  else delete next.base_url;
-
-  if (inputs.configApiKey.trim()) next.api_key = inputs.configApiKey.trim();
-  else delete next.api_key;
-
-  if (inputs.configModel.trim()) next.model = inputs.configModel.trim();
-  else delete next.model;
-
-  return stringifyConfigObject(next);
-}
-
-function normalizeJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeJsonValue(item));
+  if (!trimmed) {
+    return { valid: true, value: null as number | null };
   }
 
-  if (!value || typeof value !== "object") {
-    return value;
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return { valid: false, value: null as number | null };
   }
 
-  return Object.keys(value as Record<string, unknown>)
-    .sort()
-    .reduce<Record<string, unknown>>((result, key) => {
-      result[key] = normalizeJsonValue((value as Record<string, unknown>)[key]);
-      return result;
-    }, {});
+  return { valid: true, value: parsed };
 }
 
-function isJsonValueEqual(left: unknown, right: unknown) {
-  return JSON.stringify(normalizeJsonValue(left)) === JSON.stringify(normalizeJsonValue(right));
+function parseOptionalFloat(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return { valid: true, value: null as number | null };
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return { valid: false, value: null as number | null };
+  }
+
+  return { valid: true, value: parsed };
 }
 
 function formatDateTime(value?: string | null) {
@@ -152,9 +130,9 @@ export default function AIAccountsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [editing, setEditing] = useState<AIAccountResponse | null>(null);
   const [editingLoadingId, setEditingLoadingId] = useState<string | null>(null);
-  const [editingOriginalConfig, setEditingOriginalConfig] = useState<unknown>(null);
   const [deleteTarget, setDeleteTarget] = useState<AIAccountResponse | null>(
     null,
   );
@@ -187,7 +165,7 @@ export default function AIAccountsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setEditingOriginalConfig(null);
+    setShowApiKey(false);
     setForm(EMPTY_FORM);
     setDialogOpen(true);
   };
@@ -196,18 +174,25 @@ export default function AIAccountsPage() {
     setEditingLoadingId(item.id);
     try {
       const detail = await api.getAIAccountById(item.id);
-      const configJson = JSON.stringify(detail.config_json ?? {}, null, 2);
-      const configFields = configInputFieldsFromJson(configJson);
       setEditing(detail);
-      setEditingOriginalConfig(detail.config_json ?? {});
+      setShowApiKey(false);
       setForm({
         config_key: detail.config_key,
-        provider: detail.provider || "",
+        provider: detail.provider,
         display_name: detail.display_name,
         description: detail.description || "",
+        api_key: detail.api_key || "",
+        model: detail.model || "",
+        base_url: detail.base_url || "",
+        api_mode: detail.api_mode || "",
+        timeout_secs: detail.timeout_secs == null ? "" : String(detail.timeout_secs),
+        max_tokens: detail.max_tokens == null ? "" : String(detail.max_tokens),
+        temperature: detail.temperature == null ? "" : String(detail.temperature),
+        collection_interval_secs:
+          detail.collection_interval_secs == null
+            ? ""
+            : String(detail.collection_interval_secs),
         enabled: detail.enabled,
-        ...configFields,
-        configJson,
       });
       setDialogOpen(true);
     } catch (error) {
@@ -218,65 +203,84 @@ export default function AIAccountsPage() {
   };
 
   const submit = async () => {
-    if (!form.config_key.trim())
+    const configKey = form.config_key.trim();
+    const provider = form.provider.trim();
+    const displayName = form.display_name.trim();
+    const apiKey = form.api_key.trim();
+    const timeoutSecs = parseOptionalInteger(form.timeout_secs);
+    const maxTokens = parseOptionalInteger(form.max_tokens);
+    const temperature = parseOptionalFloat(form.temperature);
+    const collectionIntervalSecs = parseOptionalInteger(form.collection_interval_secs);
+
+    if (!configKey)
       return void toastApiError(
         new Error(""),
         t("accounts.toastConfigKeyRequired"),
       );
-    if (!form.provider.trim())
+    if (!provider)
       return void toastApiError(
         new Error(""),
         t("accounts.toastProviderRequired"),
       );
-    if (!form.display_name.trim())
+    if (!displayName)
       return void toastApiError(
         new Error(""),
         t("accounts.toastDisplayNameRequired"),
       );
-
-    let parsedConfig: unknown;
-    try {
-      parsedConfig = JSON.parse(form.configJson || "{}");
-    } catch {
+    if (!editing && !apiKey) {
       return void toastApiError(
         new Error(""),
-        t("accounts.toastConfigInvalid"),
+        t("accounts.toastApiKeyRequired"),
+      );
+    }
+    if (
+      !timeoutSecs.valid ||
+      !maxTokens.valid ||
+      !temperature.valid ||
+      !collectionIntervalSecs.valid
+    ) {
+      return void toastApiError(
+        new Error(""),
+        t("accounts.toastNumberInvalid"),
       );
     }
 
     setSubmitting(true);
     try {
       if (editing) {
-        const payload: {
-          display_name: string;
-          description: string | null;
-          enabled: boolean;
-          config?: unknown;
-        } = {
-          display_name: form.display_name.trim(),
-          description: form.description.trim() || null,
+        await api.updateAIAccount(editing.id, {
+          display_name: displayName,
+          description: normalizeNullableString(form.description),
+          api_key: normalizeNullableString(form.api_key),
+          model: normalizeNullableString(form.model),
+          base_url: normalizeNullableString(form.base_url),
+          api_mode: normalizeNullableString(form.api_mode),
+          timeout_secs: timeoutSecs.value,
+          max_tokens: maxTokens.value,
+          temperature: temperature.value,
+          collection_interval_secs: collectionIntervalSecs.value,
           enabled: form.enabled,
-        };
-
-        if (!isJsonValueEqual(parsedConfig, editingOriginalConfig)) {
-          payload.config = parsedConfig;
-        }
-
-        await api.updateAIAccount(editing.id, payload);
+        });
         toastSaved(t("accounts.toastUpdateSuccess"));
       } else {
         await api.createAIAccount({
-          config_key: form.config_key.trim(),
-          provider: form.provider.trim(),
-          display_name: form.display_name.trim(),
-          description: form.description.trim() || null,
+          config_key: configKey,
+          provider,
+          display_name: displayName,
+          description: normalizeNullableString(form.description),
+          api_key: apiKey,
+          model: normalizeNullableString(form.model),
+          base_url: normalizeNullableString(form.base_url),
+          api_mode: normalizeNullableString(form.api_mode),
+          timeout_secs: timeoutSecs.value,
+          max_tokens: maxTokens.value,
+          temperature: temperature.value,
+          collection_interval_secs: collectionIntervalSecs.value,
           enabled: form.enabled,
-          config: parsedConfig,
         });
         toastCreated(t("accounts.toastCreateSuccess"));
       }
       setDialogOpen(false);
-      setEditingOriginalConfig(null);
       await fetchData();
     } catch (error) {
       toastApiError(
@@ -430,8 +434,16 @@ export default function AIAccountsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setShowApiKey(false);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {editing
@@ -442,150 +454,162 @@ export default function AIAccountsPage() {
               {t("accounts.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>{t("accounts.fieldConfigKey")}</Label>
-              <Input
-                value={form.config_key}
-                disabled={Boolean(editing)}
-                onChange={(e) =>
-                  setForm((s) => ({ ...s, config_key: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("accounts.fieldProvider")}</Label>
-              <Input
-                value={form.provider}
-                disabled={Boolean(editing)}
-                onChange={(e) =>
-                  setForm((s) => ({ ...s, provider: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>{t("accounts.fieldDisplayName")}</Label>
-              <Input
-                value={form.display_name}
-                onChange={(e) =>
-                  setForm((s) => ({ ...s, display_name: e.target.value }))
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-3 sm:col-span-2">
-              <Label>{t("accounts.fieldEnabled")}</Label>
-              <Switch
-                checked={form.enabled}
-                onCheckedChange={(checked) =>
-                  setForm((s) => ({ ...s, enabled: checked }))
-                }
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>{t("accounts.fieldDescription")}</Label>
-              <Input
-                value={form.description}
-                onChange={(e) =>
-                  setForm((s) => ({ ...s, description: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <p className="text-sm font-medium">
-                {t("accounts.configFieldsTitle")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("accounts.configFieldsDescription")}
-              </p>
-              <div className="space-y-4">
+          <div className="space-y-5">
+            <div className="space-y-4 rounded-md border p-4">
+              <p className="text-sm font-medium">{t("accounts.sectionBasic")}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>{t("accounts.fieldConfigBaseUrl")}</Label>
+                  <Label>{t("accounts.fieldConfigKey")}</Label>
                   <Input
-                    value={form.configBaseUrl}
+                    value={form.config_key}
+                    disabled={Boolean(editing)}
                     onChange={(e) =>
-                      setForm((s) => {
-                        const configBaseUrl = e.target.value;
-                        const nextInputs = {
-                          configBaseUrl,
-                          configApiKey: s.configApiKey,
-                          configModel: s.configModel,
-                        };
-                        return {
-                          ...s,
-                          ...nextInputs,
-                          configJson: applyConfigInputsToJson(
-                            s.configJson,
-                            nextInputs,
-                          ),
-                        };
-                      })
+                      setForm((s) => ({ ...s, config_key: e.target.value }))
                     }
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("accounts.fieldConfigApiKey")}</Label>
+                  <Label>{t("accounts.fieldProvider")}</Label>
                   <Input
-                    value={form.configApiKey}
+                    value={form.provider}
+                    disabled={Boolean(editing)}
                     onChange={(e) =>
-                      setForm((s) => {
-                        const configApiKey = e.target.value;
-                        const nextInputs = {
-                          configBaseUrl: s.configBaseUrl,
-                          configApiKey,
-                          configModel: s.configModel,
-                        };
-                        return {
-                          ...s,
-                          ...nextInputs,
-                          configJson: applyConfigInputsToJson(
-                            s.configJson,
-                            nextInputs,
-                          ),
-                        };
-                      })
+                      setForm((s) => ({ ...s, provider: e.target.value }))
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>{t("accounts.fieldConfigModel")}</Label>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t("accounts.fieldDisplayName")}</Label>
                   <Input
-                    value={form.configModel}
+                    value={form.display_name}
                     onChange={(e) =>
-                      setForm((s) => {
-                        const configModel = e.target.value;
-                        const nextInputs = {
-                          configBaseUrl: s.configBaseUrl,
-                          configApiKey: s.configApiKey,
-                          configModel,
-                        };
-                        return {
-                          ...s,
-                          ...nextInputs,
-                          configJson: applyConfigInputsToJson(
-                            s.configJson,
-                            nextInputs,
-                          ),
-                        };
-                      })
+                      setForm((s) => ({ ...s, display_name: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t("accounts.fieldDescription")}</Label>
+                  <Input
+                    value={form.description}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, description: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t("accounts.fieldCollectionIntervalSecs")}</Label>
+                  <Input
+                    inputMode="numeric"
+                    value={form.collection_interval_secs}
+                    onChange={(e) =>
+                      setForm((s) => ({
+                        ...s,
+                        collection_interval_secs: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3 sm:col-span-2">
+                  <Label>{t("accounts.fieldEnabled")}</Label>
+                  <Switch
+                    checked={form.enabled}
+                    onCheckedChange={(checked) =>
+                      setForm((s) => ({ ...s, enabled: checked }))
                     }
                   />
                 </div>
               </div>
             </div>
 
-            <div className="space-y-2 sm:col-span-2">
-              <Label>{t("accounts.fieldConfigJson")}</Label>
-              <JsonTextarea
-                value={form.configJson}
-                onChange={(value) =>
-                  setForm((s) => ({
-                    ...s,
-                    ...configInputFieldsFromJson(value),
-                    configJson: value,
-                  }))
-                }
-                className="min-h-[180px]"
-              />
+            <div className="space-y-4 rounded-md border p-4">
+              <p className="text-sm font-medium">{t("accounts.sectionModelConfig")}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t("accounts.fieldBaseUrl")}</Label>
+                  <Input
+                    value={form.base_url}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, base_url: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t("accounts.fieldApiKey")}</Label>
+                  <div className="relative">
+                    <Input
+                      type={showApiKey ? "text" : "password"}
+                      value={form.api_key}
+                      className="pr-10"
+                      onChange={(e) =>
+                        setForm((s) => ({ ...s, api_key: e.target.value }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-0 top-0 inline-flex h-9 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setShowApiKey((prev) => !prev)}
+                      aria-label={
+                        showApiKey
+                          ? t("accounts.hideApiKey")
+                          : t("accounts.showApiKey")
+                      }
+                    >
+                      {showApiKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("accounts.fieldModel")}</Label>
+                  <Input
+                    value={form.model}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, model: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("accounts.fieldApiMode")}</Label>
+                  <Input
+                    value={form.api_mode}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, api_mode: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("accounts.fieldTimeoutSecs")}</Label>
+                  <Input
+                    inputMode="numeric"
+                    value={form.timeout_secs}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, timeout_secs: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("accounts.fieldMaxTokens")}</Label>
+                  <Input
+                    inputMode="numeric"
+                    value={form.max_tokens}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, max_tokens: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("accounts.fieldTemperature")}</Label>
+                  <Input
+                    value={form.temperature}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, temperature: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
