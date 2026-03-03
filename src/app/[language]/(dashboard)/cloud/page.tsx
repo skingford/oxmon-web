@@ -11,6 +11,7 @@ import type {
   BatchCreateCloudAccountsRequest,
   CloudAccountResponse,
   CreateCloudAccountRequest,
+  DictionaryItem,
   UpdateCloudAccountRequest,
 } from "@/types/api"
 import { Button } from "@/components/ui/button"
@@ -55,7 +56,13 @@ const CLOUD_PROVIDER_ALIASES: Record<string, string> = {
   qcloud: "tencent",
 }
 
-const BUILT_IN_CLOUD_PROVIDERS = ["tencent", "alibaba"] as const
+const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
+
+type CloudProviderOption = {
+  value: string
+  label: string
+  sortOrder: number
+}
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   if (!value) {
@@ -90,9 +97,53 @@ function parseDelimitedValues(value: string): string[] {
 }
 
 function getProviderOptions(accounts: CloudAccountResponse[]) {
-  return Array.from(
-    new Set(accounts.map((item) => item.provider?.trim()).filter((item): item is string => Boolean(item)))
-  ).sort((a, b) => a.localeCompare(b))
+  return Array.from(new Set(
+    accounts
+      .map((item) => normalizeCloudProvider(item.provider || ""))
+      .filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b))
+}
+
+function normalizeCloudProviderDictionaryItems(items: DictionaryItem[]): CloudProviderOption[] {
+  const normalizedItems = items
+    .map((item) => ({
+      value: normalizeCloudProvider(item.dict_key),
+      label: item.dict_label.trim() || normalizeCloudProvider(item.dict_key),
+      sortOrder: item.sort_order,
+    }))
+    .filter((item) => Boolean(item.value))
+    .sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder
+      }
+
+      return left.label.localeCompare(right.label)
+    })
+
+  const seen = new Set<string>()
+  return normalizedItems.filter((item) => {
+    if (seen.has(item.value)) {
+      return false
+    }
+
+    seen.add(item.value)
+    return true
+  })
+}
+
+function buildFallbackProviderOptions(locale: "zh" | "en"): CloudProviderOption[] {
+  return [
+    {
+      value: "tencent",
+      label: locale === "zh" ? "腾讯云" : "Tencent Cloud",
+      sortOrder: 10,
+    },
+    {
+      value: "alibaba",
+      label: locale === "zh" ? "阿里云" : "Alibaba Cloud",
+      sortOrder: 20,
+    },
+  ]
 }
 
 function buildCloudAccountFormState(account: CloudAccountResponse): CloudAccountFormState {
@@ -126,7 +177,8 @@ export default function CloudAccountsPage() {
   const [formSubmitting, setFormSubmitting] = useState(false)
   const [editingDialogLoading, setEditingDialogLoading] = useState(false)
   const [batchDialogOpen, setBatchDialogOpen] = useState(false)
-  const [batchProvider, setBatchProvider] = useState<(typeof BUILT_IN_CLOUD_PROVIDERS)[number]>("tencent")
+  const [batchProvider, setBatchProvider] = useState("tencent")
+  const [providerDictionaryOptions, setProviderDictionaryOptions] = useState<CloudProviderOption[]>([])
   const [batchCollectionIntervalSecs, setBatchCollectionIntervalSecs] = useState("300")
   const [batchText, setBatchText] = useState("")
   const [batchSubmitting, setBatchSubmitting] = useState(false)
@@ -160,13 +212,69 @@ export default function CloudAccountsPage() {
     fetchAccounts()
   }, [fetchAccounts])
 
-  const providerOptions = useMemo(() => getProviderOptions(accounts), [accounts])
+  useEffect(() => {
+    let cancelled = false
+
+    api.listDictionariesByType(CLOUD_PROVIDER_DICT_TYPE, true)
+      .then((items) => {
+        if (!cancelled) {
+          setProviderDictionaryOptions(normalizeCloudProviderDictionaryItems(items))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProviderDictionaryOptions([])
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const fallbackProviderOptions = useMemo(() => buildFallbackProviderOptions(locale), [locale])
+  const discoveredProviders = useMemo(() => getProviderOptions(accounts), [accounts])
+  const providerOptions = useMemo(() => {
+    if (providerDictionaryOptions.length > 0) {
+      return providerDictionaryOptions
+    }
+
+    if (discoveredProviders.length > 0) {
+      return discoveredProviders.map((provider, index) => ({
+        value: provider,
+        label: provider,
+        sortOrder: 1_000 + index,
+      }))
+    }
+
+    return fallbackProviderOptions
+  }, [discoveredProviders, fallbackProviderOptions, providerDictionaryOptions])
+
+  const providerLabelMap = useMemo(
+    () => new Map(providerOptions.map((item) => [item.value, item.label])),
+    [providerOptions]
+  )
+
+  const getProviderLabel = useCallback((provider: string) => {
+    const normalized = normalizeCloudProvider(provider)
+    return providerLabelMap.get(normalized) || provider || "-"
+  }, [providerLabelMap])
+
   const normalizedProvider = useMemo(() => normalizeCloudProvider(form.provider), [form.provider])
   const providerSelectValue = useMemo(() => {
-    return BUILT_IN_CLOUD_PROVIDERS.includes(normalizedProvider as (typeof BUILT_IN_CLOUD_PROVIDERS)[number])
-      ? normalizedProvider
-      : "__custom__"
-  }, [normalizedProvider])
+    const providerValues = new Set(providerOptions.map((item) => item.value))
+    return providerValues.has(normalizedProvider) ? normalizedProvider : "__custom__"
+  }, [normalizedProvider, providerOptions])
+
+  useEffect(() => {
+    if (providerOptions.length === 0) {
+      return
+    }
+
+    if (!providerOptions.some((item) => item.value === batchProvider)) {
+      setBatchProvider(providerOptions[0].value)
+    }
+  }, [batchProvider, providerOptions])
 
   const filteredAccounts = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
@@ -180,7 +288,7 @@ export default function CloudAccountsPage() {
         return false
       }
 
-      if (providerFilter !== "all" && item.provider !== providerFilter) {
+      if (providerFilter !== "all" && normalizeCloudProvider(item.provider) !== providerFilter) {
         return false
       }
 
@@ -193,6 +301,7 @@ export default function CloudAccountsPage() {
         item.account_name,
         item.config_key,
         item.provider,
+        getProviderLabel(item.provider),
         item.description ?? "",
       ]
         .join(" ")
@@ -200,7 +309,7 @@ export default function CloudAccountsPage() {
 
       return haystack.includes(keyword)
     })
-  }, [accounts, enabledFilter, providerFilter, searchKeyword])
+  }, [accounts, enabledFilter, getProviderLabel, providerFilter, searchKeyword])
 
   const stats = useMemo(() => {
     const enabledCount = accounts.filter((item) => item.enabled).length
@@ -208,21 +317,24 @@ export default function CloudAccountsPage() {
       total: accounts.length,
       enabled: enabledCount,
       disabled: accounts.length - enabledCount,
-      providers: providerOptions.length,
+      providers: discoveredProviders.length,
     }
-  }, [accounts, providerOptions.length])
+  }, [accounts, discoveredProviders.length])
 
   const resetForm = useCallback(() => {
-    setForm(DEFAULT_FORM_STATE)
+    setForm({
+      ...DEFAULT_FORM_STATE,
+      provider: providerOptions[0]?.value || DEFAULT_FORM_STATE.provider,
+    })
     setEditingAccount(null)
-  }, [])
+  }, [providerOptions])
 
   const resetBatchForm = useCallback(() => {
-    setBatchProvider("tencent")
+    setBatchProvider(providerOptions[0]?.value || DEFAULT_FORM_STATE.provider)
     setBatchCollectionIntervalSecs("300")
     setBatchText("")
     setBatchSubmitting(false)
-  }, [])
+  }, [providerOptions])
 
   const openCreateDialog = useCallback(() => {
     resetForm()
@@ -331,7 +443,7 @@ export default function CloudAccountsPage() {
         toastSaved(t("cloud.accounts.toastUpdateSuccess"))
       } else {
         const configKey = form.configKey.trim()
-        const provider = form.provider.trim()
+        const provider = normalizeCloudProvider(form.provider)
         const accountName = form.accountName.trim()
         const secretId = form.secretId.trim()
         const secretKey = form.secretKey.trim()
@@ -607,7 +719,8 @@ export default function CloudAccountsPage() {
             open={batchDialogOpen}
             onOpenChange={handleBatchDialogOpenChange}
             provider={batchProvider}
-            onProviderChange={(value) => setBatchProvider(value as (typeof BUILT_IN_CLOUD_PROVIDERS)[number])}
+            providerOptions={providerOptions}
+            onProviderChange={setBatchProvider}
             collectionIntervalSecs={batchCollectionIntervalSecs}
             onCollectionIntervalSecsChange={setBatchCollectionIntervalSecs}
             textValue={batchText}
@@ -682,6 +795,7 @@ export default function CloudAccountsPage() {
         onCopyUpdateCurl={handleCopyUpdateCurl}
         onEdit={openEditDialog}
         onDelete={setDeleteTarget}
+        getProviderLabel={getProviderLabel}
         formatDateTime={formatDateTime}
         texts={{
           title: t("cloud.accounts.tableTitle"),
@@ -718,6 +832,7 @@ export default function CloudAccountsPage() {
         isEditing={Boolean(editingAccount)}
         locale={locale}
         providerSelectValue={providerSelectValue}
+        providerOptions={providerOptions}
         form={form}
         formSubmitting={formSubmitting}
         editingDialogLoading={editingDialogLoading}
@@ -725,6 +840,7 @@ export default function CloudAccountsPage() {
         onCancel={closeDialog}
         onSubmit={handleSubmit}
         setForm={setForm}
+        getProviderLabel={getProviderLabel}
         t={t}
       />
 

@@ -62,6 +62,21 @@ const EMPTY_CHART_DATA: CloudInstancesChartResponse = {
 
 const CHART_LIMIT = 30
 const CLOUD_INSTANCE_STATUS_DICT_TYPE = "cloud_instance_status"
+const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
+
+type CloudProviderOption = {
+  value: string
+  label: string
+  sortOrder: number
+}
+
+const CLOUD_PROVIDER_ALIASES: Record<string, string> = {
+  aliyun: "alibaba",
+  alicloud: "alibaba",
+  alibabacloud: "alibaba",
+  tencentcloud: "tencent",
+  qcloud: "tencent",
+}
 
 const RANKING_METRICS: RankingMetricConfig[] = [
   { id: "memory", metric: "cloud.memory.usage", labelKey: "cloud.instances.chartMetricLabel_cloud_memory_usage" },
@@ -71,6 +86,57 @@ const RANKING_METRICS: RankingMetricConfig[] = [
 
 function normalizeStatusFilterValue(value: string | null | undefined) {
   return (value || "").trim().toLowerCase()
+}
+
+function normalizeCloudProvider(value: string | null | undefined) {
+  const normalized = (value || "").trim().toLowerCase()
+  if (!normalized) {
+    return ""
+  }
+
+  return CLOUD_PROVIDER_ALIASES[normalized] || normalized
+}
+
+function normalizeCloudProviderDictionaryItems(items: DictionaryItem[]): CloudProviderOption[] {
+  const normalizedItems = items
+    .map((item) => ({
+      value: normalizeCloudProvider(item.dict_key),
+      label: item.dict_label.trim() || normalizeCloudProvider(item.dict_key),
+      sortOrder: item.sort_order,
+    }))
+    .filter((item) => Boolean(item.value))
+    .sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder
+      }
+
+      return left.label.localeCompare(right.label)
+    })
+
+  const seen = new Set<string>()
+  return normalizedItems.filter((item) => {
+    if (seen.has(item.value)) {
+      return false
+    }
+
+    seen.add(item.value)
+    return true
+  })
+}
+
+function buildFallbackCloudProviderOptions(locale: "zh" | "en"): CloudProviderOption[] {
+  return [
+    {
+      value: "tencent",
+      label: locale === "zh" ? "腾讯云" : "Tencent Cloud",
+      sortOrder: 10,
+    },
+    {
+      value: "alibaba",
+      label: locale === "zh" ? "阿里云" : "Alibaba Cloud",
+      sortOrder: 20,
+    },
+  ]
 }
 
 function normalizeStatusDictionaryItems(items: DictionaryItem[]): CloudInstanceStatusDictionaryOption[] {
@@ -185,6 +251,7 @@ function MetricRankingCard({
   axisHint,
   legendItems,
   getLevelLabel,
+  getProviderLabel,
 }: {
   title: string
   rows: RankingRow[]
@@ -193,6 +260,7 @@ function MetricRankingCard({
   axisHint: string
   legendItems: Array<{ key: UtilizationLevel; label: string }>
   getLevelLabel: (level: UtilizationLevel) => string
+  getProviderLabel: (provider: string) => string
 }) {
   const chartHeight = Math.max(260, rows.length * 34)
 
@@ -247,7 +315,7 @@ function MetricRankingCard({
                         return String(label)
                       }
 
-                      return `${row.label} · ${row.provider}/${row.region} · ${getLevelLabel(row.level)}`
+                      return `${row.label} · ${getProviderLabel(row.provider)}/${row.region} · ${getLevelLabel(row.level)}`
                     }}
                   />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]}>
@@ -273,6 +341,7 @@ export default function CloudInstancesRankingPage() {
   const [sortOrder, setSortOrder] = useState<RankingSortOrder>("desc")
   const [activeMetricTab, setActiveMetricTab] = useState<RankingMetricId>("memory")
   const [allInstancesSnapshot, setAllInstancesSnapshot] = useState<CloudInstanceResponse[] | null>(null)
+  const [providerDictionaryOptions, setProviderDictionaryOptions] = useState<CloudProviderOption[]>([])
   const [statusDictionaryOptions, setStatusDictionaryOptions] = useState<CloudInstanceStatusDictionaryOption[]>([])
   const {
     data: rankingData,
@@ -300,6 +369,26 @@ export default function CloudInstancesRankingPage() {
       .catch(() => {
         if (!cancelled) {
           setAllInstancesSnapshot([])
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    api.listDictionariesByType(CLOUD_PROVIDER_DICT_TYPE, true)
+      .then((items) => {
+        if (!cancelled) {
+          setProviderDictionaryOptions(normalizeCloudProviderDictionaryItems(items))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProviderDictionaryOptions([])
         }
       })
 
@@ -365,9 +454,50 @@ export default function CloudInstancesRankingPage() {
 
   const optionSourceInstances = allInstancesSnapshot || []
 
-  const providerOptions = useMemo(
-    () => uniqueSortedWithLocale(optionSourceInstances.map((item) => item.provider), locale),
+  const discoveredProviders = useMemo(
+    () => uniqueSortedWithLocale(optionSourceInstances.map((item) => normalizeCloudProvider(item.provider)), locale),
     [locale, optionSourceInstances]
+  )
+
+  const fallbackProviderOptions = useMemo(
+    () => buildFallbackCloudProviderOptions(locale),
+    [locale]
+  )
+
+  const providerOptions = useMemo(() => {
+    if (providerDictionaryOptions.length > 0) {
+      return providerDictionaryOptions.map((item) => ({
+        value: item.value,
+        label: item.label,
+      }))
+    }
+
+    if (discoveredProviders.length > 0) {
+      return discoveredProviders.map((provider) => ({
+        value: provider,
+        label: provider,
+      }))
+    }
+
+    return fallbackProviderOptions.map((item) => ({
+      value: item.value,
+      label: item.label,
+    }))
+  }, [discoveredProviders, fallbackProviderOptions, providerDictionaryOptions])
+
+  const providerLabelMap = useMemo(
+    () => new Map(providerOptions.map((item) => [item.value, item.label])),
+    [providerOptions]
+  )
+
+  const getProviderLabel = useCallback((provider: string) => {
+    const normalized = normalizeCloudProvider(provider)
+    return providerLabelMap.get(normalized) || provider || "-"
+  }, [providerLabelMap])
+
+  const providerOptionValues = useMemo(
+    () => providerOptions.map((item) => item.value),
+    [providerOptions]
   )
 
   const regionOptions = useMemo(
@@ -379,6 +509,16 @@ export default function CloudInstancesRankingPage() {
     () => statusDictionaryOptions.map((item) => item.value),
     [statusDictionaryOptions]
   )
+
+  useEffect(() => {
+    if (providerFilter === "all") {
+      return
+    }
+
+    if (!providerOptionValues.includes(providerFilter)) {
+      setProviderFilter("all")
+    }
+  }, [providerFilter, providerOptionValues])
 
   const statusDictionaryLabelMap = useMemo(
     () => new Map(statusDictionaryOptions.map((item) => [item.value, item.label])),

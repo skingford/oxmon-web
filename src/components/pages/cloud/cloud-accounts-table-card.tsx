@@ -33,6 +33,7 @@ type CloudAccountsTableCardProps = {
   onCopyUpdateCurl: (account: CloudAccountResponse, insecure?: boolean) => void | Promise<void>
   onEdit: (account: CloudAccountResponse) => void
   onDelete: (account: CloudAccountResponse) => void
+  getProviderLabel: (provider: string) => string
   formatDateTime: (value: string | null | undefined, locale: "zh" | "en") => string
   texts: {
     title: string
@@ -79,6 +80,7 @@ export function CloudAccountsTableCard({
   onCopyUpdateCurl,
   onEdit,
   onDelete,
+  getProviderLabel,
   formatDateTime,
   texts,
 }: CloudAccountsTableCardProps) {
@@ -132,7 +134,7 @@ export function CloudAccountsTableCard({
                     </TableCell>
                     <TableCell className="font-mono text-xs">{account.config_key}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{account.provider}</Badge>
+                      <Badge variant="secondary">{getProviderLabel(account.provider)}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

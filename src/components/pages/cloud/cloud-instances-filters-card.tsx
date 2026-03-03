@@ -17,7 +17,10 @@ type CloudInstancesFiltersCardProps = {
   providerFilter: string;
   regionFilter: string;
   statusFilter: string;
-  providerOptions: string[];
+  providerOptions: Array<{
+    value: string;
+    label: string;
+  }>;
   regionOptions: string[];
   statusOptions: string[];
   onSearchKeywordChange: (value: string) => void;
@@ -67,10 +70,7 @@ export function CloudInstancesFiltersCard({
             value={providerFilter}
             options={[
               { value: "all", label: texts.filterProviderAll },
-              ...providerOptions.map((provider) => ({
-                value: provider,
-                label: provider,
-              })),
+              ...providerOptions,
             ]}
             onValueChange={onProviderFilterChange}
             placeholder={texts.filterProviderAll}

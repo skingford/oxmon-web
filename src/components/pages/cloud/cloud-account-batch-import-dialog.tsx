@@ -20,6 +20,10 @@ type CloudAccountBatchImportDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   provider: string
+  providerOptions: Array<{
+    value: string
+    label: string
+  }>
   onProviderChange: (value: string) => void
   collectionIntervalSecs: string
   onCollectionIntervalSecsChange: (value: string) => void
@@ -46,6 +50,7 @@ export function CloudAccountBatchImportDialog({
   open,
   onOpenChange,
   provider,
+  providerOptions,
   onProviderChange,
   collectionIntervalSecs,
   onCollectionIntervalSecsChange,
@@ -75,8 +80,11 @@ export function CloudAccountBatchImportDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tencent">Tencent</SelectItem>
-                  <SelectItem value="alibaba">Alibaba / Aliyun</SelectItem>
+                  {providerOptions.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

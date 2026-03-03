@@ -18,7 +18,10 @@ type CloudAccountsFiltersCardProps = {
   searchKeyword: string;
   providerFilter: string;
   enabledFilter: EnabledFilter;
-  providerOptions: string[];
+  providerOptions: Array<{
+    value: string;
+    label: string;
+  }>;
   onSearchKeywordChange: (value: string) => void;
   onProviderFilterChange: (value: string) => void;
   onEnabledFilterChange: (value: EnabledFilter) => void;
@@ -72,10 +75,7 @@ export function CloudAccountsFiltersCard({
             value={providerFilter}
             options={[
               { value: "all", label: texts.filterProviderAll },
-              ...providerOptions.map((provider) => ({
-                value: provider,
-                label: provider,
-              })),
+              ...providerOptions,
             ]}
             onValueChange={onProviderFilterChange}
             placeholder={texts.filterProviderAll}

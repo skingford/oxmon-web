@@ -35,6 +35,10 @@ type CloudAccountDialogProps = {
   isEditing: boolean
   locale: "zh" | "en"
   providerSelectValue: string
+  providerOptions: Array<{
+    value: string
+    label: string
+  }>
   form: CloudAccountFormState
   formSubmitting: boolean
   editingDialogLoading: boolean
@@ -42,16 +46,16 @@ type CloudAccountDialogProps = {
   onCancel: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   setForm: React.Dispatch<React.SetStateAction<CloudAccountFormState>>
+  getProviderLabel: (provider: string) => string
   t: (path: string, values?: Record<string, string | number>) => string
 }
-
-const BUILT_IN_CLOUD_PROVIDERS = ["tencent", "alibaba"] as const
 
 export const CloudAccountDialog = memo(function CloudAccountDialog({
   open,
   isEditing,
   locale,
   providerSelectValue,
+  providerOptions,
   form,
   formSubmitting,
   editingDialogLoading,
@@ -59,6 +63,7 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
   onCancel,
   onSubmit,
   setForm,
+  getProviderLabel,
   t,
 }: CloudAccountDialogProps) {
   const handleOpenChange = useCallback((nextOpen: boolean) => {
@@ -101,7 +106,7 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
                   {isEditing ? (
                     <Input
                       id="cloud-provider"
-                      value={form.provider}
+                      value={getProviderLabel(form.provider)}
                       onChange={(event) => setForm((prev) => ({ ...prev, provider: event.target.value }))}
                       placeholder={t("cloud.accounts.fieldProviderPlaceholder")}
                       disabled
@@ -128,8 +133,11 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
                           <SelectValue placeholder={t("cloud.accounts.fieldProviderPlaceholder")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="tencent">Tencent</SelectItem>
-                          <SelectItem value="alibaba">Alibaba / Aliyun</SelectItem>
+                          {providerOptions.map((provider) => (
+                            <SelectItem key={provider.value} value={provider.value}>
+                              {provider.label}
+                            </SelectItem>
+                          ))}
                           <SelectItem value="__custom__">{locale === "zh" ? "自定义" : "Custom"}</SelectItem>
                         </SelectContent>
                       </Select>

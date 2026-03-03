@@ -22,6 +22,7 @@ type CloudInstancesTableCardProps = {
   title: string
   description: string
   getStatusLabel: (status: CloudInstanceStatusKey) => string
+  getProviderLabel: (provider: string) => string
   formatDateTime: (value: string | null | undefined, locale: "zh" | "en") => string
   tableTexts: {
     colInstance: string
@@ -60,6 +61,7 @@ export function CloudInstancesTableCard({
   title,
   description,
   getStatusLabel,
+  getProviderLabel,
   formatDateTime,
   tableTexts,
   pagination,
@@ -116,7 +118,7 @@ export function CloudInstancesTableCard({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{instance.provider}</Badge>
+                        <Badge variant="secondary">{getProviderLabel(instance.provider)}</Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{instance.account_config_key}</TableCell>
                       <TableCell>{instance.region}</TableCell>
