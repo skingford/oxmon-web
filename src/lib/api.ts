@@ -42,6 +42,8 @@ import {
   BatchCreateCloudAccountsRequest,
   BatchCreateCloudAccountsResponse,
   CloudAccountQueryParams,
+  CloudAICheckJobQueryParams,
+  CloudAICheckJobResponse,
   CloudAccountResponse,
   CloudInstanceMetricsQueryParams,
   CloudInstanceMetricsResponse,
@@ -71,6 +73,8 @@ import {
   TestConnectionResponse,
   CreateSystemConfigRequest,
   TriggerCollectionResponse,
+  TriggerCloudAICheckRequest,
+  TriggerCloudAICheckResponse,
   UpdateAIAccountRequest,
   UpdateCloudAccountRequest,
   UpdateSystemConfigRequest,
@@ -699,6 +703,53 @@ export const api = {
     request<CloudInstanceMetricsResponse>(
       `/v1/cloud/instances/${id}/metrics${buildQueryString(params || {})}`,
     ),
+
+  triggerAllCloudInstancesAICheck: (data: TriggerCloudAICheckRequest = {}) =>
+    request<TriggerCloudAICheckResponse>("/v1/cloud/instances/ai-check", {
+      method: "POST",
+      body: data,
+    }),
+
+  triggerCloudInstanceAICheck: (
+    id: string,
+    data: TriggerCloudAICheckRequest = {},
+  ) =>
+    request<TriggerCloudAICheckResponse>(`/v1/cloud/instances/${id}/ai-check`, {
+      method: "POST",
+      body: data,
+    }),
+
+  listCloudAICheckJobsPage: (params: CloudAICheckJobQueryParams = {}) =>
+    request<unknown>(
+      `/v1/cloud/instances/ai-check/jobs${buildQueryString(params)}`,
+    ).then((payload) => normalizeListResponse<CloudAICheckJobResponse>(payload, {
+      fallbackLimit: params.limit ?? 0,
+      fallbackOffset: params.offset ?? 0,
+    })),
+
+  listCloudAICheckJobs: (
+    params: CloudAICheckJobQueryParams = {},
+  ) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(
+        `/v1/cloud/instances/ai-check/jobs${buildQueryString(params)}`,
+      ).then((payload) => extractListItems<CloudAICheckJobResponse>(payload))
+    }
+
+    const queryParams = {
+      status: params?.status,
+      job_type: params?.job_type,
+    }
+
+    return requestAllPages<CloudAICheckJobResponse>((page) =>
+      request<unknown>(
+        `/v1/cloud/instances/ai-check/jobs${buildQueryString({ ...queryParams, ...page })}`,
+      ).then((payload) => extractListItems<CloudAICheckJobResponse>(payload))
+    )
+  },
+
+  getCloudAICheckJob: (id: string) =>
+    request<CloudAICheckJobResponse>(`/v1/cloud/instances/ai-check/jobs/${id}`),
 
   listAIAccounts: (
     params: PaginationParams & {

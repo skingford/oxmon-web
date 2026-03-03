@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import {
   CartesianGrid,
   Line,
@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { toast, toastApiError, toastCopied } from "@/lib/toast"
+import { toast, toastApiError, toastCopied, toastStatusError } from "@/lib/toast"
 import { ApiRequestError, api } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
 import { withLocalePrefix } from "@/components/app-locale"
@@ -24,7 +24,7 @@ import {
 } from "@/components/pages/cloud/cloud-instance-list-utils"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
-import type { CloudInstanceDetailResponse, MetricLatestValue } from "@/types/api"
+import type { CloudAICheckJobResponse, CloudInstanceDetailResponse, MetricLatestValue } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +32,7 @@ import { CopyCurlDropdown } from "@/components/ui/copy-curl-dropdown"
 import { HttpMethodBadge } from "@/components/ui/http-method-badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 const INSTANCE_METRIC_OPTIONS = [
   "cloud.cpu.usage",
@@ -45,6 +46,8 @@ const INSTANCE_METRIC_OPTIONS = [
 ] as const
 
 const HISTORY_RANGE_OPTIONS = ["1h", "6h", "24h", "7d"] as const
+const INSTANCE_AI_CHECK_JOBS_LIMIT = 6
+const AI_CHECK_POLL_INTERVAL_OPTIONS = [5, 15, 30] as const
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   if (!value) {
@@ -335,6 +338,57 @@ function getStatusLabel(status: CloudInstanceStatusKey, t: ReturnType<typeof use
   return t("cloud.instances.statusUnknown")
 }
 
+function normalizeAICheckJobStatus(value: string | null | undefined) {
+  const normalized = (value || "").trim().toLowerCase()
+
+  if (normalized === "running" || normalized === "succeeded" || normalized === "failed") {
+    return normalized
+  }
+
+  return "unknown"
+}
+
+function resolveAICheckJobStatusText(
+  status: string,
+  t: ReturnType<typeof useAppTranslations>["t"]
+) {
+  const normalized = normalizeAICheckJobStatus(status)
+
+  if (normalized === "running") {
+    return t("cloud.instances.aiCheckJobStatusRunning")
+  }
+
+  if (normalized === "succeeded") {
+    return t("cloud.instances.aiCheckJobStatusSucceeded")
+  }
+
+  if (normalized === "failed") {
+    return t("cloud.instances.aiCheckJobStatusFailed")
+  }
+
+  return t("cloud.instances.statusUnknown")
+}
+
+function resolveAICheckJobStatusVariant(
+  status: string
+): "warning" | "success" | "destructive" | "secondary" {
+  const normalized = normalizeAICheckJobStatus(status)
+
+  if (normalized === "running") {
+    return "warning"
+  }
+
+  if (normalized === "succeeded") {
+    return "success"
+  }
+
+  if (normalized === "failed") {
+    return "destructive"
+  }
+
+  return "secondary"
+}
+
 function resolveInstanceTitle(instance: CloudInstanceDetailResponse | null) {
   if (!instance) {
     return "-"
@@ -369,8 +423,15 @@ export default function CloudInstanceDetailPage() {
   const { t, locale } = useAppTranslations("pages")
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
   const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null)
+  const [triggeringAICheck, setTriggeringAICheck] = useState(false)
+  const [aiCheckPollIntervalSecs, setAICheckPollIntervalSecs] = useState<(typeof AI_CHECK_POLL_INTERVAL_OPTIONS)[number]>(15)
+  const [refreshingAICheckJobId, setRefreshingAICheckJobId] = useState<string | null>(null)
+  const [recentlyCompletedAICheckJobs, setRecentlyCompletedAICheckJobs] = useState<Record<string, "succeeded" | "failed">>({})
   const [historyMetric, setHistoryMetric] = useState<(typeof INSTANCE_METRIC_OPTIONS)[number]>("cloud.cpu.usage")
   const [historyRange, setHistoryRange] = useState<(typeof HISTORY_RANGE_OPTIONS)[number]>("24h")
+  const previousAICheckStatusesRef = useRef<Record<string, string>>({})
+  const previousHasRunningAICheckJobsRef = useRef(false)
+  const clearCompletedHighlightTimerRef = useRef<number | null>(null)
   const {
     data: instance,
     loading,
@@ -384,6 +445,14 @@ export default function CloudInstanceDetailPage() {
     error: historyError,
     execute: executeHistoryRequest,
   } = useRequestState<Array<{ timestamp: string; time: string; value: number }>>([], { initialLoading: false })
+  const {
+    data: aiCheckJobs,
+    setData: setAICheckJobs,
+    loading: aiCheckJobsLoading,
+    refreshing: aiCheckJobsRefreshing,
+    error: aiCheckJobsError,
+    execute: executeAICheckJobsRequest,
+  } = useRequestState<CloudAICheckJobResponse[]>([], { initialLoading: false })
 
   const fetchDetail = useCallback(async (silent = false) => {
     if (!instanceId) {
@@ -446,6 +515,180 @@ export default function CloudInstanceDetailPage() {
     fetchHistory()
   }, [fetchHistory])
 
+  const fetchAICheckJobs = useCallback(async (silent = false, showErrorToast = true) => {
+    if (!instanceId) {
+      return
+    }
+
+    await executeAICheckJobsRequest(
+      async () => {
+        const page = await api.listCloudAICheckJobsPage({
+          job_type: `cloud_instance:${instanceId}`,
+          limit: INSTANCE_AI_CHECK_JOBS_LIMIT,
+          offset: 0,
+        })
+
+        return page.items
+      },
+      {
+        silent,
+        onError: (requestError) => {
+          if (showErrorToast) {
+            toastApiError(requestError, t("cloud.instances.detailToastFetchAICheckJobsError"))
+          }
+        },
+      }
+    )
+  }, [executeAICheckJobsRequest, instanceId, t])
+
+  useEffect(() => {
+    fetchAICheckJobs()
+  }, [fetchAICheckJobs])
+
+  useEffect(() => {
+    const previousStatuses = previousAICheckStatusesRef.current
+    const nextStatuses: Record<string, string> = {}
+    const justCompleted: Record<string, "succeeded" | "failed"> = {}
+
+    for (const job of aiCheckJobs) {
+      const normalizedStatus = normalizeAICheckJobStatus(job.status)
+      nextStatuses[job.id] = normalizedStatus
+
+      if (previousStatuses[job.id] === "running" && (normalizedStatus === "succeeded" || normalizedStatus === "failed")) {
+        justCompleted[job.id] = normalizedStatus
+      }
+    }
+
+    previousAICheckStatusesRef.current = nextStatuses
+
+    if (Object.keys(justCompleted).length === 0) {
+      return
+    }
+
+    setRecentlyCompletedAICheckJobs((prev) => ({
+      ...prev,
+      ...justCompleted,
+    }))
+
+    if (clearCompletedHighlightTimerRef.current !== null) {
+      window.clearTimeout(clearCompletedHighlightTimerRef.current)
+    }
+
+    clearCompletedHighlightTimerRef.current = window.setTimeout(() => {
+      setRecentlyCompletedAICheckJobs({})
+      clearCompletedHighlightTimerRef.current = null
+    }, 2600)
+  }, [aiCheckJobs])
+
+  const hasRunningAICheckJobs = useMemo(
+    () => aiCheckJobs.some((job) => normalizeAICheckJobStatus(job.status) === "running"),
+    [aiCheckJobs]
+  )
+
+  useEffect(() => {
+    const hadRunningJobs = previousHasRunningAICheckJobsRef.current
+
+    if (hadRunningJobs && !hasRunningAICheckJobs) {
+      const failedCount = aiCheckJobs.filter((job) => normalizeAICheckJobStatus(job.status) === "failed").length
+
+      if (failedCount > 0) {
+        toast.warning(t("cloud.instances.toastAICheckJobsCompletedWithFailure", { failed: failedCount }))
+      } else {
+        toast.success(t("cloud.instances.toastAICheckJobsCompletedSuccess"))
+      }
+    }
+
+    previousHasRunningAICheckJobsRef.current = hasRunningAICheckJobs
+  }, [aiCheckJobs, hasRunningAICheckJobs, t])
+
+  useEffect(() => {
+    if (!hasRunningAICheckJobs) {
+      return
+    }
+
+    let disposed = false
+    let timer: number | null = null
+    let inFlight = false
+
+    const resolveDelayMs = () => {
+      const baseDelayMs = aiCheckPollIntervalSecs * 1000
+
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return Math.min(60_000, baseDelayMs * 2)
+      }
+
+      return baseDelayMs
+    }
+
+    const scheduleNext = () => {
+      if (disposed) {
+        return
+      }
+
+      const baseDelayMs = resolveDelayMs()
+      const jitterRange = Math.max(300, Math.round(baseDelayMs * 0.12))
+      const jitter = Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange
+      const nextDelay = Math.max(1_000, baseDelayMs + jitter)
+
+      timer = window.setTimeout(() => {
+        void tick()
+      }, nextDelay)
+    }
+
+    const tick = async () => {
+      if (disposed) {
+        return
+      }
+
+      if (inFlight) {
+        scheduleNext()
+        return
+      }
+
+      inFlight = true
+      try {
+        await fetchAICheckJobs(true, false)
+      } finally {
+        inFlight = false
+        scheduleNext()
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (disposed || document.visibilityState !== "visible" || inFlight) {
+        return
+      }
+
+      if (timer !== null) {
+        window.clearTimeout(timer)
+        timer = null
+      }
+
+      void tick()
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    scheduleNext()
+
+    return () => {
+      disposed = true
+
+      if (timer !== null) {
+        window.clearTimeout(timer)
+      }
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [aiCheckPollIntervalSecs, fetchAICheckJobs, hasRunningAICheckJobs])
+
+  useEffect(() => {
+    return () => {
+      if (clearCompletedHighlightTimerRef.current !== null) {
+        window.clearTimeout(clearCompletedHighlightTimerRef.current)
+      }
+    }
+  }, [])
+
   const metricCards = useMemo(() => {
     if (!instance) {
       return []
@@ -483,6 +726,46 @@ export default function CloudInstanceDetailPage() {
       toast.error(t("cloud.instances.detailToastCopyApiCurlError"))
     }
   }, [instanceId, t])
+
+  const handleTriggerAICheck = useCallback(async () => {
+    if (!instanceId || triggeringAICheck) {
+      return
+    }
+
+    setTriggeringAICheck(true)
+
+    try {
+      const result = await api.triggerCloudInstanceAICheck(instanceId, {})
+      toast.success(t("cloud.instances.detailToastTriggerAICheckSuccess", {
+        reportId: result.report_id,
+      }))
+      await fetchAICheckJobs(true)
+    } catch (error) {
+      toastStatusError(error, t("cloud.instances.detailToastTriggerAICheckError"), {
+        400: t("cloud.instances.toastTriggerAICheckNoAccount"),
+      })
+    } finally {
+      setTriggeringAICheck(false)
+    }
+  }, [fetchAICheckJobs, instanceId, t, triggeringAICheck])
+
+  const handleRefreshAICheckJob = useCallback(async (jobId: string) => {
+    if (!jobId || refreshingAICheckJobId === jobId) {
+      return
+    }
+
+    setRefreshingAICheckJobId(jobId)
+
+    try {
+      const job = await api.getCloudAICheckJob(jobId)
+      setAICheckJobs((prev) => prev.map((item) => (item.id === jobId ? job : item)))
+      toast.success(t("cloud.instances.toastRefreshAICheckJobSuccess"))
+    } catch (error) {
+      toastApiError(error, t("cloud.instances.toastRefreshAICheckJobError"))
+    } finally {
+      setRefreshingAICheckJobId((prev) => (prev === jobId ? null : prev))
+    }
+  }, [refreshingAICheckJobId, setAICheckJobs, t])
 
   if (loading && !instance) {
     return (
@@ -589,14 +872,22 @@ export default function CloudInstanceDetailPage() {
             type="button"
             variant="outline"
             onClick={async () => {
-              await Promise.all([fetchDetail(true), fetchHistory()])
+              await Promise.all([fetchDetail(true), fetchHistory(), fetchAICheckJobs(true)])
             }}
-            disabled={refreshing || historyLoading}
+            disabled={refreshing || historyLoading || aiCheckJobsRefreshing}
           >
-            {refreshing || historyLoading
+            {refreshing || historyLoading || aiCheckJobsRefreshing
               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               : <RefreshCw className="mr-2 h-4 w-4" />}
             {t("cloud.instances.detailRefreshButton")}
+          </Button>
+          <Button type="button" variant="outline" onClick={handleTriggerAICheck} disabled={triggeringAICheck}>
+            {triggeringAICheck
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              : <Sparkles className="mr-2 h-4 w-4" />}
+            {triggeringAICheck
+              ? t("cloud.instances.detailTriggerAICheckingButton")
+              : t("cloud.instances.detailTriggerAICheckButton")}
           </Button>
         </div>
       </div>
@@ -693,6 +984,129 @@ export default function CloudInstanceDetailPage() {
               })()}
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <CardTitle>{t("cloud.instances.detailAICheckJobsTitle")}</CardTitle>
+            <CardDescription>
+              {t("cloud.instances.detailAICheckJobsDescription", { limit: INSTANCE_AI_CHECK_JOBS_LIMIT })}
+            </CardDescription>
+            {hasRunningAICheckJobs ? (
+              <p className="text-xs text-muted-foreground">
+                {t("cloud.instances.aiCheckJobsAutoRefreshHint", { seconds: aiCheckPollIntervalSecs })}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(aiCheckPollIntervalSecs)}
+              onValueChange={(value) => {
+                const nextValue = Number(value)
+                if (AI_CHECK_POLL_INTERVAL_OPTIONS.includes(nextValue as (typeof AI_CHECK_POLL_INTERVAL_OPTIONS)[number])) {
+                  setAICheckPollIntervalSecs(nextValue as (typeof AI_CHECK_POLL_INTERVAL_OPTIONS)[number])
+                }
+              }}
+            >
+              <SelectTrigger className="w-[140px]" aria-label={t("cloud.instances.aiCheckJobsPollIntervalLabel")}>
+                <SelectValue placeholder={t("cloud.instances.aiCheckJobsPollIntervalLabel")} />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_CHECK_POLL_INTERVAL_OPTIONS.map((seconds) => (
+                  <SelectItem key={seconds} value={String(seconds)}>
+                    {t("cloud.instances.aiCheckJobsPollIntervalOption", { seconds })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="button" variant="outline" size="sm" onClick={() => fetchAICheckJobs(true)} disabled={aiCheckJobsRefreshing}>
+              {aiCheckJobsRefreshing
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <RefreshCw className="mr-2 h-4 w-4" />}
+              {t("cloud.instances.aiCheckJobsRefreshButton")}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("cloud.instances.aiCheckJobsColStatus")}</TableHead>
+                  <TableHead>{t("cloud.instances.aiCheckJobsColStartedAt")}</TableHead>
+                  <TableHead>{t("cloud.instances.aiCheckJobsColFinishedAt")}</TableHead>
+                  <TableHead>{t("cloud.instances.aiCheckJobsColResult")}</TableHead>
+                  <TableHead className="w-[90px] text-right">{t("cloud.instances.aiCheckJobsColAction")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {aiCheckJobsLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                      {t("cloud.instances.aiCheckJobsLoading")}
+                    </TableCell>
+                  </TableRow>
+                ) : aiCheckJobs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                      {t("cloud.instances.aiCheckJobsEmpty")}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  aiCheckJobs.map((job) => {
+                    const completedStatus = recentlyCompletedAICheckJobs[job.id]
+
+                    return (
+                      <TableRow
+                        key={job.id}
+                        className={
+                          completedStatus === "failed"
+                            ? "bg-destructive/10 transition-colors duration-700"
+                            : completedStatus === "succeeded"
+                              ? "bg-emerald-500/10 transition-colors duration-700"
+                              : undefined
+                        }
+                      >
+                        <TableCell>
+                          <div className="space-y-1">
+                            <Badge variant={resolveAICheckJobStatusVariant(job.status)}>
+                              {resolveAICheckJobStatusText(job.status, t)}
+                            </Badge>
+                            <p className="font-mono text-xs text-muted-foreground">{job.id}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatDateTime(job.started_at, locale)}</TableCell>
+                        <TableCell>{formatDateTime(job.finished_at, locale)}</TableCell>
+                        <TableCell className="max-w-[280px]">
+                          {job.report_id
+                            ? <span className="font-mono text-xs">{job.report_id}</span>
+                            : <span className="text-sm text-muted-foreground">{job.error_message || "-"}</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRefreshAICheckJob(job.id)}
+                            disabled={refreshingAICheckJobId === job.id}
+                          >
+                            {refreshingAICheckJobId === job.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : t("cloud.instances.aiCheckJobsActionRefresh")}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          {aiCheckJobsError ? (
+            <div className="border-t px-4 py-2 text-xs text-muted-foreground">{aiCheckJobsError}</div>
+          ) : null}
         </CardContent>
       </Card>
 

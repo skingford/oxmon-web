@@ -260,6 +260,11 @@ export interface CloudInstanceMetricsQueryParams {
   metrics?: string;
 }
 
+export interface CloudAICheckJobQueryParams extends PaginationParams {
+  status?: string;
+  job_type?: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;
@@ -805,6 +810,28 @@ export interface TriggerCollectionResponse {
   success: boolean;
   message: string;
   collected_count?: number | null;
+}
+
+export interface TriggerCloudAICheckRequest {
+  ai_account_id?: string | null;
+  send_notification?: boolean | null;
+}
+
+export interface TriggerCloudAICheckResponse {
+  report_id: string;
+  message: string;
+}
+
+export interface CloudAICheckJobResponse {
+  id: string;
+  job_type: string;
+  status: string;
+  ai_account_id: string;
+  report_id?: string | null;
+  error_message?: string | null;
+  started_at: string;
+  finished_at?: string | null;
+  created_at: string;
 }
 
 export interface AIAccountResponse {
