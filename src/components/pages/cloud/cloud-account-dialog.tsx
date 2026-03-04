@@ -25,6 +25,7 @@ export type CloudAccountFormState = {
   description: string
   secretId: string
   secretKey: string
+  endpoint: string
   regionsText: string
   collectionIntervalSecs: string
   enabled: boolean
@@ -34,6 +35,7 @@ type CloudAccountDialogProps = {
   open: boolean
   isEditing: boolean
   locale: "zh" | "en"
+  isSangfor: boolean
   providerSelectValue: string
   providerOptions: Array<{
     value: string
@@ -54,6 +56,7 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
   open,
   isEditing,
   locale,
+  isSangfor,
   providerSelectValue,
   providerOptions,
   form,
@@ -218,8 +221,19 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
                     id="cloud-account-name"
                     value={form.accountName}
                     onChange={(event) => setForm((prev) => ({ ...prev, accountName: event.target.value }))}
-                    placeholder={locale === "zh" ? "例如：生产主账号" : "e.g. Production Main Account"}
+                    placeholder={
+                      isSangfor
+                        ? t("cloud.accounts.fieldAccountNameSangforPlaceholder")
+                        : locale === "zh"
+                          ? "例如：生产主账号"
+                          : "e.g. Production Main Account"
+                    }
                   />
+                  {isSangfor ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t("cloud.accounts.fieldAccountNameSangforHint")}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="cloud-secret-id">
@@ -244,6 +258,22 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="cloud-endpoint">
+                    {t("cloud.accounts.fieldEndpoint")}
+                  </Label>
+                  <Input
+                    id="cloud-endpoint"
+                    value={form.endpoint}
+                    onChange={(event) => setForm((prev) => ({ ...prev, endpoint: event.target.value }))}
+                    placeholder={t("cloud.accounts.fieldEndpointPlaceholder")}
+                  />
+                  {isSangfor ? (
+                    <p className="text-xs text-amber-600">
+                      {t("cloud.accounts.fieldEndpointSangforRequiredHint")}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="cloud-regions">
                     {locale === "zh" ? "地域列表" : "Regions"}
                   </Label>
@@ -251,10 +281,18 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
                     id="cloud-regions"
                     value={form.regionsText}
                     onChange={(event) => setForm((prev) => ({ ...prev, regionsText: event.target.value }))}
-                    placeholder={locale === "zh" ? "例如：ap-shanghai, ap-guangzhou" : "e.g. ap-shanghai, ap-guangzhou"}
+                    placeholder={
+                      isSangfor
+                        ? t("cloud.accounts.fieldRegionsSangforPlaceholder")
+                        : locale === "zh"
+                          ? "例如：ap-shanghai, ap-guangzhou"
+                          : "e.g. ap-shanghai, ap-guangzhou"
+                    }
                   />
                   <p className="text-xs text-muted-foreground">
-                    {locale === "zh" ? "多个地域可用逗号或换行分隔" : "Separate multiple regions with commas or new lines"}
+                    {isSangfor
+                      ? t("cloud.accounts.fieldRegionsSangforHint")
+                      : t("cloud.accounts.fieldRegionsHint")}
                   </p>
                 </div>
               </div>

@@ -1,9 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api } from "@/lib/api"
 import {
   ChannelOverview,
+  NotificationChannelQueryParams,
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useNotificationChannelSubmit } from "@/hooks/use-notification-channel-submit"
@@ -17,6 +19,7 @@ import {
   getInitialFormState,
   getSeverityLabel,
 } from "@/lib/notifications/channel-utils"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { Button } from "@/components/ui/button"
 import { NotificationsFiltersCard } from "@/components/notifications/NotificationsFiltersCard"
 import { NotificationsStatsCards } from "@/components/notifications/NotificationsStatsCards"
@@ -39,13 +42,18 @@ import {
 import { toast, toastApiError } from "@/lib/toast"
 
 const CHANNEL_SEVERITY_OPTIONS = ["info", "warning", "critical"] as const
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 
 type NotificationsQueryState = {
   channels: ChannelOverview[]
+  total: number
 }
 
 export default function NotificationsPage() {
   const { t, locale } = useAppTranslations("pages")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const {
     data,
     loading,
@@ -53,27 +61,131 @@ export default function NotificationsPage() {
     execute,
   } = useRequestState<NotificationsQueryState>({
     channels: [],
+    total: 0,
   })
 
   const channels = data.channels
+  const total = data.total
 
   const [searchKeyword, setSearchKeyword] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [severityFilter, setSeverityFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<NotificationStatusFilter>("all")
+  const [offset, setOffset] = useState(0)
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(PAGE_SIZE_OPTIONS[1])
+  const [allChannelsSnapshot, setAllChannelsSnapshot] = useState<ChannelOverview[] | null>(null)
 
   const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false)
   const [editingChannel, setEditingChannel] = useState<ChannelOverview | null>(null)
   const [channelForm, setChannelForm] = useState<NotificationChannelFormState>(getInitialFormState)
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
+  useEffect(() => {
+    const nextSearchKeyword = searchParams.get("search") || ""
+    const nextTypeFilter = searchParams.get("type") || "all"
+    const nextSeverityFilter = searchParams.get("severity") || "all"
+    const rawStatusFilter = searchParams.get("status")
+    const nextStatusFilter: NotificationStatusFilter =
+      rawStatusFilter === "enabled" || rawStatusFilter === "disabled"
+        ? rawStatusFilter
+        : "all"
 
-  const fetchChannels = useCallback(
+    const rawLimit = Number(searchParams.get("limit") || String(PAGE_SIZE_OPTIONS[1]))
+    const nextPageSize = PAGE_SIZE_OPTIONS.includes(rawLimit as (typeof PAGE_SIZE_OPTIONS)[number])
+      ? (rawLimit as (typeof PAGE_SIZE_OPTIONS)[number])
+      : PAGE_SIZE_OPTIONS[1]
+    const rawOffset = Number(searchParams.get("offset") || "0")
+    const nextOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
+
+    setSearchKeyword((prev) => (prev === nextSearchKeyword ? prev : nextSearchKeyword))
+    setTypeFilter((prev) => (prev === nextTypeFilter ? prev : nextTypeFilter))
+    setSeverityFilter((prev) => (prev === nextSeverityFilter ? prev : nextSeverityFilter))
+    setStatusFilter((prev) => (prev === nextStatusFilter ? prev : nextStatusFilter))
+    setPageSize((prev) => (prev === nextPageSize ? prev : nextPageSize))
+    setOffset((prev) => (prev === nextOffset ? prev : nextOffset))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (searchKeyword.trim()) {
+      nextParams.set("search", searchKeyword)
+    } else {
+      nextParams.delete("search")
+    }
+
+    if (typeFilter !== "all") {
+      nextParams.set("type", typeFilter)
+    } else {
+      nextParams.delete("type")
+    }
+
+    if (severityFilter !== "all") {
+      nextParams.set("severity", severityFilter)
+    } else {
+      nextParams.delete("severity")
+    }
+
+    if (statusFilter !== "all") {
+      nextParams.set("status", statusFilter)
+    } else {
+      nextParams.delete("status")
+    }
+
+    if (pageSize !== PAGE_SIZE_OPTIONS[1]) {
+      nextParams.set("limit", String(pageSize))
+    } else {
+      nextParams.delete("limit")
+    }
+
+    if (offset > 0) {
+      nextParams.set("offset", String(offset))
+    } else {
+      nextParams.delete("offset")
+    }
+
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery === currentQuery) {
+      return
+    }
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }, [
+    offset,
+    pageSize,
+    pathname,
+    router,
+    searchKeyword,
+    searchParams,
+    severityFilter,
+    statusFilter,
+    typeFilter,
+  ])
+
+
+  const fetchChannelsPage = useCallback(
     async (silent = false) => {
+      const params: NotificationChannelQueryParams = {
+        name__contains: searchKeyword.trim() || undefined,
+        channel_type__eq: typeFilter !== "all" ? typeFilter : undefined,
+        min_severity__eq: severityFilter !== "all" ? severityFilter : undefined,
+        enabled__eq:
+          statusFilter === "all"
+            ? undefined
+            : statusFilter === "enabled",
+        limit: pageSize,
+        offset,
+      }
+
       await execute(
         async () => {
+          const page = await api.listChannelsPage(params)
+
           return {
-            channels: await api.listChannels(),
+            channels: page.items,
+            total: page.total,
           }
         },
         {
@@ -84,21 +196,45 @@ export default function NotificationsPage() {
         }
       )
     },
-    [execute, t]
+    [execute, offset, pageSize, searchKeyword, severityFilter, statusFilter, t, typeFilter]
   )
 
   useEffect(() => {
-    fetchChannels()
-  }, [fetchChannels])
+    fetchChannelsPage()
+  }, [fetchChannelsPage])
+
+  const fetchChannelsSnapshot = useCallback(async () => {
+    try {
+      setAllChannelsSnapshot(await api.listChannels())
+    } catch {
+      // ignore snapshot fetch failures; main table still relies on paginated API
+      setAllChannelsSnapshot(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchChannelsSnapshot()
+  }, [fetchChannelsSnapshot])
+
+  const refreshChannels = useCallback(
+    async (silent = false) => {
+      await Promise.all([
+        fetchChannelsPage(silent),
+        fetchChannelsSnapshot(),
+      ])
+    },
+    [fetchChannelsPage, fetchChannelsSnapshot]
+  )
+
+  const optionSourceChannels = allChannelsSnapshot ?? channels
 
   const {
     stats,
-    filteredChannels,
     hasActiveFilters,
     filterTypeOptions,
     filterSeverityOptions,
   } = useNotificationChannelFilters({
-    channels,
+    channels: optionSourceChannels,
     searchKeyword,
     typeFilter,
     severityFilter,
@@ -107,6 +243,19 @@ export default function NotificationsPage() {
     t,
   })
 
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit: pageSize,
+    currentItemsCount: channels.length,
+    totalItems: total,
+  })
+
+  const pageSizeOptionLabel = useCallback(
+    (size: number) => (locale === "zh" ? `${size} / 页` : `${size} / page`),
+    [locale]
+  )
+
+  const isBusy = loading || refreshing
   const severityOptions = CHANNEL_SEVERITY_OPTIONS
 
   const getSeverityLabelForForm = useCallback(
@@ -119,6 +268,7 @@ export default function NotificationsPage() {
     setTypeFilter("all")
     setSeverityFilter("all")
     setStatusFilter("all")
+    setOffset(0)
   }
 
   const {
@@ -130,7 +280,7 @@ export default function NotificationsPage() {
     handleSubmitChannel,
   } = useNotificationChannelSubmit({
     t,
-    fetchChannels,
+    fetchChannels: refreshChannels,
     editingChannel,
     setEditingChannel,
     channelForm,
@@ -153,14 +303,14 @@ export default function NotificationsPage() {
             : t("notifications.toastToggleEnableSuccess")
         )
 
-        await fetchChannels(true)
+        await refreshChannels(true)
       } catch (error) {
         toastApiError(error, t("notifications.toastToggleError"))
       } finally {
         setTogglingId(null)
       }
     },
-    [fetchChannels, t]
+    [refreshChannels, t]
   )
 
   return (
@@ -174,10 +324,10 @@ export default function NotificationsPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => fetchChannels(true)}
-            disabled={refreshing}
+            onClick={() => refreshChannels(true)}
+            disabled={isBusy}
           >
-            {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            {isBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {t("notifications.refreshButton")}
           </Button>
           <Button type="button" onClick={openCreateDialog}>
@@ -197,16 +347,58 @@ export default function NotificationsPage() {
         hasActiveFilters={hasActiveFilters}
         typeOptions={filterTypeOptions}
         severityOptions={filterSeverityOptions}
-        onSearchKeywordChange={setSearchKeyword}
-        onTypeFilterChange={setTypeFilter}
-        onSeverityFilterChange={setSeverityFilter}
-        onStatusFilterChange={setStatusFilter}
+        onSearchKeywordChange={(value) => {
+          setSearchKeyword(value)
+          setOffset(0)
+        }}
+        onTypeFilterChange={(value) => {
+          setTypeFilter(value)
+          setOffset(0)
+        }}
+        onSeverityFilterChange={(value) => {
+          setSeverityFilter(value)
+          setOffset(0)
+        }}
+        onStatusFilterChange={(value) => {
+          setStatusFilter(value)
+          setOffset(0)
+        }}
         onResetFilters={resetFilters}
       />
 
       <NotificationsChannelsTable
         loading={loading}
-        channels={filteredChannels}
+        channels={channels}
+        pagination={{
+          pageSize,
+          pageSizeOptions: [...PAGE_SIZE_OPTIONS],
+          onPageSizeChange: (nextPageSize) => {
+            const normalizedPageSize = nextPageSize as (typeof PAGE_SIZE_OPTIONS)[number]
+            if (normalizedPageSize === pageSize) {
+              return
+            }
+
+            setPageSize(normalizedPageSize)
+            setOffset(0)
+          },
+          summaryText: t("notifications.paginationSummary", {
+            total,
+            start: pagination.rangeStart,
+            end: pagination.rangeEnd,
+          }),
+          pageIndicatorText: t("notifications.paginationPage", {
+            current: pagination.currentPage,
+            total: pagination.totalPages,
+          }),
+          pageSizePlaceholder: t("notifications.pageSizePlaceholder"),
+          prevLabel: t("notifications.paginationPrev"),
+          nextLabel: t("notifications.paginationNext"),
+          onPrevPage: () => setOffset((prev) => Math.max(0, prev - pageSize)),
+          onNextPage: () => setOffset((prev) => prev + pageSize),
+          prevDisabled: isBusy || !pagination.canGoPrev,
+          nextDisabled: isBusy || !pagination.canGoNext,
+          pageSizeOptionLabel,
+        }}
         hasActiveFilters={hasActiveFilters}
         togglingId={togglingId}
         locale={locale}

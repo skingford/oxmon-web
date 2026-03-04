@@ -30,6 +30,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +83,7 @@ const EMPTY_FORM: FormState = {
   collection_interval_secs: "",
   enabled: true,
 };
+const PAGE_SIZE_OPTIONS = [5, 10, 20] as const;
 
 function normalizeNullableString(value: string) {
   const trimmed = value.trim();
@@ -124,8 +127,9 @@ function formatDateTime(value?: string | null) {
 }
 
 export default function AIAccountsPage() {
-  const { t } = useAppTranslations("ai");
+  const { t, locale } = useAppTranslations("ai");
   const [items, setItems] = useState<AIAccountResponse[]>([]);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -146,6 +150,10 @@ export default function AIAccountsPage() {
       ),
     [items],
   );
+  const tablePagination = useClientPagination({
+    items: sortedItems,
+    pageSize,
+  });
 
   const fetchData = async () => {
     setLoading(true);
@@ -378,7 +386,7 @@ export default function AIAccountsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedItems.map((item) => (
+                tablePagination.paginatedItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>
                       <div className="min-w-0">
@@ -431,6 +439,56 @@ export default function AIAccountsPage() {
               )}
             </TableBody>
           </Table>
+          {!loading && sortedItems.length > 0 ? (
+            <PaginationControls
+              className="mt-4 border px-0 pb-0 pt-4 md:border-0 md:px-0 md:pb-0 md:pt-4"
+              pageSize={pageSize}
+              pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
+              onPageSizeChange={(nextPageSize) => {
+                if (
+                  !PAGE_SIZE_OPTIONS.includes(
+                    nextPageSize as (typeof PAGE_SIZE_OPTIONS)[number],
+                  )
+                ) {
+                  return;
+                }
+
+                setPageSize(nextPageSize);
+                tablePagination.setPage(1);
+              }}
+              summaryText={t("accounts.paginationSummary", {
+                total: tablePagination.totalRows,
+                start: tablePagination.startIndex,
+                end: tablePagination.endIndex,
+              })}
+              pageIndicatorText={t("accounts.paginationPage", {
+                current: tablePagination.currentPage,
+                total: tablePagination.totalPages,
+              })}
+              pageSizePlaceholder={t("accounts.pageSizePlaceholder")}
+              prevLabel={t("accounts.paginationPrev")}
+              nextLabel={t("accounts.paginationNext")}
+              onPrevPage={() =>
+                tablePagination.setPage((prev) => Math.max(1, prev - 1))
+              }
+              onNextPage={() =>
+                tablePagination.setPage((prev) =>
+                  Math.min(tablePagination.totalPages, prev + 1),
+                )
+              }
+              prevDisabled={
+                tablePagination.currentPage <= 1 ||
+                tablePagination.totalRows === 0
+              }
+              nextDisabled={
+                tablePagination.currentPage >= tablePagination.totalPages ||
+                tablePagination.totalRows === 0
+              }
+              pageSizeOptionLabel={(value) =>
+                locale === "zh" ? `${value} / 页` : `${value} / page`
+              }
+            />
+          ) : null}
         </CardContent>
       </Card>
 

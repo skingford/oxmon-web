@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import {
   Table,
   TableBody,
@@ -367,17 +367,23 @@ export default function AlertHistoryPage() {
           </div>
 
           {!loading && alerts.length > 0 && (
-            <ServerPaginationControls
-              className="mt-4 flex items-center justify-between"
+            <PaginationControls
+              className="mt-4"
               pageSize={limit}
               showSummary
-              showPageIndicator={false}
-              summaryText={`${t("history.paginationPage", { page: Math.floor(offset / limit) + 1 })}${
+              summaryText={`${t("history.paginationSummary", {
+                total: alertsTotal,
+                start: pagination.rangeStart,
+                end: pagination.rangeEnd,
+              })}${
                 filteredAlerts.length !== alerts.length
                   ? ` • ${t("history.paginationShown", { filtered: filteredAlerts.length, total: alerts.length })}`
                   : ""
               }`}
-              pageIndicatorText=""
+              pageIndicatorText={t("history.paginationPage", {
+                current: pagination.currentPage,
+                total: pagination.totalPages,
+              })}
               prevLabel={t("history.paginationPrevious")}
               nextLabel={t("history.paginationNext")}
               onPrevPage={() => setOffset(Math.max(0, offset - limit))}

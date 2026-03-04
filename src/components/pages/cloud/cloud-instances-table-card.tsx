@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { TablePaginationControls } from "@/components/ui/table-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { CloudInstanceResponse } from "@/types/api"
 
@@ -152,7 +152,7 @@ export function CloudInstancesTableCard({
           </Table>
         </div>
 
-        <TablePaginationControls
+        <PaginationControls
           pageSize={pagination.pageSize}
           pageSizeOptions={pagination.pageSizeOptions}
           onPageSizeChange={pagination.onPageSizeChange}

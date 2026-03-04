@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -772,15 +772,23 @@ export default function ActiveAlertsPage() {
           </div>
 
           {!loading && alerts.length > 0 && (
-            <ServerPaginationControls
-              className="mt-4 flex items-center justify-between"
+            <PaginationControls
+              className="mt-4"
               pageSize={limit}
               showSummary
-              showPageIndicator={false}
-              summaryText={`${t("active.paginationPage", { page: Math.floor(offset / limit) + 1 })}${
-                searchQuery ? ` • ${t("active.paginationFilteredResults", { count: filteredAlerts.length })}` : ""
+              summaryText={`${t("active.paginationSummary", {
+                total: alertsTotal,
+                start: pagination.rangeStart,
+                end: pagination.rangeEnd,
+              })}${
+                filteredAlerts.length !== alerts.length
+                  ? ` • ${t("active.paginationShown", { filtered: filteredAlerts.length, total: alerts.length })}`
+                  : ""
               }`}
-              pageIndicatorText=""
+              pageIndicatorText={t("active.paginationPage", {
+                current: pagination.currentPage,
+                total: pagination.totalPages,
+              })}
               prevLabel={t("active.paginationPrevious")}
               nextLabel={t("active.paginationNext")}
               onPrevPage={() => setOffset(Math.max(0, offset - limit))}

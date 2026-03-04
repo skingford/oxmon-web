@@ -2,6 +2,7 @@
 
 import { Loader2, MoreHorizontal, Play, TestTube2 } from "lucide-react"
 import type { CloudAccountResponse } from "@/types/api"
+import { normalizeCloudProvider } from "@/lib/cloud-provider"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -44,6 +45,7 @@ type CloudAccountsTableCardProps = {
     colStatus: string
     colUpdatedAt: string
     colActions: string
+    endpointLabel: string
     tableLoading: string
     tableEmpty: string
     toggleEnabledLabel: string
@@ -125,6 +127,11 @@ export function CloudAccountsTableCard({
                         <div className="text-xs text-muted-foreground">
                           {account.account_name}
                         </div>
+                        {normalizeCloudProvider(account.provider) === "sangfor" && account.endpoint ? (
+                          <div className="text-xs text-muted-foreground">
+                            {texts.endpointLabel}: <span className="font-mono">{account.endpoint}</span>
+                          </div>
+                        ) : null}
                         {account.description ? (
                           <div className="max-w-[320px] truncate text-xs text-muted-foreground">
                             {account.description}

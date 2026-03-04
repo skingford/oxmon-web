@@ -21,7 +21,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
-import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { CopyCurlDropdown } from "@/components/ui/copy-curl-dropdown"
 import { HttpMethodBadge } from "@/components/ui/http-method-badge"
 import {
@@ -757,10 +757,18 @@ export default function CertificatesPage() {
             </Table>
           </div>
 
-          <ServerPaginationControls
-            className="mt-4 flex items-center justify-end gap-2"
+          <PaginationControls
+            className="mt-4"
             pageSize={PAGE_LIMIT}
-            pageIndicatorText={t("certificates.overview.paginationPage", { page: pagination.currentPage })}
+            summaryText={t("certificates.overview.paginationSummary", {
+              total: certsPage.total,
+              start: pagination.rangeStart,
+              end: pagination.rangeEnd,
+            })}
+            pageIndicatorText={t("certificates.overview.paginationPage", {
+              current: pagination.currentPage,
+              total: pagination.totalPages,
+            })}
             prevLabel={t("certificates.overview.paginationPrev")}
             nextLabel={t("certificates.overview.paginationNext")}
             onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}

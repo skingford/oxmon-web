@@ -1,15 +1,17 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
-type TablePaginationControlsProps = {
+export type PaginationControlsProps = {
   pageSize: number
-  pageSizeOptions: number[]
-  onPageSizeChange: (pageSize: number) => void
-  summaryText: string
+  pageSizeOptions?: number[]
+  onPageSizeChange?: (pageSize: number) => void
+  summaryText?: string
   pageIndicatorText: string
-  pageSizePlaceholder: string
+  pageSizePlaceholder?: string
   prevLabel: string
   nextLabel: string
   onPrevPage: () => void
@@ -23,13 +25,13 @@ type TablePaginationControlsProps = {
   showPageIndicator?: boolean
 }
 
-export function TablePaginationControls({
+export function PaginationControls({
   pageSize,
   pageSizeOptions,
   onPageSizeChange,
-  summaryText,
+  summaryText = "",
   pageIndicatorText,
-  pageSizePlaceholder,
+  pageSizePlaceholder = "",
   prevLabel,
   nextLabel,
   onPrevPage,
@@ -38,22 +40,47 @@ export function TablePaginationControls({
   nextDisabled,
   pageSizeOptionLabel = (value) => `${value} / page`,
   className,
-  showPageSizeSelector = true,
-  showSummary = true,
+  showPageSizeSelector,
+  showSummary,
   showPageIndicator = true,
-}: TablePaginationControlsProps) {
+}: PaginationControlsProps) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const resolvedPageSizeOptions = pageSizeOptions && pageSizeOptions.length > 0
+    ? pageSizeOptions
+    : [pageSize]
+  const shouldShowPageSizeSelector = showPageSizeSelector ?? (
+    Boolean(onPageSizeChange) && resolvedPageSizeOptions.length > 1
+  )
+  const canRenderPageSizeSelector = mounted && shouldShowPageSizeSelector
+  const shouldShowSummary = showSummary ?? Boolean(summaryText)
+
   return (
-    <div className={className || "flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between"}>
-      {showSummary ? <div className="text-sm text-muted-foreground">{summaryText}</div> : null}
+    <div className={cn("flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between", className)}>
+      {shouldShowSummary ? <div className="text-sm text-muted-foreground">{summaryText}</div> : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        {showPageSizeSelector ? (
-          <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
+        {canRenderPageSizeSelector ? (
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => {
+              const nextPageSize = Number(value)
+              if (!Number.isFinite(nextPageSize) || !onPageSizeChange) {
+                return
+              }
+
+              onPageSizeChange(nextPageSize)
+            }}
+          >
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder={pageSizePlaceholder} />
             </SelectTrigger>
             <SelectContent>
-              {pageSizeOptions.map((option) => (
+              {resolvedPageSizeOptions.map((option) => (
                 <SelectItem key={option} value={String(option)}>
                   {pageSizeOptionLabel(option)}
                 </SelectItem>

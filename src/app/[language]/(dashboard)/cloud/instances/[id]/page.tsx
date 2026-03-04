@@ -16,6 +16,12 @@ import {
 import { toast, toastApiError, toastCopied, toastStatusError } from "@/lib/toast"
 import { ApiRequestError, api } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
+import {
+  buildFallbackCloudProviderOptions,
+  normalizeCloudProvider,
+  normalizeCloudProviderDictionaryItems,
+  type CloudProviderOption,
+} from "@/lib/cloud-provider"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   getCloudInstanceStatusBadgeVariant,
@@ -24,7 +30,7 @@ import {
 } from "@/components/pages/cloud/cloud-instance-list-utils"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
-import type { CloudAICheckJobResponse, CloudInstanceDetailResponse, MetricLatestValue } from "@/types/api"
+import type { CloudAICheckJobResponse, CloudInstanceDetailResponse, DictionaryItem, MetricLatestValue } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -48,6 +54,7 @@ const INSTANCE_METRIC_OPTIONS = [
 const HISTORY_RANGE_OPTIONS = ["1h", "6h", "24h", "7d"] as const
 const INSTANCE_AI_CHECK_JOBS_LIMIT = 6
 const AI_CHECK_POLL_INTERVAL_OPTIONS = [5, 15, 30] as const
+const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   if (!value) {
@@ -424,14 +431,17 @@ export default function CloudInstanceDetailPage() {
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
   const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null)
   const [triggeringAICheck, setTriggeringAICheck] = useState(false)
+  const [providerDictionaryOptions, setProviderDictionaryOptions] = useState<CloudProviderOption[]>([])
   const [aiCheckPollIntervalSecs, setAICheckPollIntervalSecs] = useState<(typeof AI_CHECK_POLL_INTERVAL_OPTIONS)[number]>(15)
   const [refreshingAICheckJobId, setRefreshingAICheckJobId] = useState<string | null>(null)
+  const [recentlyTriggeredAICheckJobId, setRecentlyTriggeredAICheckJobId] = useState<string | null>(null)
   const [recentlyCompletedAICheckJobs, setRecentlyCompletedAICheckJobs] = useState<Record<string, "succeeded" | "failed">>({})
   const [historyMetric, setHistoryMetric] = useState<(typeof INSTANCE_METRIC_OPTIONS)[number]>("cloud.cpu.usage")
   const [historyRange, setHistoryRange] = useState<(typeof HISTORY_RANGE_OPTIONS)[number]>("24h")
   const previousAICheckStatusesRef = useRef<Record<string, string>>({})
   const previousHasRunningAICheckJobsRef = useRef(false)
   const clearCompletedHighlightTimerRef = useRef<number | null>(null)
+  const clearTriggeredHighlightTimerRef = useRef<number | null>(null)
   const {
     data: instance,
     loading,
@@ -480,6 +490,44 @@ export default function CloudInstanceDetailPage() {
   useEffect(() => {
     fetchDetail()
   }, [fetchDetail])
+
+  useEffect(() => {
+    let cancelled = false
+
+    api.listDictionariesByType(CLOUD_PROVIDER_DICT_TYPE, true)
+      .then((items) => {
+        if (!cancelled) {
+          setProviderDictionaryOptions(normalizeCloudProviderDictionaryItems(items))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProviderDictionaryOptions([])
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const providerOptions = useMemo(() => {
+    if (providerDictionaryOptions.length > 0) {
+      return providerDictionaryOptions
+    }
+
+    return buildFallbackCloudProviderOptions(locale)
+  }, [locale, providerDictionaryOptions])
+
+  const providerLabelMap = useMemo(
+    () => new Map(providerOptions.map((item) => [item.value, item.label])),
+    [providerOptions]
+  )
+
+  const getProviderLabel = useCallback((provider: string) => {
+    const normalizedProvider = normalizeCloudProvider(provider)
+    return providerLabelMap.get(normalizedProvider) || provider || "-"
+  }, [providerLabelMap])
 
   useEffect(() => {
     if (!autoRefreshEnabled || !instanceId) {
@@ -682,9 +730,26 @@ export default function CloudInstanceDetailPage() {
   }, [aiCheckPollIntervalSecs, fetchAICheckJobs, hasRunningAICheckJobs])
 
   useEffect(() => {
+    if (!recentlyTriggeredAICheckJobId) {
+      return
+    }
+
+    const rowElement = document.getElementById(`ai-check-job-row-${recentlyTriggeredAICheckJobId}`)
+    if (!rowElement) {
+      return
+    }
+
+    rowElement.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [aiCheckJobs, recentlyTriggeredAICheckJobId])
+
+  useEffect(() => {
     return () => {
       if (clearCompletedHighlightTimerRef.current !== null) {
         window.clearTimeout(clearCompletedHighlightTimerRef.current)
+      }
+
+      if (clearTriggeredHighlightTimerRef.current !== null) {
+        window.clearTimeout(clearTriggeredHighlightTimerRef.current)
       }
     }
   }, [])
@@ -736,8 +801,22 @@ export default function CloudInstanceDetailPage() {
 
     try {
       const result = await api.triggerCloudInstanceAICheck(instanceId, {})
+      const jobId = result.job_id || result.report_id || "-"
+      setRecentlyTriggeredAICheckJobId(jobId === "-" ? null : jobId)
+
+      if (jobId !== "-") {
+        if (clearTriggeredHighlightTimerRef.current !== null) {
+          window.clearTimeout(clearTriggeredHighlightTimerRef.current)
+        }
+
+        clearTriggeredHighlightTimerRef.current = window.setTimeout(() => {
+          setRecentlyTriggeredAICheckJobId(null)
+          clearTriggeredHighlightTimerRef.current = null
+        }, 3200)
+      }
+
       toast.success(t("cloud.instances.detailToastTriggerAICheckSuccess", {
-        reportId: result.report_id,
+        jobId,
       }))
       await fetchAICheckJobs(true)
     } catch (error) {
@@ -900,7 +979,7 @@ export default function CloudInstanceDetailPage() {
           <FieldItem label={t("cloud.instances.detailFieldId")} value={instance.id} mono />
           <FieldItem label={t("cloud.instances.detailFieldInstanceId")} value={instance.instance_id} mono />
           <FieldItem label={t("cloud.instances.detailFieldName")} value={instance.instance_name || "-"} />
-          <FieldItem label={t("cloud.instances.detailFieldProvider")} value={instance.provider} />
+          <FieldItem label={t("cloud.instances.detailFieldProvider")} value={getProviderLabel(instance.provider)} />
           <FieldItem label={t("cloud.instances.detailFieldAccount")} value={instance.account_config_key} mono />
           <FieldItem label={t("cloud.instances.detailFieldRegion")} value={instance.region} />
           <div className="space-y-1">
@@ -1057,24 +1136,34 @@ export default function CloudInstanceDetailPage() {
                 ) : (
                   aiCheckJobs.map((job) => {
                     const completedStatus = recentlyCompletedAICheckJobs[job.id]
+                    const isRecentlyTriggered = recentlyTriggeredAICheckJobId === job.id
+                    const rowClassName = isRecentlyTriggered
+                      ? "bg-sky-500/10 ring-1 ring-inset ring-sky-500/30 transition-colors duration-700"
+                      : completedStatus === "failed"
+                        ? "bg-destructive/10 transition-colors duration-700"
+                        : completedStatus === "succeeded"
+                          ? "bg-emerald-500/10 transition-colors duration-700"
+                          : undefined
 
                     return (
                       <TableRow
                         key={job.id}
-                        className={
-                          completedStatus === "failed"
-                            ? "bg-destructive/10 transition-colors duration-700"
-                            : completedStatus === "succeeded"
-                              ? "bg-emerald-500/10 transition-colors duration-700"
-                              : undefined
-                        }
+                        id={`ai-check-job-row-${job.id}`}
+                        className={rowClassName}
                       >
                         <TableCell>
                           <div className="space-y-1">
                             <Badge variant={resolveAICheckJobStatusVariant(job.status)}>
                               {resolveAICheckJobStatusText(job.status, t)}
                             </Badge>
-                            <p className="font-mono text-xs text-muted-foreground">{job.id}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-xs text-muted-foreground">{job.id}</p>
+                              {isRecentlyTriggered ? (
+                                <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                                  {t("cloud.instances.aiCheckJobsNewBadge")}
+                                </Badge>
+                              ) : null}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>{formatDateTime(job.started_at, locale)}</TableCell>

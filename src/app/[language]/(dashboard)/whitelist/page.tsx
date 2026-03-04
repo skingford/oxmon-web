@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
-import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import {
   Dialog,
   DialogContent,
@@ -640,10 +640,18 @@ export default function WhitelistPage() {
             </Table>
           </div>
 
-          <ServerPaginationControls
-            className="mt-4 flex items-center justify-end gap-2"
+          <PaginationControls
+            className="mt-4"
             pageSize={PAGE_LIMIT}
-            pageIndicatorText={t("whitelist.paginationPage", { page: pagination.currentPage })}
+            summaryText={t("whitelist.paginationSummary", {
+              total: agentsPage.total,
+              start: pagination.rangeStart,
+              end: pagination.rangeEnd,
+            })}
+            pageIndicatorText={t("whitelist.paginationPage", {
+              current: pagination.currentPage,
+              total: pagination.totalPages,
+            })}
             prevLabel={t("whitelist.paginationPrev")}
             nextLabel={t("whitelist.paginationNext")}
             onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}

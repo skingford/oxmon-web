@@ -689,6 +689,7 @@ export interface CloudAccountResponse {
   account_name: string;
   secret_id: string;
   secret_key: string;
+  endpoint?: string | null;
   regions: string[];
   collection_interval_secs: number;
   enabled: boolean;
@@ -785,6 +786,7 @@ export interface CreateCloudAccountRequest {
   account_name: string;
   secret_id: string;
   secret_key: string;
+  endpoint?: string | null;
   regions: string[];
   collection_interval_secs?: number | null;
 }
@@ -795,6 +797,7 @@ export interface UpdateCloudAccountRequest {
   account_name?: string | null;
   secret_id?: string | null;
   secret_key?: string | null;
+  endpoint?: string | null;
   regions?: string[] | null;
   collection_interval_secs?: number | null;
   enabled?: boolean | null;
@@ -818,7 +821,8 @@ export interface TriggerCloudAICheckRequest {
 }
 
 export interface TriggerCloudAICheckResponse {
-  report_id: string;
+  job_id?: string | null;
+  report_id?: string | null;
   message: string;
 }
 
@@ -893,6 +897,11 @@ export interface AIReportListItem {
   risk_level: string;
   notified: boolean;
   created_at: string;
+}
+
+export interface AIReportQueryParams extends PaginationParams {
+  report_date?: string;
+  risk_level?: string;
 }
 
 export interface AIReportRow extends AIReportListItem {

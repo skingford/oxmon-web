@@ -30,7 +30,7 @@ import {
   MetricsTimeRange,
 } from "@/components/metrics/MetricsQueryToolbar";
 import { Button } from "@/components/ui/button";
-import { TablePaginationControls } from "@/components/ui/table-pagination-controls";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
   Table,
   TableBody,
@@ -995,7 +995,7 @@ function MetricsPageContent() {
                 </TableBody>
               </Table>
 
-              <TablePaginationControls
+              <PaginationControls
                 className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
                 summaryText={t("metrics.tableSummary", {
                   total: tablePagination.totalRows,

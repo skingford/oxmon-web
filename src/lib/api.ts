@@ -26,6 +26,7 @@ function finishProgress() {
 import {
   AIAccountResponse,
   AIReportListItem,
+  AIReportQueryParams,
   AIReportRow,
   ActiveAlertQueryParams,
   AlertEventResponse,
@@ -600,6 +601,14 @@ export const api = {
     );
   },
 
+  listChannelsPage: (params: NotificationChannelQueryParams = {}) =>
+    request<unknown>(
+      `/v1/notifications/channels${buildQueryString(params)}`,
+    ).then((payload) => normalizeListResponse<ChannelOverview>(payload, {
+      fallbackLimit: params.limit ?? 0,
+      fallbackOffset: params.offset ?? 0,
+    })),
+
   getChannelById: (id: string) =>
     request<ChannelOverview>(`/v1/notifications/channels/${id}`),
 
@@ -796,10 +805,32 @@ export const api = {
       allowEmptyResponse: true,
     }),
 
-  listAIReports: () =>
-    request<unknown>("/v1/ai/reports").then(
-      (payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as AIReportListItem[],
+  listAIReportsPage: (params: AIReportQueryParams = {}) =>
+    request<unknown>(`/v1/ai/reports${buildQueryString(params)}`).then(
+      (payload) => normalizeListResponse<AIReportListItem>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
     ),
+
+  listAIReports: (params: AIReportQueryParams = {}) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(`/v1/ai/reports${buildQueryString(params)}`).then(
+        (payload) => extractListItems<AIReportListItem>(payload),
+      )
+    }
+
+    const queryParams = {
+      report_date: params?.report_date,
+      risk_level: params?.risk_level,
+    }
+
+    return requestAllPages<AIReportListItem>((page) =>
+      request<unknown>(`/v1/ai/reports${buildQueryString({ ...queryParams, ...page })}`).then(
+        (payload) => extractListItems<AIReportListItem>(payload),
+      ),
+    )
+  },
 
   getAIReportById: (id: string) => request<AIReportRow>(`/v1/ai/reports/${id}`),
 

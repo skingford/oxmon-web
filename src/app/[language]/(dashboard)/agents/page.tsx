@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
-import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import {
   Table,
   TableBody,
@@ -355,10 +355,18 @@ export default function AgentsPage() {
             </Table>
           </div>
 
-          <ServerPaginationControls
-            className="mt-4 flex items-center justify-end gap-2"
+          <PaginationControls
+            className="mt-4"
             pageSize={limit}
-            pageIndicatorText={t("agents.paginationPage", { page: pagination.currentPage })}
+            summaryText={t("agents.paginationSummary", {
+              total: agentsPage.total,
+              start: pagination.rangeStart,
+              end: pagination.rangeEnd,
+            })}
+            pageIndicatorText={t("agents.paginationPage", {
+              current: pagination.currentPage,
+              total: pagination.totalPages,
+            })}
             prevLabel={t("agents.paginationPrev")}
             nextLabel={t("agents.paginationNext")}
             onPrevPage={() => setOffset((prev) => Math.max(0, prev - limit))}

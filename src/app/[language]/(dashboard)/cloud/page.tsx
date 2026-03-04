@@ -7,11 +7,16 @@ import { api, getApiErrorMessage } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
+import {
+  buildFallbackCloudProviderOptions,
+  normalizeCloudProvider,
+  normalizeCloudProviderDictionaryItems,
+  type CloudProviderOption,
+} from "@/lib/cloud-provider"
 import type {
   BatchCreateCloudAccountsRequest,
   CloudAccountResponse,
   CreateCloudAccountRequest,
-  DictionaryItem,
   UpdateCloudAccountRequest,
 } from "@/types/api"
 import { Button } from "@/components/ui/button"
@@ -43,26 +48,13 @@ const DEFAULT_FORM_STATE: CloudAccountFormState = {
   description: "",
   secretId: "",
   secretKey: "",
+  endpoint: "",
   regionsText: "",
   collectionIntervalSecs: "300",
   enabled: true,
 }
 
-const CLOUD_PROVIDER_ALIASES: Record<string, string> = {
-  aliyun: "alibaba",
-  alicloud: "alibaba",
-  alibabacloud: "alibaba",
-  tencentcloud: "tencent",
-  qcloud: "tencent",
-}
-
 const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
-
-type CloudProviderOption = {
-  value: string
-  label: string
-  sortOrder: number
-}
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   if (!value) {
@@ -78,11 +70,6 @@ function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
     hour12: false,
   })
-}
-
-function normalizeCloudProvider(provider: string) {
-  const normalized = provider.trim().toLowerCase()
-  return CLOUD_PROVIDER_ALIASES[normalized] || normalized
 }
 
 function parseDelimitedValues(value: string): string[] {
@@ -104,48 +91,6 @@ function getProviderOptions(accounts: CloudAccountResponse[]) {
   )).sort((a, b) => a.localeCompare(b))
 }
 
-function normalizeCloudProviderDictionaryItems(items: DictionaryItem[]): CloudProviderOption[] {
-  const normalizedItems = items
-    .map((item) => ({
-      value: normalizeCloudProvider(item.dict_key),
-      label: item.dict_label.trim() || normalizeCloudProvider(item.dict_key),
-      sortOrder: item.sort_order,
-    }))
-    .filter((item) => Boolean(item.value))
-    .sort((left, right) => {
-      if (left.sortOrder !== right.sortOrder) {
-        return left.sortOrder - right.sortOrder
-      }
-
-      return left.label.localeCompare(right.label)
-    })
-
-  const seen = new Set<string>()
-  return normalizedItems.filter((item) => {
-    if (seen.has(item.value)) {
-      return false
-    }
-
-    seen.add(item.value)
-    return true
-  })
-}
-
-function buildFallbackProviderOptions(locale: "zh" | "en"): CloudProviderOption[] {
-  return [
-    {
-      value: "tencent",
-      label: locale === "zh" ? "腾讯云" : "Tencent Cloud",
-      sortOrder: 10,
-    },
-    {
-      value: "alibaba",
-      label: locale === "zh" ? "阿里云" : "Alibaba Cloud",
-      sortOrder: 20,
-    },
-  ]
-}
-
 function buildCloudAccountFormState(account: CloudAccountResponse): CloudAccountFormState {
   return {
     configKey: account.config_key,
@@ -155,6 +100,7 @@ function buildCloudAccountFormState(account: CloudAccountResponse): CloudAccount
     description: account.description ?? "",
     secretId: account.secret_id ?? "",
     secretKey: account.secret_key ?? "",
+    endpoint: account.endpoint ?? "",
     regionsText: (account.regions || []).join(", "),
     collectionIntervalSecs: String(account.collection_interval_secs || 300),
     enabled: account.enabled,
@@ -232,7 +178,7 @@ export default function CloudAccountsPage() {
     }
   }, [])
 
-  const fallbackProviderOptions = useMemo(() => buildFallbackProviderOptions(locale), [locale])
+  const fallbackProviderOptions = useMemo(() => buildFallbackCloudProviderOptions(locale), [locale])
   const discoveredProviders = useMemo(() => getProviderOptions(accounts), [accounts])
   const providerOptions = useMemo(() => {
     if (providerDictionaryOptions.length > 0) {
@@ -387,6 +333,8 @@ export default function CloudAccountsPage() {
 
     const displayName = form.displayName.trim()
     const description = form.description.trim()
+    const provider = normalizeCloudProvider(form.provider)
+    const isSangforProvider = provider === "sangfor"
 
     if (!displayName) {
       toast.error(t("cloud.accounts.toastDisplayNameRequired"))
@@ -399,12 +347,17 @@ export default function CloudAccountsPage() {
       if (editingAccount) {
         const secretId = form.secretId.trim()
         const secretKey = form.secretKey.trim()
+        const endpoint = form.endpoint.trim()
         const regions = parseDelimitedValues(form.regionsText)
 
         const payload: UpdateCloudAccountRequest = {
           display_name: displayName,
           description: description || null,
-          account_name: form.accountName.trim() || null,
+          account_name: form.accountName.trim() || (
+            isSangforProvider
+              ? displayName
+              : editingAccount.account_name || null
+          ),
           enabled: form.enabled,
         }
 
@@ -418,7 +371,12 @@ export default function CloudAccountsPage() {
           return
         }
 
-        if (regions.length === 0) {
+        if (isSangforProvider && !endpoint) {
+          toast.error(t("cloud.accounts.toastEndpointRequired"))
+          return
+        }
+
+        if (!isSangforProvider && regions.length === 0) {
           toast.error(locale === "zh" ? "请至少填写一个地域" : "Please provide at least one region")
           return
         }
@@ -437,16 +395,17 @@ export default function CloudAccountsPage() {
 
         payload.secret_id = secretId
         payload.secret_key = secretKey
+        payload.endpoint = endpoint || null
         payload.regions = regions
 
         await api.updateCloudAccount(editingAccount.id, payload)
         toastSaved(t("cloud.accounts.toastUpdateSuccess"))
       } else {
         const configKey = form.configKey.trim()
-        const provider = normalizeCloudProvider(form.provider)
-        const accountName = form.accountName.trim()
+        const accountName = form.accountName.trim() || (isSangforProvider ? displayName : "")
         const secretId = form.secretId.trim()
         const secretKey = form.secretKey.trim()
+        const endpoint = form.endpoint.trim()
         const regions = parseDelimitedValues(form.regionsText)
         const collectionIntervalSecsValue = form.collectionIntervalSecs.trim()
 
@@ -461,7 +420,7 @@ export default function CloudAccountsPage() {
         }
 
         if (!accountName) {
-          toast.error(locale === "zh" ? "请输入云账号名称" : "Please enter account name")
+          toast.error(t("cloud.accounts.toastAccountNameRequired"))
           return
         }
 
@@ -475,7 +434,12 @@ export default function CloudAccountsPage() {
           return
         }
 
-        if (regions.length === 0) {
+        if (isSangforProvider && !endpoint) {
+          toast.error(t("cloud.accounts.toastEndpointRequired"))
+          return
+        }
+
+        if (!isSangforProvider && regions.length === 0) {
           toast.error(locale === "zh" ? "请至少填写一个地域" : "Please provide at least one region")
           return
         }
@@ -497,6 +461,7 @@ export default function CloudAccountsPage() {
           account_name: accountName,
           secret_id: secretId,
           secret_key: secretKey,
+          endpoint: endpoint || null,
           regions,
           collection_interval_secs: collectionIntervalSecs,
         }
@@ -674,6 +639,7 @@ export default function CloudAccountsPage() {
           account_name: account.account_name,
           secret_id: account.secret_id,
           secret_key: account.secret_key,
+          endpoint: account.endpoint,
           regions: account.regions,
           collection_interval_secs: account.collection_interval_secs,
           enabled: account.enabled,
@@ -806,6 +772,7 @@ export default function CloudAccountsPage() {
           colStatus: t("cloud.accounts.tableColStatus"),
           colUpdatedAt: t("cloud.accounts.tableColUpdatedAt"),
           colActions: t("cloud.accounts.tableColActions"),
+          endpointLabel: t("cloud.accounts.tableEndpointLabel"),
           tableLoading: t("cloud.accounts.tableLoading"),
           tableEmpty: t("cloud.accounts.tableEmpty"),
           toggleEnabledLabel: t("cloud.accounts.toggleEnabledLabel"),
@@ -831,6 +798,7 @@ export default function CloudAccountsPage() {
         open={dialogOpen}
         isEditing={Boolean(editingAccount)}
         locale={locale}
+        isSangfor={normalizedProvider === "sangfor"}
         providerSelectValue={providerSelectValue}
         providerOptions={providerOptions}
         form={form}

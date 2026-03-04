@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Loader2, RefreshCw } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
 
@@ -427,7 +427,7 @@ export default function NotificationLogsPage() {
             </Table>
           </div>
 
-          <ServerPaginationControls
+          <PaginationControls
             className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             pageSize={PAGE_LIMIT}
             showSummary
@@ -437,7 +437,7 @@ export default function NotificationLogsPage() {
               end: pagination.rangeEnd,
             })}
             pageIndicatorText={t("notifications.logsPaginationPage", {
-              page: pagination.currentPage,
+              current: pagination.currentPage,
               total: pagination.totalPages,
             })}
             prevLabel={t("notifications.logsPaginationPrev")}

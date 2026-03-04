@@ -16,10 +16,18 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useClientPagination } from "@/hooks/use-client-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { api } from "@/lib/api"
+import {
+  buildFallbackCloudProviderOptions,
+  normalizeCloudProvider,
+  normalizeCloudProviderDictionaryItems,
+  type CloudProviderOption,
+} from "@/lib/cloud-provider"
 import { toast, toastApiError, toastStatusError } from "@/lib/toast"
 import type { CloudAICheckJobResponse, CloudInstanceQueryParams, CloudInstanceResponse, DictionaryItem } from "@/types/api"
 
@@ -32,6 +40,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const CLOUD_INSTANCE_STATUS_DICT_TYPE = "cloud_instance_status"
 const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
 const AI_CHECK_JOBS_LIMIT = 8
+const AI_CHECK_JOBS_PAGE_SIZE_OPTIONS = [3, 5, 10] as const
 const AI_CHECK_POLL_INTERVAL_OPTIONS = [5, 15, 30] as const
 
 type CloudInstanceStatusDictionaryOption = {
@@ -40,73 +49,8 @@ type CloudInstanceStatusDictionaryOption = {
   sortOrder: number
 }
 
-type CloudProviderOption = {
-  value: string
-  label: string
-  sortOrder: number
-}
-
-const CLOUD_PROVIDER_ALIASES: Record<string, string> = {
-  aliyun: "alibaba",
-  alicloud: "alibaba",
-  alibabacloud: "alibaba",
-  tencentcloud: "tencent",
-  qcloud: "tencent",
-}
-
 function normalizeStatusFilterValue(value: string | null | undefined) {
   return (value || "").trim().toLowerCase()
-}
-
-function normalizeCloudProvider(value: string | null | undefined) {
-  const normalized = (value || "").trim().toLowerCase()
-  if (!normalized) {
-    return ""
-  }
-
-  return CLOUD_PROVIDER_ALIASES[normalized] || normalized
-}
-
-function normalizeCloudProviderDictionaryItems(items: DictionaryItem[]): CloudProviderOption[] {
-  const normalizedItems = items
-    .map((item) => ({
-      value: normalizeCloudProvider(item.dict_key),
-      label: item.dict_label.trim() || normalizeCloudProvider(item.dict_key),
-      sortOrder: item.sort_order,
-    }))
-    .filter((item) => Boolean(item.value))
-    .sort((left, right) => {
-      if (left.sortOrder !== right.sortOrder) {
-        return left.sortOrder - right.sortOrder
-      }
-
-      return left.label.localeCompare(right.label)
-    })
-
-  const seen = new Set<string>()
-  return normalizedItems.filter((item) => {
-    if (seen.has(item.value)) {
-      return false
-    }
-
-    seen.add(item.value)
-    return true
-  })
-}
-
-function buildFallbackCloudProviderOptions(locale: "zh" | "en"): CloudProviderOption[] {
-  return [
-    {
-      value: "tencent",
-      label: locale === "zh" ? "腾讯云" : "Tencent Cloud",
-      sortOrder: 10,
-    },
-    {
-      value: "alibaba",
-      label: locale === "zh" ? "阿里云" : "Alibaba Cloud",
-      sortOrder: 20,
-    },
-  ]
 }
 
 function normalizeAICheckJobStatus(value: string | null | undefined) {
@@ -258,12 +202,14 @@ export default function CloudInstancesPage() {
   const [providerFilter, setProviderFilter] = useState("all")
   const [regionFilter, setRegionFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [aiCheckJobsPageSize, setAICheckJobsPageSize] = useState<number>(AI_CHECK_JOBS_PAGE_SIZE_OPTIONS[0])
   const [pageSize, setPageSize] = useState<number>(20)
   const [offset, setOffset] = useState(0)
   const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState("")
   const [triggeringAICheckAll, setTriggeringAICheckAll] = useState(false)
   const [aiCheckPollIntervalSecs, setAICheckPollIntervalSecs] = useState<(typeof AI_CHECK_POLL_INTERVAL_OPTIONS)[number]>(15)
   const [refreshingAICheckJobId, setRefreshingAICheckJobId] = useState<string | null>(null)
+  const [recentlyTriggeredAICheckJobId, setRecentlyTriggeredAICheckJobId] = useState<string | null>(null)
   const [recentlyCompletedAICheckJobs, setRecentlyCompletedAICheckJobs] = useState<Record<string, "succeeded" | "failed">>({})
   const [allInstancesSnapshot, setAllInstancesSnapshot] = useState<CloudInstanceResponse[] | null>(null)
   const [providerDictionaryOptions, setProviderDictionaryOptions] = useState<CloudProviderOption[]>([])
@@ -272,9 +218,16 @@ export default function CloudInstancesPage() {
   const previousAICheckStatusesRef = useRef<Record<string, string>>({})
   const previousHasRunningAICheckJobsRef = useRef(false)
   const clearCompletedHighlightTimerRef = useRef<number | null>(null)
+  const clearTriggeredHighlightTimerRef = useRef<number | null>(null)
 
   const instances = data.instances
   const total = data.total
+  const aiCheckJobsPagination = useClientPagination({
+    items: aiCheckJobs,
+    pageSize: aiCheckJobsPageSize,
+  })
+  const setAICheckJobsPage = aiCheckJobsPagination.setPage
+  const aiCheckJobsPage = aiCheckJobsPagination.page
 
   useEffect(() => {
     syncingFromUrlRef.current = true
@@ -289,14 +242,26 @@ export default function CloudInstancesPage() {
       : PAGE_SIZE_OPTIONS[1]
     const rawOffset = Number(searchParams.get("offset") || "0")
     const nextOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
+    const rawAICheckJobsLimit = Number(searchParams.get("aiJobsLimit") || String(AI_CHECK_JOBS_PAGE_SIZE_OPTIONS[0]))
+    const nextAICheckJobsPageSize = AI_CHECK_JOBS_PAGE_SIZE_OPTIONS.includes(
+      rawAICheckJobsLimit as (typeof AI_CHECK_JOBS_PAGE_SIZE_OPTIONS)[number]
+    )
+      ? rawAICheckJobsLimit
+      : AI_CHECK_JOBS_PAGE_SIZE_OPTIONS[0]
+    const rawAICheckJobsPage = Number(searchParams.get("aiJobsPage") || "1")
+    const nextAICheckJobsPage = Number.isFinite(rawAICheckJobsPage) && rawAICheckJobsPage > 1
+      ? Math.floor(rawAICheckJobsPage)
+      : 1
 
     setSearchKeyword((prev) => (prev === nextSearchKeyword ? prev : nextSearchKeyword))
     setProviderFilter((prev) => (prev === nextProviderFilter ? prev : nextProviderFilter))
     setRegionFilter((prev) => (prev === nextRegionFilter ? prev : nextRegionFilter))
     setStatusFilter((prev) => (prev === nextStatusFilter ? prev : nextStatusFilter))
+    setAICheckJobsPageSize((prev) => (prev === nextAICheckJobsPageSize ? prev : nextAICheckJobsPageSize))
+    setAICheckJobsPage((prev) => (prev === nextAICheckJobsPage ? prev : nextAICheckJobsPage))
     setPageSize((prev) => (prev === nextPageSize ? prev : nextPageSize))
     setOffset((prev) => (prev === nextOffset ? prev : nextOffset))
-  }, [searchParams])
+  }, [searchParams, setAICheckJobsPage])
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams.toString())
@@ -337,6 +302,18 @@ export default function CloudInstancesPage() {
       nextParams.delete("offset")
     }
 
+    if (aiCheckJobsPageSize !== AI_CHECK_JOBS_PAGE_SIZE_OPTIONS[0]) {
+      nextParams.set("aiJobsLimit", String(aiCheckJobsPageSize))
+    } else {
+      nextParams.delete("aiJobsLimit")
+    }
+
+    if (aiCheckJobsPage > 1) {
+      nextParams.set("aiJobsPage", String(aiCheckJobsPage))
+    } else {
+      nextParams.delete("aiJobsPage")
+    }
+
     const nextQuery = nextParams.toString()
     const currentQuery = searchParams.toString()
 
@@ -345,7 +322,19 @@ export default function CloudInstancesPage() {
     }
 
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
-  }, [offset, pageSize, pathname, providerFilter, regionFilter, router, searchKeyword, searchParams, statusFilter])
+  }, [
+    aiCheckJobsPage,
+    aiCheckJobsPageSize,
+    offset,
+    pageSize,
+    pathname,
+    providerFilter,
+    regionFilter,
+    router,
+    searchKeyword,
+    searchParams,
+    statusFilter,
+  ])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -558,9 +547,26 @@ export default function CloudInstancesPage() {
   }, [aiCheckPollIntervalSecs, fetchAICheckJobs, hasRunningAICheckJobs])
 
   useEffect(() => {
+    if (!recentlyTriggeredAICheckJobId) {
+      return
+    }
+
+    const rowElement = document.getElementById(`ai-check-job-row-${recentlyTriggeredAICheckJobId}`)
+    if (!rowElement) {
+      return
+    }
+
+    rowElement.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [aiCheckJobs, recentlyTriggeredAICheckJobId])
+
+  useEffect(() => {
     return () => {
       if (clearCompletedHighlightTimerRef.current !== null) {
         window.clearTimeout(clearCompletedHighlightTimerRef.current)
+      }
+
+      if (clearTriggeredHighlightTimerRef.current !== null) {
+        window.clearTimeout(clearTriggeredHighlightTimerRef.current)
       }
     }
   }, [])
@@ -761,8 +767,23 @@ export default function CloudInstancesPage() {
 
     try {
       const result = await api.triggerAllCloudInstancesAICheck({})
+      const jobId = result.job_id || result.report_id || "-"
+      setRecentlyTriggeredAICheckJobId(jobId === "-" ? null : jobId)
+      setAICheckJobsPage(1)
+
+      if (jobId !== "-") {
+        if (clearTriggeredHighlightTimerRef.current !== null) {
+          window.clearTimeout(clearTriggeredHighlightTimerRef.current)
+        }
+
+        clearTriggeredHighlightTimerRef.current = window.setTimeout(() => {
+          setRecentlyTriggeredAICheckJobId(null)
+          clearTriggeredHighlightTimerRef.current = null
+        }, 3200)
+      }
+
       toast.success(t("cloud.instances.toastTriggerAICheckAllSuccess", {
-        reportId: result.report_id,
+        jobId,
       }))
       await fetchAICheckJobs(true)
     } catch (error) {
@@ -772,7 +793,7 @@ export default function CloudInstancesPage() {
     } finally {
       setTriggeringAICheckAll(false)
     }
-  }, [fetchAICheckJobs, t, triggeringAICheckAll])
+  }, [fetchAICheckJobs, setAICheckJobsPage, t, triggeringAICheckAll])
 
   const handleRefreshAICheckJob = useCallback(async (jobId: string) => {
     if (!jobId || refreshingAICheckJobId === jobId) {
@@ -891,24 +912,34 @@ export default function CloudInstancesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  aiCheckJobs.map((job) => {
+                  aiCheckJobsPagination.paginatedItems.map((job) => {
                     const completedStatus = recentlyCompletedAICheckJobs[job.id]
+                    const isRecentlyTriggered = recentlyTriggeredAICheckJobId === job.id
+                    const rowClassName = isRecentlyTriggered
+                      ? "bg-sky-500/10 ring-1 ring-inset ring-sky-500/30 transition-colors duration-700"
+                      : completedStatus === "failed"
+                        ? "bg-destructive/10 transition-colors duration-700"
+                        : completedStatus === "succeeded"
+                          ? "bg-emerald-500/10 transition-colors duration-700"
+                          : undefined
 
                     return (
                       <TableRow
                         key={job.id}
-                        className={
-                          completedStatus === "failed"
-                            ? "bg-destructive/10 transition-colors duration-700"
-                            : completedStatus === "succeeded"
-                              ? "bg-emerald-500/10 transition-colors duration-700"
-                              : undefined
-                        }
+                        id={`ai-check-job-row-${job.id}`}
+                        className={rowClassName}
                       >
                         <TableCell className="max-w-[260px]">
                           <div className="space-y-1">
                             <p className="text-sm">{resolveAICheckJobTypeText(job.job_type, t)}</p>
-                            <p className="font-mono text-xs text-muted-foreground">{job.id}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-xs text-muted-foreground">{job.id}</p>
+                              {isRecentlyTriggered ? (
+                                <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                                  {t("cloud.instances.aiCheckJobsNewBadge")}
+                                </Badge>
+                              ) : null}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -943,6 +974,40 @@ export default function CloudInstancesPage() {
               </TableBody>
             </Table>
           </div>
+          {!aiCheckJobsLoading && aiCheckJobs.length > 0 ? (
+            <PaginationControls
+              pageSize={aiCheckJobsPageSize}
+              pageSizeOptions={[...AI_CHECK_JOBS_PAGE_SIZE_OPTIONS]}
+              onPageSizeChange={(nextPageSize) => {
+                if (!AI_CHECK_JOBS_PAGE_SIZE_OPTIONS.includes(nextPageSize as (typeof AI_CHECK_JOBS_PAGE_SIZE_OPTIONS)[number])) {
+                  return
+                }
+
+                setAICheckJobsPageSize(nextPageSize)
+                setAICheckJobsPage(1)
+              }}
+              summaryText={t("cloud.instances.paginationSummary", {
+                total: aiCheckJobsPagination.totalRows,
+                start: aiCheckJobsPagination.startIndex,
+                end: aiCheckJobsPagination.endIndex,
+              })}
+              pageIndicatorText={t("cloud.instances.paginationPage", {
+                current: aiCheckJobsPagination.currentPage,
+                total: aiCheckJobsPagination.totalPages,
+              })}
+              prevLabel={t("cloud.instances.paginationPrev")}
+              nextLabel={t("cloud.instances.paginationNext")}
+              pageSizePlaceholder={t("cloud.instances.pageSizePlaceholder")}
+              onPrevPage={() => aiCheckJobsPagination.setPage((prev) => Math.max(1, prev - 1))}
+              onNextPage={() => aiCheckJobsPagination.setPage((prev) => Math.min(aiCheckJobsPagination.totalPages, prev + 1))}
+              prevDisabled={aiCheckJobsPagination.currentPage <= 1 || aiCheckJobsPagination.totalRows === 0}
+              nextDisabled={
+                aiCheckJobsPagination.currentPage >= aiCheckJobsPagination.totalPages
+                || aiCheckJobsPagination.totalRows === 0
+              }
+              pageSizeOptionLabel={pageSizeOptionLabel}
+            />
+          ) : null}
         </CardContent>
       </Card>
 

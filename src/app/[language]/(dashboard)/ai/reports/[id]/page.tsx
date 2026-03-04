@@ -6,6 +6,11 @@ import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { AIReportRow } from "@/types/api";
 import { toastApiError } from "@/lib/toast";
+import {
+  resolveRiskLevel,
+  riskLevelLabelZh,
+  riskBadgeClassNameByLevel,
+} from "@/lib/risk-level";
 import { useAppTranslations } from "@/hooks/use-app-translations";
 import { useAppLocale } from "@/hooks/use-app-locale";
 import { withLocalePrefix } from "@/components/app-locale";
@@ -67,6 +72,11 @@ export default function AIReportDetailPage() {
   const id = String(params?.id || "");
   const [report, setReport] = useState<AIReportRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const riskLevel = useMemo(
+    () => resolveRiskLevel(report?.risk_level || ""),
+    [report?.risk_level],
+  );
+  const riskLevelLabel = riskLevelLabelZh(riskLevel);
   const formattedRawMetricsJson = useMemo(
     () => formatJsonText(report?.raw_metrics_json),
     [report?.raw_metrics_json],
@@ -177,7 +187,9 @@ export default function AIReportDetailPage() {
               {t("reports.detailFieldRisk")}
             </div>
             <div className="text-sm">
-              <Badge variant="outline">{report.risk_level}</Badge>
+              <Badge variant="outline" className={riskBadgeClassNameByLevel(riskLevel)}>
+                {riskLevelLabel}
+              </Badge>
             </div>
           </div>
           <MetaItem

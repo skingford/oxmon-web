@@ -24,6 +24,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import { api } from "@/lib/api"
+import {
+  buildFallbackCloudProviderOptions,
+  normalizeCloudProvider,
+  normalizeCloudProviderDictionaryItems,
+  type CloudProviderOption,
+} from "@/lib/cloud-provider"
+import {
+  resolveRiskLevelByScore,
+  riskLevelColorHex,
+  type RiskLevel,
+} from "@/lib/risk-level"
 import { toastApiError } from "@/lib/toast"
 import type { CloudInstanceResponse, CloudInstancesChartResponse, DictionaryItem } from "@/types/api"
 
@@ -52,7 +63,7 @@ type RankingRow = {
   level: UtilizationLevel
 }
 
-type UtilizationLevel = "normal" | "attention" | "alert" | "critical"
+type UtilizationLevel = RiskLevel
 
 const EMPTY_CHART_DATA: CloudInstancesChartResponse = {
   labels: [],
@@ -64,20 +75,6 @@ const CHART_LIMIT = 30
 const CLOUD_INSTANCE_STATUS_DICT_TYPE = "cloud_instance_status"
 const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
 
-type CloudProviderOption = {
-  value: string
-  label: string
-  sortOrder: number
-}
-
-const CLOUD_PROVIDER_ALIASES: Record<string, string> = {
-  aliyun: "alibaba",
-  alicloud: "alibaba",
-  alibabacloud: "alibaba",
-  tencentcloud: "tencent",
-  qcloud: "tencent",
-}
-
 const RANKING_METRICS: RankingMetricConfig[] = [
   { id: "memory", metric: "cloud.memory.usage", labelKey: "cloud.instances.chartMetricLabel_cloud_memory_usage" },
   { id: "disk", metric: "cloud.disk.usage", labelKey: "cloud.instances.chartMetricLabel_cloud_disk_usage" },
@@ -86,57 +83,6 @@ const RANKING_METRICS: RankingMetricConfig[] = [
 
 function normalizeStatusFilterValue(value: string | null | undefined) {
   return (value || "").trim().toLowerCase()
-}
-
-function normalizeCloudProvider(value: string | null | undefined) {
-  const normalized = (value || "").trim().toLowerCase()
-  if (!normalized) {
-    return ""
-  }
-
-  return CLOUD_PROVIDER_ALIASES[normalized] || normalized
-}
-
-function normalizeCloudProviderDictionaryItems(items: DictionaryItem[]): CloudProviderOption[] {
-  const normalizedItems = items
-    .map((item) => ({
-      value: normalizeCloudProvider(item.dict_key),
-      label: item.dict_label.trim() || normalizeCloudProvider(item.dict_key),
-      sortOrder: item.sort_order,
-    }))
-    .filter((item) => Boolean(item.value))
-    .sort((left, right) => {
-      if (left.sortOrder !== right.sortOrder) {
-        return left.sortOrder - right.sortOrder
-      }
-
-      return left.label.localeCompare(right.label)
-    })
-
-  const seen = new Set<string>()
-  return normalizedItems.filter((item) => {
-    if (seen.has(item.value)) {
-      return false
-    }
-
-    seen.add(item.value)
-    return true
-  })
-}
-
-function buildFallbackCloudProviderOptions(locale: "zh" | "en"): CloudProviderOption[] {
-  return [
-    {
-      value: "tencent",
-      label: locale === "zh" ? "腾讯云" : "Tencent Cloud",
-      sortOrder: 10,
-    },
-    {
-      value: "alibaba",
-      label: locale === "zh" ? "阿里云" : "Alibaba Cloud",
-      sortOrder: 20,
-    },
-  ]
 }
 
 function normalizeStatusDictionaryItems(items: DictionaryItem[]): CloudInstanceStatusDictionaryOption[] {
@@ -175,36 +121,8 @@ function formatPercentValue(value: number | null | undefined) {
   return `${value.toFixed(2)}%`
 }
 
-function getUtilizationLevel(value: number): UtilizationLevel {
-  if (value > 85) {
-    return "critical"
-  }
-
-  if (value > 80) {
-    return "alert"
-  }
-
-  if (value < 60) {
-    return "normal"
-  }
-
-  return "attention"
-}
-
 function getBarColorByLevel(level: UtilizationLevel) {
-  if (level === "normal") {
-    return "#22c55e"
-  }
-
-  if (level === "attention") {
-    return "#3b82f6"
-  }
-
-  if (level === "alert") {
-    return "#f59e0b"
-  }
-
-  return "#ef4444"
+  return riskLevelColorHex(level)
 }
 
 function buildRankingRows(chartData: CloudInstancesChartResponse, metricKey: string) {
@@ -225,7 +143,7 @@ function buildRankingRows(chartData: CloudInstancesChartResponse, metricKey: str
         value,
         provider: instance?.provider || "-",
         region: instance?.region || "-",
-        level: getUtilizationLevel(value),
+        level: resolveRiskLevelByScore(value),
       }
     })
     .filter((item): item is RankingRow => Boolean(item))
@@ -588,14 +506,16 @@ export default function CloudInstancesRankingPage() {
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-2 flex-1 min-w-[200px]">
               <Label>{t("cloud.instances.filterProvider")}</Label>
-              <Select value={providerFilter} onValueChange={setProviderFilter}>
+              <Select value={providerFilter} onValueChange={(value) => {
+                setProviderFilter(value === "all" ? "all" : normalizeCloudProvider(value))
+              }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("cloud.instances.filterProviderAll")}</SelectItem>
                   {providerOptions.map((provider) => (
-                    <SelectItem key={provider} value={provider}>{provider}</SelectItem>
+                    <SelectItem key={provider.value} value={provider.value}>{provider.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -677,6 +597,7 @@ export default function CloudInstancesRankingPage() {
               axisHint={t("cloud.instancesRanking.axisHint")}
               legendItems={legendItems}
               getLevelLabel={getLevelLabel}
+              getProviderLabel={getProviderLabel}
             />
           </TabsContent>
         ))}

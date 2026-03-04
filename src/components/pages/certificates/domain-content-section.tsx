@@ -26,7 +26,11 @@ type DomainContentSectionProps = {
     pageLimit: number
     loading: boolean
     domains: CertDomain[]
+    totalCount: number
     pageNumber: number
+    totalPages: number
+    rangeStart: number
+    rangeEnd: number
     canGoPrev: boolean
     canGoNext: boolean
     checkingId: string | null
@@ -62,7 +66,11 @@ export function DomainContentSection({ t, locale, stats, filters, table }: Domai
         pageLimit={table.pageLimit}
         loading={table.loading}
         domains={table.domains}
+        totalCount={table.totalCount}
         pageNumber={table.pageNumber}
+        totalPages={table.totalPages}
+        rangeStart={table.rangeStart}
+        rangeEnd={table.rangeEnd}
         canGoPrev={table.canGoPrev}
         canGoNext={table.canGoNext}
         checkingId={table.checkingId}

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import {
   Table,
   TableBody,
@@ -29,9 +30,26 @@ import {
   TriangleAlert,
 } from "lucide-react"
 
+type NotificationsChannelsPagination = {
+  pageSize: number
+  pageSizeOptions: number[]
+  onPageSizeChange: (pageSize: number) => void
+  summaryText: string
+  pageIndicatorText: string
+  pageSizePlaceholder: string
+  prevLabel: string
+  nextLabel: string
+  onPrevPage: () => void
+  onNextPage: () => void
+  prevDisabled: boolean
+  nextDisabled: boolean
+  pageSizeOptionLabel: (pageSize: number) => string
+}
+
 type NotificationsChannelsTableProps = {
   loading: boolean
   channels: ChannelOverview[]
+  pagination: NotificationsChannelsPagination
   hasActiveFilters: boolean
   togglingId: string | null
   locale: "zh" | "en"
@@ -42,6 +60,7 @@ type NotificationsChannelsTableProps = {
 export function NotificationsChannelsTable({
   loading,
   channels,
+  pagination,
   hasActiveFilters,
   togglingId,
   locale,
@@ -54,7 +73,7 @@ export function NotificationsChannelsTable({
         <CardTitle>{t("notifications.tableTitle")}</CardTitle>
         <CardDescription>{t("notifications.tableDescription")}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <div className="w-full overflow-x-auto">
           <Table className="min-w-[820px]">
             <TableHeader>
@@ -150,6 +169,22 @@ export function NotificationsChannelsTable({
             </TableBody>
           </Table>
         </div>
+
+        <PaginationControls
+          pageSize={pagination.pageSize}
+          pageSizeOptions={pagination.pageSizeOptions}
+          onPageSizeChange={pagination.onPageSizeChange}
+          summaryText={pagination.summaryText}
+          pageIndicatorText={pagination.pageIndicatorText}
+          pageSizePlaceholder={pagination.pageSizePlaceholder}
+          prevLabel={pagination.prevLabel}
+          nextLabel={pagination.nextLabel}
+          onPrevPage={pagination.onPrevPage}
+          onNextPage={pagination.onNextPage}
+          prevDisabled={pagination.prevDisabled}
+          nextDisabled={pagination.nextDisabled}
+          pageSizeOptionLabel={pagination.pageSizeOptionLabel}
+        />
       </CardContent>
     </Card>
   )

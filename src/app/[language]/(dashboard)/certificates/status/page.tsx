@@ -25,7 +25,7 @@ import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { HttpMethodBadge } from "@/components/ui/http-method-badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Loader2,
@@ -600,10 +600,18 @@ export default function CertificateStatusPage() {
             </Table>
           </div>
 
-          <ServerPaginationControls
-            className="mt-4 flex items-center justify-end gap-2"
+          <PaginationControls
+            className="mt-4"
             pageSize={PAGE_LIMIT}
-            pageIndicatorText={t("certificates.status.paginationPage", { page: pagination.currentPage })}
+            summaryText={t("certificates.status.paginationSummary", {
+              total: statusesPage.total,
+              start: pagination.rangeStart,
+              end: pagination.rangeEnd,
+            })}
+            pageIndicatorText={t("certificates.status.paginationPage", {
+              current: pagination.currentPage,
+              total: pagination.totalPages,
+            })}
             prevLabel={t("certificates.status.paginationPrev")}
             nextLabel={t("certificates.status.paginationNext")}
             onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}

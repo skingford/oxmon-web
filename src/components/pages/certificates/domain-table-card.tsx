@@ -5,7 +5,7 @@ import { CertDomain } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ServerPaginationControls } from "@/components/ui/server-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { History, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react"
@@ -32,7 +32,11 @@ type DomainTableCardProps = {
   pageLimit: number
   loading: boolean
   domains: CertDomain[]
+  totalCount: number
   pageNumber: number
+  totalPages: number
+  rangeStart: number
+  rangeEnd: number
   canGoPrev: boolean
   canGoNext: boolean
   checkingId: string | null
@@ -53,7 +57,11 @@ export function DomainTableCard({
   pageLimit,
   loading,
   domains,
+  totalCount,
   pageNumber,
+  totalPages,
+  rangeStart,
+  rangeEnd,
   canGoPrev,
   canGoNext,
   checkingId,
@@ -183,10 +191,18 @@ export function DomainTableCard({
           </Table>
         </div>
 
-        <ServerPaginationControls
-          className="mt-4 flex items-center justify-end gap-2"
+        <PaginationControls
+          className="mt-4"
           pageSize={pageLimit}
-          pageIndicatorText={t("certificates.domains.paginationPage", { page: pageNumber })}
+          summaryText={t("certificates.domains.paginationSummary", {
+            total: totalCount,
+            start: rangeStart,
+            end: rangeEnd,
+          })}
+          pageIndicatorText={t("certificates.domains.paginationPage", {
+            current: pageNumber,
+            total: totalPages,
+          })}
           prevLabel={t("certificates.domains.paginationPrev")}
           nextLabel={t("certificates.domains.paginationNext")}
           onPrevPage={onPrevPage}

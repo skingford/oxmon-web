@@ -1,23 +1,29 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { api } from "@/lib/api";
-import type { AIReportListItem } from "@/types/api";
-import { toastApiError } from "@/lib/toast";
-import { useAppTranslations } from "@/hooks/use-app-translations";
-import { useAppLocale } from "@/hooks/use-app-locale";
-import { withLocalePrefix } from "@/components/app-locale";
+import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { api } from "@/lib/api"
+import type { AIReportListItem } from "@/types/api"
+import { toastApiError } from "@/lib/toast"
+import {
+  resolveRiskLevel,
+  riskLevelLabelZh,
+  riskBadgeClassNameByLevel,
+} from "@/lib/risk-level"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { useAppLocale } from "@/hooks/use-app-locale"
+import { useRequestState } from "@/hooks/use-request-state"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
+import { withLocalePrefix } from "@/components/app-locale"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { motion, AnimatePresence } from "framer-motion"
-import { Badge } from "@/components/ui/badge";
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -25,54 +31,99 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { RefreshCw } from "lucide-react";
+} from "@/components/ui/table"
+import { PaginationControls } from "@/components/ui/pagination-controls"
+import { Loader2, RefreshCw } from "lucide-react"
 
-function formatDateTime(value?: string | null) {
-  if (!value) return "-";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+type ReportsState = {
+  items: AIReportListItem[]
+  total: number
 }
 
-function riskVariant(
-  risk: string,
-): "default" | "destructive" | "secondary" | "outline" {
-  const x = risk.toLowerCase();
-  if (x.includes("high") || x.includes("critical")) return "destructive";
-  if (x.includes("medium") || x.includes("warn")) return "default";
-  if (x.includes("low")) return "secondary";
-  return "outline";
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
+const RISK_LEGEND_ITEMS = [
+  { textKey: "reports.legendNormal", dotClassName: "bg-emerald-500" },
+  { textKey: "reports.legendAttention", dotClassName: "bg-blue-500" },
+  { textKey: "reports.legendAlert", dotClassName: "bg-amber-500" },
+  { textKey: "reports.legendCritical", dotClassName: "bg-red-500" },
+] as const
+
+function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
+  if (!value) {
+    return "-"
+  }
+
+  const parsed = Date.parse(value)
+  if (!Number.isFinite(parsed)) {
+    return value
+  }
+
+  return new Date(parsed).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")
 }
 
 export default function AIReportsPage() {
-  const { t } = useAppTranslations("ai");
-  const locale = useAppLocale();
-  const [items, setItems] = useState<AIReportListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { t } = useAppTranslations("ai")
+  const locale = useAppLocale()
+  const [offset, setOffset] = useState(0)
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(PAGE_SIZE_OPTIONS[1])
+  const {
+    data,
+    loading,
+    refreshing,
+    execute,
+  } = useRequestState<ReportsState>({
+    items: [],
+    total: 0,
+  })
 
   const sortedItems = useMemo(
     () =>
-      [...items].sort(
+      [...data.items].sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       ),
-    [items],
-  );
+    [data.items],
+  )
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      setItems(await api.listAIReports());
-    } catch (error) {
-      toastApiError(error, t("reports.toastFetchError"));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchData = useCallback(async (silent = false) => {
+    await execute(
+      async () => {
+        const page = await api.listAIReportsPage({
+          limit: pageSize,
+          offset,
+        })
+
+        return {
+          items: page.items,
+          total: page.total,
+        }
+      },
+      {
+        silent,
+        onError: (error) => {
+          toastApiError(error, t("reports.toastFetchError"))
+        },
+      },
+    )
+  }, [execute, offset, pageSize, t])
 
   useEffect(() => {
-    void fetchData();
-  }, []);
+    void fetchData()
+  }, [fetchData])
+
+  const pagination = useServerOffsetPagination({
+    offset,
+    limit: pageSize,
+    currentItemsCount: sortedItems.length,
+    totalItems: data.total,
+  })
+
+  const pageSizeOptionLabel = useCallback(
+    (size: number) => (locale === "zh" ? `${size} / 页` : `${size} / page`),
+    [locale],
+  )
+
+  const isBusy = loading || refreshing
 
   return (
     <div className="min-w-0 space-y-6 p-4 md:p-8">
@@ -88,12 +139,10 @@ export default function AIReportsPage() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => void fetchData()}
-          disabled={loading}
+          onClick={() => void fetchData(true)}
+          disabled={isBusy}
         >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
-          />
+          {isBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
           {t("reports.refreshButton")}
         </Button>
       </div>
@@ -102,81 +151,128 @@ export default function AIReportsPage() {
         <CardHeader>
           <CardTitle>{t("reports.tableTitle")}</CardTitle>
           <CardDescription>{t("reports.tableDescription")}</CardDescription>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-sm text-muted-foreground">
+            {RISK_LEGEND_ITEMS.map((item) => (
+              <span key={item.textKey} className="inline-flex items-center gap-2">
+                <span
+                  className={`inline-block h-2.5 w-2.5 rounded-full ${item.dotClassName}`}
+                  aria-hidden="true"
+                />
+                {t(item.textKey)}
+              </span>
+            ))}
+          </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("reports.colDate")}</TableHead>
-                <TableHead>{t("reports.colProvider")}</TableHead>
-                <TableHead>{t("reports.colModel")}</TableHead>
-                <TableHead>{t("reports.colRisk")}</TableHead>
-                <TableHead>{t("reports.colAgents")}</TableHead>
-                <TableHead>{t("reports.colNotified")}</TableHead>
-                <TableHead>{t("reports.colCreatedAt")}</TableHead>
-                <TableHead className="text-right">
-                  {t("reports.colActions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    {t("reports.tableLoading")}
-                  </TableCell>
+                  <TableHead>{t("reports.colDate")}</TableHead>
+                  <TableHead>{t("reports.colProvider")}</TableHead>
+                  <TableHead>{t("reports.colModel")}</TableHead>
+                  <TableHead>{t("reports.colRisk")}</TableHead>
+                  <TableHead>{t("reports.colAgents")}</TableHead>
+                  <TableHead>{t("reports.colNotified")}</TableHead>
+                  <TableHead>{t("reports.colCreatedAt")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("reports.colActions")}
+                  </TableHead>
                 </TableRow>
-              ) : sortedItems.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    {t("reports.tableEmpty")}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{item.report_date}</TableCell>
-                    <TableCell>{item.ai_provider}</TableCell>
-                    <TableCell className="max-w-[220px] truncate">
-                      {item.ai_model}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={riskVariant(item.risk_level)}>
-                        {item.risk_level}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{item.total_agents}</TableCell>
-                    <TableCell>
-                      {item.notified
-                        ? t("reports.notifiedYes")
-                        : t("reports.notifiedNo")}
-                    </TableCell>
-                    <TableCell>{formatDateTime(item.created_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button type="button" size="sm" variant="outline" asChild>
-                        <Link
-                          href={withLocalePrefix(
-                            `/ai/reports/${item.id}`,
-                            locale,
-                          )}
-                        >
-                          {t("reports.actionView")}
-                        </Link>
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      {t("reports.tableLoading")}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : sortedItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      {t("reports.tableEmpty")}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedItems.map((item) => {
+                    const level = resolveRiskLevel(item.risk_level)
+                    const riskLabel = riskLevelLabelZh(level)
+
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.report_date}</TableCell>
+                        <TableCell>{item.ai_provider}</TableCell>
+                        <TableCell className="max-w-[220px] truncate">
+                          {item.ai_model}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={riskBadgeClassNameByLevel(level)}
+                          >
+                            {riskLabel}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{item.total_agents}</TableCell>
+                        <TableCell>
+                          {item.notified
+                            ? t("reports.notifiedYes")
+                            : t("reports.notifiedNo")}
+                        </TableCell>
+                        <TableCell>{formatDateTime(item.created_at, locale)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" size="sm" variant="outline" asChild>
+                            <Link href={withLocalePrefix(`/ai/reports/${item.id}`, locale)}>
+                              {t("reports.actionView")}
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <PaginationControls
+            pageSize={pageSize}
+            pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(value) => {
+              const nextSize = value as (typeof PAGE_SIZE_OPTIONS)[number]
+              if (nextSize === pageSize) {
+                return
+              }
+
+              setPageSize(nextSize)
+              setOffset(0)
+            }}
+            summaryText={t("reports.paginationSummary", {
+              total: data.total,
+              start: pagination.rangeStart,
+              end: pagination.rangeEnd,
+            })}
+            pageIndicatorText={t("reports.paginationPage", {
+              current: pagination.currentPage,
+              total: pagination.totalPages,
+            })}
+            pageSizePlaceholder={t("reports.pageSizePlaceholder")}
+            prevLabel={t("reports.paginationPrev")}
+            nextLabel={t("reports.paginationNext")}
+            onPrevPage={() => setOffset((prev) => Math.max(0, prev - pageSize))}
+            onNextPage={() => setOffset((prev) => prev + pageSize)}
+            prevDisabled={isBusy || !pagination.canGoPrev}
+            nextDisabled={isBusy || !pagination.canGoNext}
+            pageSizeOptionLabel={pageSizeOptionLabel}
+          />
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

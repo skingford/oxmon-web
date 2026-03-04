@@ -9,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -61,10 +60,16 @@ export function CloudAccountBatchImportDialog({
   texts,
 }: CloudAccountBatchImportDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline">{texts.trigger}</Button>
-      </DialogTrigger>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        aria-haspopup="dialog"
+        onClick={() => onOpenChange(true)}
+      >
+        {texts.trigger}
+      </Button>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{texts.title}</DialogTitle>
@@ -126,6 +131,7 @@ export function CloudAccountBatchImportDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }

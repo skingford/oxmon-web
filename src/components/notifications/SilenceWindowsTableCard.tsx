@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { TablePaginationControls } from "@/components/ui/table-pagination-controls"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pencil, ShieldOff, Trash2 } from "lucide-react"
 
@@ -175,7 +175,7 @@ export function SilenceWindowsTableCard({
           </TableBody>
         </Table>
 
-        <TablePaginationControls
+        <PaginationControls
           className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
           pageSize={pagination.pageSize}
           pageSizeOptions={pagination.pageSizeOptions}
