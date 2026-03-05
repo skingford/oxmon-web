@@ -42,6 +42,7 @@ import {
   Info,
 } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
+import { joinFilteredPaginationSummaryText } from "@/lib/pagination-summary"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   AreaChart,
@@ -775,21 +776,24 @@ export default function ActiveAlertsPage() {
             <PaginationControls
               className="mt-4"
               pageSize={limit}
-              showSummary
-              summaryText={`${t("active.paginationSummary", {
-                total: alertsTotal,
-                start: pagination.rangeStart,
-                end: pagination.rangeEnd,
-              })}${
-                filteredAlerts.length !== alerts.length
-                  ? ` • ${t("active.paginationShown", { filtered: filteredAlerts.length, total: alerts.length })}`
-                  : ""
-              }`}
+              summaryText={joinFilteredPaginationSummaryText({
+                summaryText: t("active.paginationSummary", {
+                  total: alertsTotal,
+                  start: pagination.rangeStart,
+                  end: pagination.rangeEnd,
+                }),
+                filteredSummaryText: t("active.paginationShown", {
+                  filtered: filteredAlerts.length,
+                  total: alerts.length,
+                }),
+                filteredCount: filteredAlerts.length,
+                totalCount: alerts.length,
+              })}
               pageIndicatorText={t("active.paginationPage", {
                 current: pagination.currentPage,
                 total: pagination.totalPages,
               })}
-              prevLabel={t("active.paginationPrevious")}
+              prevLabel={t("active.paginationPrev")}
               nextLabel={t("active.paginationNext")}
               onPrevPage={() => setOffset(Math.max(0, offset - limit))}
               onNextPage={() => setOffset(offset + limit)}

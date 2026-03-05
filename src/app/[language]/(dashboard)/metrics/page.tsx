@@ -14,6 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { joinFilteredPaginationSummaryText } from "@/lib/pagination-summary";
 import { MetricDataPointResponse, MetricSummaryResponse } from "@/types/api";
 import { useRequestState } from "@/hooks/use-request-state";
 import { useAppTranslations } from "@/hooks/use-app-translations";
@@ -996,11 +997,19 @@ function MetricsPageContent() {
               </Table>
 
               <PaginationControls
-                className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-                summaryText={t("metrics.tableSummary", {
-                  total: tablePagination.totalRows,
-                  start: tablePagination.startIndex,
-                  end: tablePagination.endIndex,
+                className="mt-4"
+                summaryText={joinFilteredPaginationSummaryText({
+                  summaryText: t("metrics.tableSummary", {
+                    total: tablePagination.totalRows,
+                    start: tablePagination.startIndex,
+                    end: tablePagination.endIndex,
+                  }),
+                  filteredSummaryText: t("metrics.paginationShown", {
+                    filtered: filteredDataPoints.length,
+                    total: dataPoints.length,
+                  }),
+                  filteredCount: filteredDataPoints.length,
+                  totalCount: dataPoints.length,
                 })}
                 pageSize={pageSize}
                 pageSizeOptions={[20, 50, 100]}

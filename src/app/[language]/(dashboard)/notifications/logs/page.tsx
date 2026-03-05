@@ -428,9 +428,8 @@ export default function NotificationLogsPage() {
           </div>
 
           <PaginationControls
-            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            className="mt-4"
             pageSize={PAGE_LIMIT}
-            showSummary
             summaryText={t("notifications.logsPaginationSummary", {
               total: data.total,
               start: pagination.rangeStart,

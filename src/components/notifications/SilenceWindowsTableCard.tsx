@@ -176,7 +176,7 @@ export function SilenceWindowsTableCard({
         </Table>
 
         <PaginationControls
-          className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+          className="mt-4"
           pageSize={pagination.pageSize}
           pageSizeOptions={pagination.pageSizeOptions}
           onPageSizeChange={pagination.onPageSizeChange}

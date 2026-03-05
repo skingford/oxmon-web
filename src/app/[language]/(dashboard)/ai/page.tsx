@@ -441,7 +441,7 @@ export default function AIAccountsPage() {
           </Table>
           {!loading && sortedItems.length > 0 ? (
             <PaginationControls
-              className="mt-4 border px-0 pb-0 pt-4 md:border-0 md:px-0 md:pb-0 md:pt-4"
+              className="mt-4"
               pageSize={pageSize}
               pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
               onPageSizeChange={(nextPageSize) => {

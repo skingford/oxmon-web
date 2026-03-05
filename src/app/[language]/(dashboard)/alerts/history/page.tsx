@@ -31,6 +31,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
+import { joinFilteredPaginationSummaryText } from "@/lib/pagination-summary"
 import { motion, AnimatePresence } from "framer-motion"
 
 type AlertHistoryParams = {
@@ -370,21 +371,24 @@ export default function AlertHistoryPage() {
             <PaginationControls
               className="mt-4"
               pageSize={limit}
-              showSummary
-              summaryText={`${t("history.paginationSummary", {
-                total: alertsTotal,
-                start: pagination.rangeStart,
-                end: pagination.rangeEnd,
-              })}${
-                filteredAlerts.length !== alerts.length
-                  ? ` • ${t("history.paginationShown", { filtered: filteredAlerts.length, total: alerts.length })}`
-                  : ""
-              }`}
+              summaryText={joinFilteredPaginationSummaryText({
+                summaryText: t("history.paginationSummary", {
+                  total: alertsTotal,
+                  start: pagination.rangeStart,
+                  end: pagination.rangeEnd,
+                }),
+                filteredSummaryText: t("history.paginationShown", {
+                  filtered: filteredAlerts.length,
+                  total: alerts.length,
+                }),
+                filteredCount: filteredAlerts.length,
+                totalCount: alerts.length,
+              })}
               pageIndicatorText={t("history.paginationPage", {
                 current: pagination.currentPage,
                 total: pagination.totalPages,
               })}
-              prevLabel={t("history.paginationPrevious")}
+              prevLabel={t("history.paginationPrev")}
               nextLabel={t("history.paginationNext")}
               onPrevPage={() => setOffset(Math.max(0, offset - limit))}
               onNextPage={() => setOffset(offset + limit)}

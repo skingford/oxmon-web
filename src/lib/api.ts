@@ -564,6 +564,7 @@ export const api = {
   getCertificates: (
     params: PaginationParams & {
       domain__contains?: string;
+      not_after__gte?: number;
       not_after__lte?: number;
       ip_address__contains?: string;
       issuer__contains?: string;

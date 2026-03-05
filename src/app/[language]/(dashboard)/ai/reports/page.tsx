@@ -61,6 +61,14 @@ function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
   return new Date(parsed).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")
 }
 
+function notifiedBadgeClassName(notified: boolean) {
+  if (notified) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-600"
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-600"
+}
+
 export default function AIReportsPage() {
   const { t } = useAppTranslations("ai")
   const locale = useAppLocale()
@@ -221,9 +229,14 @@ export default function AIReportsPage() {
                         </TableCell>
                         <TableCell>{item.total_agents}</TableCell>
                         <TableCell>
-                          {item.notified
-                            ? t("reports.notifiedYes")
-                            : t("reports.notifiedNo")}
+                          <Badge
+                            variant="outline"
+                            className={notifiedBadgeClassName(item.notified)}
+                          >
+                            {item.notified
+                              ? t("reports.notifiedYes")
+                              : t("reports.notifiedNo")}
+                          </Badge>
                         </TableCell>
                         <TableCell>{formatDateTime(item.created_at, locale)}</TableCell>
                         <TableCell className="text-right">

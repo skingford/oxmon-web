@@ -7,6 +7,7 @@ import { AgentWhitelistDetail, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
+import { joinFilteredPaginationSummaryText } from "@/lib/pagination-summary"
 import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -643,10 +644,18 @@ export default function WhitelistPage() {
           <PaginationControls
             className="mt-4"
             pageSize={PAGE_LIMIT}
-            summaryText={t("whitelist.paginationSummary", {
-              total: agentsPage.total,
-              start: pagination.rangeStart,
-              end: pagination.rangeEnd,
+            summaryText={joinFilteredPaginationSummaryText({
+              summaryText: t("whitelist.paginationSummary", {
+                total: agentsPage.total,
+                start: pagination.rangeStart,
+                end: pagination.rangeEnd,
+              }),
+              filteredSummaryText: t("whitelist.paginationShown", {
+                filtered: filteredAgents.length,
+                total: agents.length,
+              }),
+              filteredCount: filteredAgents.length,
+              totalCount: agents.length,
             })}
             pageIndicatorText={t("whitelist.paginationPage", {
               current: pagination.currentPage,

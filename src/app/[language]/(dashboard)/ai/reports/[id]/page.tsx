@@ -44,6 +44,14 @@ function formatJsonText(value?: string | null) {
   }
 }
 
+function notifiedBadgeClassName(notified: boolean) {
+  if (notified) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-600";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
 function MetaItem({
   label,
   value,
@@ -196,14 +204,21 @@ export default function AIReportDetailPage() {
             label={t("reports.detailFieldTotalAgents")}
             value={report.total_agents}
           />
-          <MetaItem
-            label={t("reports.detailFieldNotified")}
-            value={
-              report.notified
-                ? t("reports.notifiedYes")
-                : t("reports.notifiedNo")
-            }
-          />
+          <div className="space-y-1 rounded-md border p-3">
+            <div className="text-xs text-muted-foreground">
+              {t("reports.detailFieldNotified")}
+            </div>
+            <div className="text-sm">
+              <Badge
+                variant="outline"
+                className={notifiedBadgeClassName(report.notified)}
+              >
+                {report.notified
+                  ? t("reports.notifiedYes")
+                  : t("reports.notifiedNo")}
+              </Badge>
+            </div>
+          </div>
           <MetaItem
             label={t("reports.detailFieldCreatedAt")}
             value={formatDateTime(report.created_at)}

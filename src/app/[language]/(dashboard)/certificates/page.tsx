@@ -46,6 +46,7 @@ import {
 import { toast, toastApiError, toastCopied } from "@/lib/toast"
 
 const PAGE_LIMIT = 20
+const EXPIRING_SOON_DAYS = 30
 
 type CertificatesQueryState = {
   certsPage: ListResponse<CertificateDetails>
@@ -53,6 +54,7 @@ type CertificatesQueryState = {
 }
 
 type CertificateStatusFilter = "all" | "valid" | "invalid"
+type CertificateExpiringFilter = "all" | "expiringSoon"
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
 function isValidNonNegativeIntegerText(value: string) {
@@ -145,9 +147,10 @@ export default function CertificatesPage() {
   const searchParams = useSearchParams()
 
   const domainParamValue = searchParams.get("domain") || ""
-  const issuerParamValue = searchParams.get("issuer") || ""
-  const ipParamValue = searchParams.get("ip") || ""
   const expiryParamValue = searchParams.get("expiry") || ""
+  const expiringParamValue = (searchParams.get("expiring") || "all") as CertificateExpiringFilter
+  const normalizedExpiringParamValue: CertificateExpiringFilter =
+    expiringParamValue === "expiringSoon" ? expiringParamValue : "all"
   const statusParamValue = (searchParams.get("status") || "all") as CertificateStatusFilter
   const normalizedStatusParamValue: CertificateStatusFilter =
     statusParamValue === "valid" || statusParamValue === "invalid" ? statusParamValue : "all"
@@ -155,14 +158,12 @@ export default function CertificatesPage() {
   const initialOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
 
   const [domainKeyword, setDomainKeyword] = useState(domainParamValue)
-  const [issuerKeyword, setIssuerKeyword] = useState(issuerParamValue)
-  const [ipKeyword, setIpKeyword] = useState(ipParamValue)
   const [expiryDays, setExpiryDays] = useState(expiryParamValue)
+  const [expiringFilter, setExpiringFilter] = useState<CertificateExpiringFilter>(normalizedExpiringParamValue)
   const [statusFilter, setStatusFilter] = useState<CertificateStatusFilter>(normalizedStatusParamValue)
   const [domainKeywordDraft, setDomainKeywordDraft] = useState(domainParamValue)
-  const [issuerKeywordDraft, setIssuerKeywordDraft] = useState(issuerParamValue)
-  const [ipKeywordDraft, setIpKeywordDraft] = useState(ipParamValue)
   const [expiryDaysDraft, setExpiryDaysDraft] = useState(expiryParamValue)
+  const [expiringFilterDraft, setExpiringFilterDraft] = useState<CertificateExpiringFilter>(normalizedExpiringParamValue)
   const [statusFilterDraft, setStatusFilterDraft] = useState<CertificateStatusFilter>(normalizedStatusParamValue)
   const [offset, setOffset] = useState(initialOffset)
 
@@ -195,7 +196,7 @@ export default function CertificatesPage() {
   const certs = certsPage.items
   const summary = certificatesData.summary
 
-  const expiryLimit = useMemo(() => {
+  const expiryLimitByDays = useMemo(() => {
     const days = Number(expiryDays)
 
     if (!Number.isFinite(days) || days <= 0) {
@@ -204,6 +205,31 @@ export default function CertificatesPage() {
 
     return Math.floor(Date.now() / 1000) + Math.floor(days) * 24 * 3600
   }, [expiryDays])
+
+  const expiringSoonRange = useMemo(() => {
+    if (expiringFilter !== "expiringSoon") {
+      return null
+    }
+
+    const now = Math.floor(Date.now() / 1000)
+
+    return {
+      lower: now,
+      upper: now + EXPIRING_SOON_DAYS * 24 * 3600,
+    }
+  }, [expiringFilter])
+
+  const effectiveExpiryUpperBound = useMemo(() => {
+    if (!expiringSoonRange) {
+      return expiryLimitByDays
+    }
+
+    if (expiryLimitByDays === undefined) {
+      return expiringSoonRange.upper
+    }
+
+    return Math.min(expiringSoonRange.upper, expiryLimitByDays)
+  }, [expiringSoonRange, expiryLimitByDays])
 
   const fetchCertificates = useCallback(
     async (silent = false) => {
@@ -214,9 +240,8 @@ export default function CertificatesPage() {
               limit: PAGE_LIMIT,
               offset,
               domain__contains: domainKeyword.trim() || undefined,
-              issuer__contains: issuerKeyword.trim() || undefined,
-              ip_address__contains: ipKeyword.trim() || undefined,
-              not_after__lte: expiryLimit,
+              not_after__gte: expiringSoonRange?.lower,
+              not_after__lte: effectiveExpiryUpperBound,
               is_valid__eq:
                 statusFilter === "all"
                   ? undefined
@@ -238,7 +263,7 @@ export default function CertificatesPage() {
         }
       )
     },
-    [domainKeyword, execute, expiryLimit, ipKeyword, issuerKeyword, offset, statusFilter, t]
+    [domainKeyword, effectiveExpiryUpperBound, execute, expiringSoonRange, offset, statusFilter, t]
   )
 
   useEffect(() => {
@@ -247,9 +272,12 @@ export default function CertificatesPage() {
 
   useEffect(() => {
     const nextDomain = searchParams.get("domain") || ""
-    const nextIssuer = searchParams.get("issuer") || ""
-    const nextIp = searchParams.get("ip") || ""
     const nextExpiry = searchParams.get("expiry") || ""
+    const nextExpiringParam = (searchParams.get("expiring") || "all") as CertificateExpiringFilter
+    const nextExpiring: CertificateExpiringFilter =
+      nextExpiringParam === "expiringSoon"
+        ? nextExpiringParam
+        : "all"
     const nextStatusParam = (searchParams.get("status") || "all") as CertificateStatusFilter
     const nextStatus: CertificateStatusFilter =
       nextStatusParam === "valid" || nextStatusParam === "invalid"
@@ -261,14 +289,12 @@ export default function CertificatesPage() {
       : 0
 
     setDomainKeyword((previous) => (previous === nextDomain ? previous : nextDomain))
-    setIssuerKeyword((previous) => (previous === nextIssuer ? previous : nextIssuer))
-    setIpKeyword((previous) => (previous === nextIp ? previous : nextIp))
     setExpiryDays((previous) => (previous === nextExpiry ? previous : nextExpiry))
+    setExpiringFilter((previous) => (previous === nextExpiring ? previous : nextExpiring))
     setStatusFilter((previous) => (previous === nextStatus ? previous : nextStatus))
     setDomainKeywordDraft((previous) => (previous === nextDomain ? previous : nextDomain))
-    setIssuerKeywordDraft((previous) => (previous === nextIssuer ? previous : nextIssuer))
-    setIpKeywordDraft((previous) => (previous === nextIp ? previous : nextIp))
     setExpiryDaysDraft((previous) => (previous === nextExpiry ? previous : nextExpiry))
+    setExpiringFilterDraft((previous) => (previous === nextExpiring ? previous : nextExpiring))
     setStatusFilterDraft((previous) => (previous === nextStatus ? previous : nextStatus))
     setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
   }, [searchParams])
@@ -281,23 +307,19 @@ export default function CertificatesPage() {
     } else {
       nextParams.delete("domain")
     }
-
-    if (issuerKeyword.trim()) {
-      nextParams.set("issuer", issuerKeyword)
-    } else {
-      nextParams.delete("issuer")
-    }
-
-    if (ipKeyword.trim()) {
-      nextParams.set("ip", ipKeyword)
-    } else {
-      nextParams.delete("ip")
-    }
+    nextParams.delete("issuer")
+    nextParams.delete("ip")
 
     if (expiryDays.trim()) {
       nextParams.set("expiry", expiryDays)
     } else {
       nextParams.delete("expiry")
+    }
+
+    if (expiringFilter !== "all") {
+      nextParams.set("expiring", expiringFilter)
+    } else {
+      nextParams.delete("expiring")
     }
 
     if (statusFilter !== "all") {
@@ -322,7 +344,7 @@ export default function CertificatesPage() {
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
       scroll: false,
     })
-  }, [domainKeyword, expiryDays, ipKeyword, issuerKeyword, offset, pathname, router, searchParams, statusFilter])
+  }, [domainKeyword, expiringFilter, expiryDays, offset, pathname, router, searchParams, statusFilter])
 
   const pagination = useServerOffsetPagination({
     offset,
@@ -332,16 +354,14 @@ export default function CertificatesPage() {
   })
   const hasAppliedApiFilters = Boolean(
     domainKeyword.trim() ||
-    issuerKeyword.trim() ||
-    ipKeyword.trim() ||
     expiryDays.trim() ||
+    expiringFilter !== "all" ||
     statusFilter !== "all"
   )
   const hasPendingApiFilterChanges =
     domainKeywordDraft.trim() !== domainKeyword.trim() ||
-    issuerKeywordDraft.trim() !== issuerKeyword.trim() ||
-    ipKeywordDraft.trim() !== ipKeyword.trim() ||
     expiryDaysDraft.trim() !== expiryDays.trim() ||
+    expiringFilterDraft !== expiringFilter ||
     statusFilterDraft !== statusFilter
   const isExpiryDaysDraftValid = isValidNonNegativeIntegerText(expiryDaysDraft)
 
@@ -351,12 +371,11 @@ export default function CertificatesPage() {
     }
 
     setDomainKeyword(domainKeywordDraft)
-    setIssuerKeyword(issuerKeywordDraft)
-    setIpKeyword(ipKeywordDraft)
     setExpiryDays(expiryDaysDraft)
+    setExpiringFilter(expiringFilterDraft)
     setStatusFilter(statusFilterDraft)
     setOffset(0)
-  }, [domainKeywordDraft, expiryDaysDraft, ipKeywordDraft, isExpiryDaysDraftValid, issuerKeywordDraft, statusFilterDraft])
+  }, [domainKeywordDraft, expiringFilterDraft, expiryDaysDraft, isExpiryDaysDraftValid, statusFilterDraft])
 
   const handleApiFilterKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter") {
@@ -369,14 +388,12 @@ export default function CertificatesPage() {
 
   const handleClearFilters = () => {
     setDomainKeyword("")
-    setIssuerKeyword("")
-    setIpKeyword("")
     setExpiryDays("")
+    setExpiringFilter("all")
     setStatusFilter("all")
     setDomainKeywordDraft("")
-    setIssuerKeywordDraft("")
-    setIpKeywordDraft("")
     setExpiryDaysDraft("")
+    setExpiringFilterDraft("all")
     setStatusFilterDraft("all")
     setOffset(0)
   }
@@ -412,16 +429,12 @@ export default function CertificatesPage() {
       query.set("domain__contains", domainKeyword.trim())
     }
 
-    if (issuerKeyword.trim()) {
-      query.set("issuer__contains", issuerKeyword.trim())
+    if (expiringSoonRange) {
+      query.set("not_after__gte", String(expiringSoonRange.lower))
     }
 
-    if (ipKeyword.trim()) {
-      query.set("ip_address__contains", ipKeyword.trim())
-    }
-
-    if (expiryLimit !== undefined) {
-      query.set("not_after__lte", String(expiryLimit))
+    if (effectiveExpiryUpperBound !== undefined) {
+      query.set("not_after__lte", String(effectiveExpiryUpperBound))
     }
 
     if (statusFilter !== "all") {
@@ -495,8 +508,7 @@ export default function CertificatesPage() {
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
               <p>{t("certificates.overview.openapiMappingDomain")}</p>
               <p>{t("certificates.overview.openapiMappingStatus")}</p>
-              <p>{t("certificates.overview.openapiMappingIssuer")}</p>
-              <p>{t("certificates.overview.openapiMappingIp")}</p>
+              <p>{t("certificates.overview.openapiMappingExpiringSoon")}</p>
               <p>{t("certificates.overview.openapiMappingExpiry")}</p>
             </div>
           </details>
@@ -506,7 +518,7 @@ export default function CertificatesPage() {
               <p className="text-xs text-muted-foreground">{t("certificates.overview.filterApiHint")}</p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="cert-overview-domain">{t("certificates.overview.filterDomainLabel")}</Label>
                 <Input
@@ -535,26 +547,19 @@ export default function CertificatesPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cert-overview-issuer">{t("certificates.overview.filterIssuerLabel")}</Label>
-                <Input
-                  id="cert-overview-issuer"
-                  value={issuerKeywordDraft}
-                  onChange={(event) => setIssuerKeywordDraft(event.target.value)}
-                  onKeyDown={handleApiFilterKeyDown}
-                  placeholder={t("certificates.overview.filterIssuerPlaceholder")}
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cert-overview-ip">{t("certificates.overview.filterIpLabel")}</Label>
-                <Input
-                  id="cert-overview-ip"
-                  value={ipKeywordDraft}
-                  onChange={(event) => setIpKeywordDraft(event.target.value)}
-                  onKeyDown={handleApiFilterKeyDown}
-                  placeholder={t("certificates.overview.filterIpPlaceholder")}
-                  className="h-10"
-                />
+                <Label htmlFor="cert-overview-expiring">{t("certificates.overview.filterExpiringSoonLabel")}</Label>
+                <Select
+                  value={expiringFilterDraft}
+                  onValueChange={(value) => setExpiringFilterDraft(value as CertificateExpiringFilter)}
+                >
+                  <SelectTrigger id="cert-overview-expiring" className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("certificates.overview.filterExpiringSoonAll")}</SelectItem>
+                    <SelectItem value="expiringSoon">{t("certificates.overview.filterExpiringSoonOnly")}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cert-overview-expiry-days">{t("certificates.overview.filterExpiryDaysLabel")}</Label>
@@ -608,14 +613,9 @@ export default function CertificatesPage() {
                       : t("certificates.overview.appliedStatusInvalid")}
                   </Badge>
                 ) : null}
-                {issuerKeyword.trim() ? (
+                {expiringFilter === "expiringSoon" ? (
                   <Badge variant="secondary">
-                    {t("certificates.overview.appliedIssuer", { value: issuerKeyword.trim() })}
-                  </Badge>
-                ) : null}
-                {ipKeyword.trim() ? (
-                  <Badge variant="secondary">
-                    {t("certificates.overview.appliedIp", { value: ipKeyword.trim() })}
+                    {t("certificates.overview.appliedExpiringSoon")}
                   </Badge>
                 ) : null}
                 {expiryDays.trim() ? (
