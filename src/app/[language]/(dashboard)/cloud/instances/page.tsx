@@ -22,6 +22,8 @@ import { useClientPagination } from "@/hooks/use-client-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { api } from "@/lib/api"
+import { formatDateTimeByLocale } from "@/lib/date-time"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import {
   buildFallbackCloudProviderOptions,
   normalizeCloudProvider,
@@ -64,17 +66,7 @@ function normalizeAICheckJobStatus(value: string | null | undefined) {
 }
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(value, locale, value || "-", {
     hour12: false,
   })
 }
@@ -986,17 +978,18 @@ export default function CloudInstancesPage() {
                 setAICheckJobsPageSize(nextPageSize)
                 setAICheckJobsPage(1)
               }}
-              summaryText={t("cloud.instances.paginationSummary", {
+              {...buildTranslatedPaginationTextBundle({
+                t,
+                summaryKey: "cloud.instances.paginationSummary",
                 total: aiCheckJobsPagination.totalRows,
                 start: aiCheckJobsPagination.startIndex,
                 end: aiCheckJobsPagination.endIndex,
+                pageKey: "cloud.instances.paginationPage",
+                currentPage: aiCheckJobsPagination.currentPage,
+                totalPages: aiCheckJobsPagination.totalPages,
+                prevKey: "cloud.instances.paginationPrev",
+                nextKey: "cloud.instances.paginationNext",
               })}
-              pageIndicatorText={t("cloud.instances.paginationPage", {
-                current: aiCheckJobsPagination.currentPage,
-                total: aiCheckJobsPagination.totalPages,
-              })}
-              prevLabel={t("cloud.instances.paginationPrev")}
-              nextLabel={t("cloud.instances.paginationNext")}
               pageSizePlaceholder={t("cloud.instances.pageSizePlaceholder")}
               onPrevPage={() => aiCheckJobsPagination.setPage((prev) => Math.max(1, prev - 1))}
               onNextPage={() => aiCheckJobsPagination.setPage((prev) => Math.min(aiCheckJobsPagination.totalPages, prev + 1))}
@@ -1077,18 +1070,22 @@ export default function CloudInstancesPage() {
             setPageSize(nextPageSize)
             setOffset(0)
           },
-          summaryText: t("cloud.instances.paginationSummary", {
+          ...buildTranslatedPaginationTextBundle({
+            t,
+            summaryKey: "cloud.instances.paginationSummary",
             total,
             start: pagination.rangeStart,
             end: pagination.rangeEnd,
-          }),
-          pageIndicatorText: t("cloud.instances.paginationPage", {
-            current: pagination.currentPage,
-            total: pagination.totalPages,
+            shownKey: "cloud.instances.paginationShown",
+            filtered: total,
+            unfilteredTotal: allInstancesSnapshot?.length ?? total,
+            pageKey: "cloud.instances.paginationPage",
+            currentPage: pagination.currentPage,
+            totalPages: pagination.totalPages,
+            prevKey: "cloud.instances.paginationPrev",
+            nextKey: "cloud.instances.paginationNext",
           }),
           pageSizePlaceholder: t("cloud.instances.pageSizePlaceholder"),
-          prevLabel: t("cloud.instances.paginationPrev"),
-          nextLabel: t("cloud.instances.paginationNext"),
           onPrevPage: () => setOffset((prev) => Math.max(0, prev - pageSize)),
           onNextPage: () => setOffset((prev) => prev + pageSize),
           prevDisabled: !pagination.canGoPrev || total === 0,

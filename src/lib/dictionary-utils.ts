@@ -1,3 +1,5 @@
+import { formatDateTimeByLocale } from "@/lib/date-time"
+
 export function normalizeNullableText(value: string) {
   const trimmed = value.trim()
   return trimmed ? trimmed : null
@@ -20,13 +22,7 @@ export function parseOptionalSortOrder(value: string) {
 }
 
 export function formatDateTime(value: string, locale: "zh" | "en") {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(value, locale, "-", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, Plus, RefreshCw } from "lucide-react"
 import { toast, toastApiError, toastCopied, toastCreated, toastDeleted, toastSaved } from "@/lib/toast"
 import { api, getApiErrorMessage } from "@/lib/api"
+import { formatDateTimeByLocale } from "@/lib/date-time"
 import { copyApiCurlCommand } from "@/lib/api-curl"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
@@ -57,17 +58,7 @@ const DEFAULT_FORM_STATE: CloudAccountFormState = {
 const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(value, locale, value || "-", {
     hour12: false,
   })
 }

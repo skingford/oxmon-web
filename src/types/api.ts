@@ -80,6 +80,29 @@ export interface LatestMetric {
   timestamp: string;
 }
 
+export interface AgentReportLogItem {
+  id?: string | null;
+  agent_id?: string | null;
+  reported_at?: string | null;
+  report_time?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  timestamp?: string | null;
+  hostname?: string | null;
+  os?: string | null;
+  os_version?: string | null;
+  arch?: string | null;
+  cpu_cores?: number | null;
+  memory_gb?: number | null;
+  status?: string | null;
+  message?: string | null;
+  metric_count?: number | null;
+  metrics_count?: number | null;
+  payload_size?: number | null;
+  payload_size_bytes?: number | null;
+  [key: string]: unknown;
+}
+
 export interface AlertEventResponse {
   id: string;
   rule_id: string;
@@ -171,6 +194,8 @@ export interface AgentWhitelistQueryParams extends PaginationParams {
   agent_id__contains?: string;
   description__contains?: string;
 }
+
+export interface AgentReportLogQueryParams extends PaginationParams {}
 
 export interface ActiveAlertQueryParams extends PaginationParams {
   agent_id__contains?: string;

@@ -191,6 +191,62 @@ export default async function RootLayout({
             })()
           `}
         </Script>
+        <Script id="suppress-immersive-translate-sync-error" strategy="beforeInteractive">
+          {`
+            (() => {
+              const hasSyncRulesSignature = (text) => {
+                if (!text) return false
+                const normalized = String(text)
+                return normalized.includes("Immersive Translate ERROR") ||
+                  normalized.includes("sync rules error") ||
+                  normalized.includes("fetchError: Failed to fetch")
+              }
+
+              const isImmersiveTranslateError = (message, stack, source) => {
+                if (!hasSyncRulesSignature(message) && !hasSyncRulesSignature(stack)) {
+                  return false
+                }
+
+                const sourceText = String(source || "")
+                const stackText = String(stack || "")
+                return sourceText.includes("chrome-extension://") ||
+                  sourceText.includes("immersive") ||
+                  stackText.includes("chrome-extension://") ||
+                  stackText.includes("immersive")
+              }
+
+              window.addEventListener("error", (event) => {
+                const message = event && event.message ? String(event.message) : ""
+                const stack = event && event.error && event.error.stack ? String(event.error.stack) : ""
+                const source = event && event.filename ? String(event.filename) : ""
+
+                if (!isImmersiveTranslateError(message, stack, source)) {
+                  return
+                }
+
+                event.preventDefault()
+                if (typeof event.stopImmediatePropagation === "function") {
+                  event.stopImmediatePropagation()
+                }
+              }, true)
+
+              window.addEventListener("unhandledrejection", (event) => {
+                const reason = event ? event.reason : null
+                const message = reason && reason.message ? String(reason.message) : String(reason || "")
+                const stack = reason && reason.stack ? String(reason.stack) : ""
+
+                if (!isImmersiveTranslateError(message, stack, stack)) {
+                  return
+                }
+
+                event.preventDefault()
+                if (typeof event.stopImmediatePropagation === "function") {
+                  event.stopImmediatePropagation()
+                }
+              }, true)
+            })()
+          `}
+        </Script>
         {children}
         <Toaster />
       </body>

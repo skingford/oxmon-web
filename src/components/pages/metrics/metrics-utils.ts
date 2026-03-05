@@ -1,4 +1,10 @@
 import { MetricsTimeRange } from "@/components/metrics/MetricsQueryToolbar";
+import {
+  detectMetricUnit,
+  formatBinaryBytes,
+  formatMetricValue,
+  type MetricUnitKind,
+} from "@/lib/metric-format";
 
 export type TimeRange = MetricsTimeRange;
 export type TablePageSize = "20" | "50" | "100";
@@ -51,102 +57,8 @@ export function isTimeRange(value: string | null): value is TimeRange {
   );
 }
 
-export type MetricUnitKind =
-  | "percent"
-  | "bytes"
-  | "bytes_per_sec"
-  | "iops"
-  | "ms"
-  | "seconds"
-  | "temperature_c"
-  | "count"
-  | "plain";
-
-export function detectMetricUnit(metricName?: string): MetricUnitKind {
-  const name = (metricName || "").toLowerCase();
-
-  if (!name) return "plain";
-  if (/(percent|_pct|\.pct|cpu\.usage|memory\.usage|disk\.usage)/.test(name))
-    return "percent";
-  if (/(iops)/.test(name)) return "iops";
-  if (/(latency|duration)(_ms|\.ms)?|response_time_ms|_ms$|\.ms$/.test(name))
-    return "ms";
-  if (
-    /(uptime|duration)(_secs|_seconds)?|_secs$|_seconds$|\.seconds$/.test(name)
-  )
-    return "seconds";
-  if (/(temp|temperature)/.test(name)) return "temperature_c";
-  if (
-    /(bytes_per_sec|bytes\/s|network\.(bytes_recv|bytes_sent)|network_(in|out)_bytes)/.test(
-      name,
-    )
-  )
-    return "bytes_per_sec";
-  if (/(bytes|_bytes|memory_used|disk_used|mem_used)/.test(name))
-    return "bytes";
-  if (/(connections|count|total|qps|rps|tps)/.test(name)) return "count";
-
-  return "plain";
-}
-
-export function formatBinaryBytes(value: number, suffix = "") {
-  const abs = Math.abs(value);
-  if (abs === 0) return `0 B${suffix}`;
-  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-  const exponent = Math.min(
-    Math.floor(Math.log(abs) / Math.log(1024)),
-    units.length - 1,
-  );
-  const scaled = value / 1024 ** exponent;
-  const digits = Math.abs(scaled) >= 100 ? 0 : Math.abs(scaled) >= 10 ? 1 : 2;
-  return `${scaled.toLocaleString(undefined, { maximumFractionDigits: digits })} ${units[exponent]}${suffix}`;
-}
-
-export function formatMetricValue(value: number, metricName?: string) {
-  if (Number.isNaN(value)) {
-    return "-";
-  }
-
-  const unit = detectMetricUnit(metricName);
-
-  if (unit === "percent") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
-  }
-
-  if (unit === "bytes") {
-    return formatBinaryBytes(value);
-  }
-
-  if (unit === "bytes_per_sec") {
-    return formatBinaryBytes(value, "/s");
-  }
-
-  if (unit === "iops") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} IOPS`;
-  }
-
-  if (unit === "ms") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ms`;
-  }
-
-  if (unit === "seconds") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} s`;
-  }
-
-  if (unit === "temperature_c") {
-    return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} °C`;
-  }
-
-  if (unit === "count") {
-    return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
-  }
-
-  if (Math.abs(value) >= 1000) {
-    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  }
-
-  return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
-}
+export { detectMetricUnit, formatBinaryBytes, formatMetricValue };
+export type { MetricUnitKind };
 
 export function normalizeMetricName(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { api } from "@/lib/api"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import {
   NotificationLogItem,
   NotificationLogSummaryQueryParams,
@@ -430,17 +431,18 @@ export default function NotificationLogsPage() {
           <PaginationControls
             className="mt-4"
             pageSize={PAGE_LIMIT}
-            summaryText={t("notifications.logsPaginationSummary", {
+            {...buildTranslatedPaginationTextBundle({
+              t,
+              summaryKey: "notifications.logsPaginationSummary",
               total: data.total,
               start: pagination.rangeStart,
               end: pagination.rangeEnd,
+              pageKey: "notifications.logsPaginationPage",
+              currentPage: pagination.currentPage,
+              totalPages: pagination.totalPages,
+              prevKey: "notifications.logsPaginationPrev",
+              nextKey: "notifications.logsPaginationNext",
             })}
-            pageIndicatorText={t("notifications.logsPaginationPage", {
-              current: pagination.currentPage,
-              total: pagination.totalPages,
-            })}
-            prevLabel={t("notifications.logsPaginationPrev")}
-            nextLabel={t("notifications.logsPaginationNext")}
             onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
             onNextPage={() => setOffset((previous) => previous + PAGE_LIMIT)}
             prevDisabled={!pagination.canGoPrev || loading}

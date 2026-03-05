@@ -1,15 +1,7 @@
+import { formatDateTimeByLocale } from "@/lib/date-time"
+
 export function formatCertificateDateTime(value: string | null, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(value, locale, "-", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

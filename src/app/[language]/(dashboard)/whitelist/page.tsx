@@ -7,7 +7,8 @@ import { AgentWhitelistDetail, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
-import { joinFilteredPaginationSummaryText } from "@/lib/pagination-summary"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
+import { formatDateTimeByLocale } from "@/lib/date-time"
 import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -59,17 +60,7 @@ type TokenDialogState = {
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
 function formatTimestamp(timestamp: string | null, locale: "zh" | "en") {
-  if (!timestamp) {
-    return "-"
-  }
-
-  const date = new Date(timestamp)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(timestamp, locale, "-", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -644,25 +635,21 @@ export default function WhitelistPage() {
           <PaginationControls
             className="mt-4"
             pageSize={PAGE_LIMIT}
-            summaryText={joinFilteredPaginationSummaryText({
-              summaryText: t("whitelist.paginationSummary", {
-                total: agentsPage.total,
-                start: pagination.rangeStart,
-                end: pagination.rangeEnd,
-              }),
-              filteredSummaryText: t("whitelist.paginationShown", {
-                filtered: filteredAgents.length,
-                total: agents.length,
-              }),
-              filteredCount: filteredAgents.length,
-              totalCount: agents.length,
+            {...buildTranslatedPaginationTextBundle({
+              t,
+              summaryKey: "whitelist.paginationSummary",
+              total: agentsPage.total,
+              start: pagination.rangeStart,
+              end: pagination.rangeEnd,
+              shownKey: "whitelist.paginationShown",
+              filtered: filteredAgents.length,
+              unfilteredTotal: agents.length,
+              pageKey: "whitelist.paginationPage",
+              currentPage: pagination.currentPage,
+              totalPages: pagination.totalPages,
+              prevKey: "whitelist.paginationPrev",
+              nextKey: "whitelist.paginationNext",
             })}
-            pageIndicatorText={t("whitelist.paginationPage", {
-              current: pagination.currentPage,
-              total: pagination.totalPages,
-            })}
-            prevLabel={t("whitelist.paginationPrev")}
-            nextLabel={t("whitelist.paginationNext")}
             onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
             onNextPage={() => setOffset((previous) => previous + PAGE_LIMIT)}
             prevDisabled={!pagination.canGoPrev || loading}

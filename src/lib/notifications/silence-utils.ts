@@ -1,4 +1,5 @@
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
+import { formatDateTimeByLocale } from "@/lib/date-time"
 import type { CreateSilenceWindowRequest, SilenceWindow } from "@/types/api"
 
 export type SilenceStatus = "active" | "scheduled" | "expired" | "unknown"
@@ -265,13 +266,7 @@ export function toLocalDatetimeInputValue(value: string | null | undefined) {
 }
 
 export function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  const date = parseDate(value)
-
-  if (!date) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(value, locale, "-", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { api } from "@/lib/api"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import type { AIReportListItem } from "@/types/api"
 import { toastApiError } from "@/lib/toast"
+import { formatDateTimeByLocale } from "@/lib/date-time"
+import { notifiedBadgeClassName } from "@/lib/notified-status"
 import {
   resolveRiskLevel,
   riskLevelLabelZh,
@@ -47,27 +50,6 @@ const RISK_LEGEND_ITEMS = [
   { textKey: "reports.legendAlert", dotClassName: "bg-amber-500" },
   { textKey: "reports.legendCritical", dotClassName: "bg-red-500" },
 ] as const
-
-function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const parsed = Date.parse(value)
-  if (!Number.isFinite(parsed)) {
-    return value
-  }
-
-  return new Date(parsed).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")
-}
-
-function notifiedBadgeClassName(notified: boolean) {
-  if (notified) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-600"
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-600"
-}
 
 export default function AIReportsPage() {
   const { t } = useAppTranslations("ai")
@@ -238,7 +220,7 @@ export default function AIReportsPage() {
                               : t("reports.notifiedNo")}
                           </Badge>
                         </TableCell>
-                        <TableCell>{formatDateTime(item.created_at, locale)}</TableCell>
+                        <TableCell>{formatDateTimeByLocale(item.created_at, locale)}</TableCell>
                         <TableCell className="text-right">
                           <Button type="button" size="sm" variant="outline" asChild>
                             <Link href={withLocalePrefix(`/ai/reports/${item.id}`, locale)}>
@@ -266,18 +248,19 @@ export default function AIReportsPage() {
               setPageSize(nextSize)
               setOffset(0)
             }}
-            summaryText={t("reports.paginationSummary", {
+            {...buildTranslatedPaginationTextBundle({
+              t,
+              summaryKey: "reports.paginationSummary",
               total: data.total,
               start: pagination.rangeStart,
               end: pagination.rangeEnd,
-            })}
-            pageIndicatorText={t("reports.paginationPage", {
-              current: pagination.currentPage,
-              total: pagination.totalPages,
+              pageKey: "reports.paginationPage",
+              currentPage: pagination.currentPage,
+              totalPages: pagination.totalPages,
+              prevKey: "reports.paginationPrev",
+              nextKey: "reports.paginationNext",
             })}
             pageSizePlaceholder={t("reports.pageSizePlaceholder")}
-            prevLabel={t("reports.paginationPrev")}
-            nextLabel={t("reports.paginationNext")}
             onPrevPage={() => setOffset((prev) => Math.max(0, prev - pageSize))}
             onNextPage={() => setOffset((prev) => prev + pageSize)}
             prevDisabled={isBusy || !pagination.canGoPrev}

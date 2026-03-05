@@ -16,6 +16,7 @@ import {
 import { toast, toastApiError, toastCopied, toastStatusError } from "@/lib/toast"
 import { ApiRequestError, api } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
+import { formatDateTimeByLocale } from "@/lib/date-time"
 import {
   buildFallbackCloudProviderOptions,
   normalizeCloudProvider,
@@ -57,29 +58,13 @@ const AI_CHECK_POLL_INTERVAL_OPTIONS = [5, 15, 30] as const
 const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
 
 function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(value, locale, value || "-", {
     hour12: false,
   })
 }
 
 function formatChartTime(value: string, locale: "zh" | "en") {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(value, locale, value, {
     hour12: false,
     month: "2-digit",
     day: "2-digit",

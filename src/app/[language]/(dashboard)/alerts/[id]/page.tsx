@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, CheckCheck, CheckCircle, Loader2 } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
+import { formatDateTimeByLocale } from "@/lib/date-time"
 
 function getSeverityBadgeClass(severity: string) {
   const normalized = severity.toLowerCase()
@@ -58,8 +59,7 @@ function getSeverityLabel(
 
 function formatFullTimestamp(timestamp: string, locale: "zh" | "en") {
   try {
-    const date = new Date(timestamp)
-    return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    return formatDateTimeByLocale(timestamp, locale, timestamp, {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

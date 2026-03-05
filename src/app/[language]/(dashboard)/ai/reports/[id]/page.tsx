@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { AIReportRow } from "@/types/api";
+import { formatDateTimeByLocale } from "@/lib/date-time";
+import { notifiedBadgeClassName } from "@/lib/notified-status";
 import { toastApiError } from "@/lib/toast";
 import {
   resolveRiskLevel,
@@ -29,12 +31,6 @@ import { Loader2, RefreshCw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-function formatDateTime(value?: string | null) {
-  if (!value) return "-";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
-}
-
 function formatJsonText(value?: string | null) {
   if (!value) return "";
   try {
@@ -42,14 +38,6 @@ function formatJsonText(value?: string | null) {
   } catch {
     return value;
   }
-}
-
-function notifiedBadgeClassName(notified: boolean) {
-  if (notified) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-600";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-600";
 }
 
 function MetaItem({
@@ -221,11 +209,11 @@ export default function AIReportDetailPage() {
           </div>
           <MetaItem
             label={t("reports.detailFieldCreatedAt")}
-            value={formatDateTime(report.created_at)}
+            value={formatDateTimeByLocale(report.created_at, locale)}
           />
           <MetaItem
             label={t("reports.detailFieldUpdatedAt")}
-            value={formatDateTime(report.updated_at)}
+            value={formatDateTimeByLocale(report.updated_at, locale)}
           />
         </CardContent>
       </Card>

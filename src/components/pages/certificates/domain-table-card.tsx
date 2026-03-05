@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { History, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react"
 
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
@@ -194,17 +195,18 @@ export function DomainTableCard({
         <PaginationControls
           className="mt-4"
           pageSize={pageLimit}
-          summaryText={t("certificates.domains.paginationSummary", {
+          {...buildTranslatedPaginationTextBundle({
+            t,
+            summaryKey: "certificates.domains.paginationSummary",
             total: totalCount,
             start: rangeStart,
             end: rangeEnd,
+            pageKey: "certificates.domains.paginationPage",
+            currentPage: pageNumber,
+            totalPages,
+            prevKey: "certificates.domains.paginationPrev",
+            nextKey: "certificates.domains.paginationNext",
           })}
-          pageIndicatorText={t("certificates.domains.paginationPage", {
-            current: pageNumber,
-            total: totalPages,
-          })}
-          prevLabel={t("certificates.domains.paginationPrev")}
-          nextLabel={t("certificates.domains.paginationNext")}
           onPrevPage={onPrevPage}
           onNextPage={onNextPage}
           prevDisabled={!canGoPrev || loading}

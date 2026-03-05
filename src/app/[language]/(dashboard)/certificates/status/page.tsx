@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
 import { formatCertificateDateTime } from "@/lib/certificates/formats"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { CertCheckResult, CertStatusSummary, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
@@ -603,17 +604,18 @@ export default function CertificateStatusPage() {
           <PaginationControls
             className="mt-4"
             pageSize={PAGE_LIMIT}
-            summaryText={t("certificates.status.paginationSummary", {
+            {...buildTranslatedPaginationTextBundle({
+              t,
+              summaryKey: "certificates.status.paginationSummary",
               total: statusesPage.total,
               start: pagination.rangeStart,
               end: pagination.rangeEnd,
+              pageKey: "certificates.status.paginationPage",
+              currentPage: pagination.currentPage,
+              totalPages: pagination.totalPages,
+              prevKey: "certificates.status.paginationPrev",
+              nextKey: "certificates.status.paginationNext",
             })}
-            pageIndicatorText={t("certificates.status.paginationPage", {
-              current: pagination.currentPage,
-              total: pagination.totalPages,
-            })}
-            prevLabel={t("certificates.status.paginationPrev")}
-            nextLabel={t("certificates.status.paginationNext")}
             onPrevPage={() => setOffset((previous) => Math.max(0, previous - PAGE_LIMIT))}
             onNextPage={() => setOffset((previous) => previous + PAGE_LIMIT)}
             prevDisabled={!pagination.canGoPrev || loading}

@@ -10,6 +10,7 @@ import {
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useNotificationChannelSubmit } from "@/hooks/use-notification-channel-submit"
 import { useNotificationChannelFilters, type NotificationStatusFilter } from "@/hooks/use-notification-channel-filters"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import {
   NotificationChannelFormFields,
   NotificationChannelFormState,
@@ -381,18 +382,22 @@ export default function NotificationsPage() {
             setPageSize(normalizedPageSize)
             setOffset(0)
           },
-          summaryText: t("notifications.paginationSummary", {
+          ...buildTranslatedPaginationTextBundle({
+            t,
+            summaryKey: "notifications.paginationSummary",
             total,
             start: pagination.rangeStart,
             end: pagination.rangeEnd,
-          }),
-          pageIndicatorText: t("notifications.paginationPage", {
-            current: pagination.currentPage,
-            total: pagination.totalPages,
+            shownKey: "notifications.paginationShown",
+            filtered: total,
+            unfilteredTotal: allChannelsSnapshot?.length ?? total,
+            pageKey: "notifications.paginationPage",
+            currentPage: pagination.currentPage,
+            totalPages: pagination.totalPages,
+            prevKey: "notifications.paginationPrev",
+            nextKey: "notifications.paginationNext",
           }),
           pageSizePlaceholder: t("notifications.pageSizePlaceholder"),
-          prevLabel: t("notifications.paginationPrev"),
-          nextLabel: t("notifications.paginationNext"),
           onPrevPage: () => setOffset((prev) => Math.max(0, prev - pageSize)),
           onNextPage: () => setOffset((prev) => prev + pageSize),
           prevDisabled: isBusy || !pagination.canGoPrev,

@@ -9,7 +9,7 @@ import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useRequestState } from "@/hooks/use-request-state"
-import { joinFilteredPaginationSummaryText } from "@/lib/pagination-summary"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { withLocalePrefix } from "@/components/app-locale"
 import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
@@ -359,25 +359,21 @@ export default function AgentsPage() {
           <PaginationControls
             className="mt-4"
             pageSize={limit}
-            summaryText={joinFilteredPaginationSummaryText({
-              summaryText: t("agents.paginationSummary", {
-                total: agentsPage.total,
-                start: pagination.rangeStart,
-                end: pagination.rangeEnd,
-              }),
-              filteredSummaryText: t("agents.paginationShown", {
-                filtered: filteredAgents.length,
-                total: agents.length,
-              }),
-              filteredCount: filteredAgents.length,
-              totalCount: agents.length,
+            {...buildTranslatedPaginationTextBundle({
+              t,
+              summaryKey: "agents.paginationSummary",
+              total: agentsPage.total,
+              start: pagination.rangeStart,
+              end: pagination.rangeEnd,
+              shownKey: "agents.paginationShown",
+              filtered: filteredAgents.length,
+              unfilteredTotal: agents.length,
+              pageKey: "agents.paginationPage",
+              currentPage: pagination.currentPage,
+              totalPages: pagination.totalPages,
+              prevKey: "agents.paginationPrev",
+              nextKey: "agents.paginationNext",
             })}
-            pageIndicatorText={t("agents.paginationPage", {
-              current: pagination.currentPage,
-              total: pagination.totalPages,
-            })}
-            prevLabel={t("agents.paginationPrev")}
-            nextLabel={t("agents.paginationNext")}
             onPrevPage={() => setOffset((prev) => Math.max(0, prev - limit))}
             onNextPage={() => setOffset((prev) => prev + limit)}
             prevDisabled={!pagination.canGoPrev || loading}

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { Pencil, ShieldOff, Trash2 } from "lucide-react"
 
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
@@ -25,6 +26,7 @@ type SilenceWindowsTableCardProps = {
   windows: SilenceWindow[]
   windowOrigins: Record<string, WindowOriginMeta>
   hasActiveFilters: boolean
+  totalWindowCount: number
   onEditWindow: (window: SilenceWindow) => void
   onDeleteWindow: (window: SilenceWindow) => void
   pagination: {
@@ -50,6 +52,7 @@ export function SilenceWindowsTableCard({
   windows,
   windowOrigins,
   hasActiveFilters,
+  totalWindowCount,
   onEditWindow,
   onDeleteWindow,
   pagination,
@@ -180,18 +183,22 @@ export function SilenceWindowsTableCard({
           pageSize={pagination.pageSize}
           pageSizeOptions={pagination.pageSizeOptions}
           onPageSizeChange={pagination.onPageSizeChange}
-          summaryText={t("notifications.silencePaginationSummary", {
+          {...buildTranslatedPaginationTextBundle({
+            t,
+            summaryKey: "notifications.silencePaginationSummary",
             total: pagination.totalRows,
             start: pagination.startIndex,
             end: pagination.endIndex,
-          })}
-          pageIndicatorText={t("notifications.silencePaginationPage", {
-            current: pagination.currentPage,
-            total: pagination.totalPages,
+            shownKey: "notifications.silencePaginationShown",
+            filtered: pagination.totalRows,
+            unfilteredTotal: totalWindowCount,
+            pageKey: "notifications.silencePaginationPage",
+            currentPage: pagination.currentPage,
+            totalPages: pagination.totalPages,
+            prevKey: "notifications.silencePaginationPrev",
+            nextKey: "notifications.silencePaginationNext",
           })}
           pageSizePlaceholder={t("notifications.silencePageSizePlaceholder")}
-          prevLabel={t("notifications.silencePaginationPrev")}
-          nextLabel={t("notifications.silencePaginationNext")}
           onPrevPage={pagination.onPrevPage}
           onNextPage={pagination.onNextPage}
           prevDisabled={pagination.prevDisabled}

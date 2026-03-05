@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary";
 import type { AIAccountResponse } from "@/types/api";
+import { formatDateTimeByLocale } from "@/lib/date-time";
 import {
   toastApiError,
   toastCreated,
@@ -118,12 +120,6 @@ function parseOptionalFloat(value: string) {
   }
 
   return { valid: true, value: parsed };
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "-";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
 }
 
 export default function AIAccountsPage() {
@@ -409,7 +405,7 @@ export default function AIAccountsPage() {
                           : t("accounts.statusDisabled")}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDateTime(item.updated_at)}</TableCell>
+                    <TableCell>{formatDateTimeByLocale(item.updated_at, locale, item.updated_at || "-")}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -456,18 +452,19 @@ export default function AIAccountsPage() {
                 setPageSize(nextPageSize);
                 tablePagination.setPage(1);
               }}
-              summaryText={t("accounts.paginationSummary", {
+              {...buildTranslatedPaginationTextBundle({
+                t,
+                summaryKey: "accounts.paginationSummary",
                 total: tablePagination.totalRows,
                 start: tablePagination.startIndex,
                 end: tablePagination.endIndex,
-              })}
-              pageIndicatorText={t("accounts.paginationPage", {
-                current: tablePagination.currentPage,
-                total: tablePagination.totalPages,
+                pageKey: "accounts.paginationPage",
+                currentPage: tablePagination.currentPage,
+                totalPages: tablePagination.totalPages,
+                prevKey: "accounts.paginationPrev",
+                nextKey: "accounts.paginationNext",
               })}
               pageSizePlaceholder={t("accounts.pageSizePlaceholder")}
-              prevLabel={t("accounts.paginationPrev")}
-              nextLabel={t("accounts.paginationNext")}
               onPrevPage={() =>
                 tablePagination.setPage((prev) => Math.max(1, prev - 1))
               }

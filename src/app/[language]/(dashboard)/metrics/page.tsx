@@ -14,7 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { joinFilteredPaginationSummaryText } from "@/lib/pagination-summary";
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary";
 import { MetricDataPointResponse, MetricSummaryResponse } from "@/types/api";
 import { useRequestState } from "@/hooks/use-request-state";
 import { useAppTranslations } from "@/hooks/use-app-translations";
@@ -998,18 +998,20 @@ function MetricsPageContent() {
 
               <PaginationControls
                 className="mt-4"
-                summaryText={joinFilteredPaginationSummaryText({
-                  summaryText: t("metrics.tableSummary", {
-                    total: tablePagination.totalRows,
-                    start: tablePagination.startIndex,
-                    end: tablePagination.endIndex,
-                  }),
-                  filteredSummaryText: t("metrics.paginationShown", {
-                    filtered: filteredDataPoints.length,
-                    total: dataPoints.length,
-                  }),
-                  filteredCount: filteredDataPoints.length,
-                  totalCount: dataPoints.length,
+                {...buildTranslatedPaginationTextBundle({
+                  t,
+                  summaryKey: "metrics.tableSummary",
+                  total: tablePagination.totalRows,
+                  start: tablePagination.startIndex,
+                  end: tablePagination.endIndex,
+                  shownKey: "metrics.paginationShown",
+                  filtered: filteredDataPoints.length,
+                  unfilteredTotal: dataPoints.length,
+                  pageKey: "metrics.pageIndicator",
+                  currentPage: tablePagination.currentPage,
+                  totalPages: tablePagination.totalPages,
+                  prevKey: "metrics.prevPage",
+                  nextKey: "metrics.nextPage",
                 })}
                 pageSize={pageSize}
                 pageSizeOptions={[20, 50, 100]}
@@ -1017,12 +1019,6 @@ function MetricsPageContent() {
                   setTablePageSize(String(value) as TablePageSize)
                 }
                 pageSizePlaceholder={t("metrics.pageSizePlaceholder")}
-                prevLabel={t("metrics.prevPage")}
-                nextLabel={t("metrics.nextPage")}
-                pageIndicatorText={t("metrics.pageIndicator", {
-                  current: tablePagination.currentPage,
-                  total: tablePagination.totalPages,
-                })}
                 onPrevPage={() =>
                   tablePagination.setPage((prev) => Math.max(1, prev - 1))
                 }

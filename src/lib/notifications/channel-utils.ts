@@ -1,4 +1,5 @@
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
+import { formatDateTimeByLocale } from "@/lib/date-time"
 
 export const CHANNEL_TYPE_OPTIONS = ["email", "dingtalk", "webhook", "slack", "sms"] as const
 
@@ -163,17 +164,7 @@ const CHANNEL_CONFIG_SCHEMA: Record<string, ChannelConfigFieldSchema[]> = {
 export type ChannelConfigFormValues = Record<string, string | boolean>
 
 export function formatDateTime(value: string | null, locale: "zh" | "en") {
-  if (!value) {
-    return "-"
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return "-"
-  }
-
-  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+  return formatDateTimeByLocale(value, locale, "-", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

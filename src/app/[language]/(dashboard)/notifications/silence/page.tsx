@@ -198,6 +198,7 @@ export default function SilenceWindowsPage() {
         windows={tablePagination.paginatedItems}
         windowOrigins={windowOrigins}
         hasActiveFilters={hasActiveFilters}
+        totalWindowCount={windows.length}
         onEditWindow={openEditDialog}
         onDeleteWindow={setDeleteDialogWindow}
         pagination={{

@@ -1,13 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api } from "@/lib/api"
-import { AgentDetail, LatestMetric } from "@/types/api"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
+import { AgentDetail, AgentReportLogItem, LatestMetric } from "@/types/api"
+import { formatDateTimeByLocale } from "@/lib/date-time"
+import { formatMetricValue } from "@/lib/metric-format"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
+import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   AlertDialog,
@@ -32,8 +36,28 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PaginationControls } from "@/components/ui/pagination-controls"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { AlertCircle, ArrowLeft, Gauge, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
 import { toast, toastApiError, toastDeleted, toastSaved } from "@/lib/toast"
+
+const REPORT_LOGS_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
+const REPORT_LOGS_LIMIT_QUERY_KEY = "report_limit"
+const REPORT_LOGS_OFFSET_QUERY_KEY = "report_offset"
+
+type AgentReportLogsState = {
+  items: AgentReportLogItem[]
+  total: number
+  limit: number
+  offset: number
+}
 
 function toFiniteNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -256,7 +280,7 @@ function formatLoad(value?: number) {
   return parsed.toFixed(2)
 }
 
-function formatUpdatedAt(metrics: LatestMetric[]) {
+function formatUpdatedAt(metrics: LatestMetric[], locale: "zh" | "en") {
   if (metrics.length === 0) {
     return "-"
   }
@@ -265,13 +289,7 @@ function formatUpdatedAt(metrics: LatestMetric[]) {
     new Date(current.timestamp).getTime() > new Date(max.timestamp).getTime() ? current : max
   )
 
-  const time = new Date(latest.timestamp)
-
-  if (Number.isNaN(time.getTime())) {
-    return "-"
-  }
-
-  return time.toLocaleString()
+  return formatDateTimeByLocale(latest.timestamp, locale)
 }
 
 function buildLatestMetricsFromPoints(points: LatestMetric[]) {
@@ -345,9 +363,166 @@ function getMetricDisplayName(metricName: string, nameLabelMap: Record<string, s
   return metricName
 }
 
+function getAgentReportLogTimestamp(log: AgentReportLogItem) {
+  const candidates = [
+    log.reported_at,
+    log.report_time,
+    log.created_at,
+    log.updated_at,
+    log.timestamp,
+  ]
+
+  const matched = candidates.find((item) => typeof item === "string" && item.trim())
+  return typeof matched === "string" ? matched : null
+}
+
+function parseFiniteValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.trim())
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+
+  return null
+}
+
+function getAgentReportLogStatus(log: AgentReportLogItem) {
+  if (typeof log.status === "string" && log.status.trim()) {
+    return log.status.trim()
+  }
+
+  const fallback = [log.level, log.result, log.state]
+    .find((item) => typeof item === "string" && item.trim())
+  return typeof fallback === "string" ? fallback.trim() : null
+}
+
+function getAgentReportLogHostname(log: AgentReportLogItem) {
+  const matched = [
+    log.hostname,
+    log.host,
+    log.node_name,
+    log.agent_id,
+  ].find((item) => typeof item === "string" && item.trim())
+
+  return typeof matched === "string" ? matched.trim() : null
+}
+
+function getAgentReportLogSystem(log: AgentReportLogItem) {
+  const osParts = [log.os, log.os_version]
+    .filter((item) => typeof item === "string" && item.trim())
+    .join(" ")
+    .trim()
+  const arch = typeof log.arch === "string" && log.arch.trim() ? log.arch.trim() : ""
+
+  if (osParts && arch) {
+    return `${osParts} / ${arch}`
+  }
+
+  if (osParts) {
+    return osParts
+  }
+
+  if (arch) {
+    return arch
+  }
+
+  return null
+}
+
+function getAgentReportLogResource(log: AgentReportLogItem) {
+  const cpuCores = parseFiniteValue(log.cpu_cores)
+  const memoryGb = parseFiniteValue(log.memory_gb)
+
+  const cpuText = cpuCores !== null ? `${cpuCores}C` : ""
+  const memoryText = memoryGb !== null ? `${memoryGb.toFixed(1)}GB` : ""
+  const text = [cpuText, memoryText].filter(Boolean).join(" / ")
+
+  return text || null
+}
+
+function getAgentReportLogMessage(log: AgentReportLogItem) {
+  const fallback = [
+    log.message,
+    log.err_msg,
+    log.error_message,
+    log.error,
+    log.detail,
+  ].find((item) => typeof item === "string" && item.trim())
+
+  if (typeof fallback === "string") {
+    return fallback.trim()
+  }
+
+  const summaryParts: string[] = []
+  if (typeof log.hostname === "string" && log.hostname.trim()) {
+    summaryParts.push(log.hostname.trim())
+  }
+
+  const osPart = [log.os, log.os_version]
+    .filter((item) => typeof item === "string" && item.trim())
+    .join(" ")
+  if (osPart) {
+    summaryParts.push(osPart)
+  }
+
+  if (typeof log.arch === "string" && log.arch.trim()) {
+    summaryParts.push(log.arch.trim())
+  }
+
+  const resourceSummary = getAgentReportLogResource(log) || ""
+  if (resourceSummary) {
+    summaryParts.push(resourceSummary)
+  }
+
+  if (summaryParts.length > 0) {
+    return summaryParts.join(" · ")
+  }
+
+  const copy = { ...log }
+  delete copy.id
+  delete copy.agent_id
+  delete copy.reported_at
+  delete copy.report_time
+  delete copy.created_at
+  delete copy.updated_at
+  delete copy.timestamp
+  delete copy.hostname
+  delete copy.os
+  delete copy.os_version
+  delete copy.arch
+  delete copy.cpu_cores
+  delete copy.memory_gb
+  delete copy.status
+  delete copy.level
+  delete copy.result
+  delete copy.state
+
+  const text = JSON.stringify(copy)
+  return text && text !== "{}" ? text : ""
+}
+
+function getAgentReportLogMetricCount(log: AgentReportLogItem) {
+  const candidates = [log.metric_count, log.metrics_count, log.point_count, log.points_count]
+  for (const value of candidates) {
+    const parsed = parseFiniteValue(value)
+    if (parsed !== null) {
+      return parsed
+    }
+  }
+
+  return null
+}
+
 export default function AgentDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const locale = useAppLocale()
   const { t } = useAppTranslations("pages")
 
@@ -368,6 +543,17 @@ export default function AgentDetailPage() {
     refreshing,
     execute,
   } = useRequestState<LatestMetric[]>([])
+  const {
+    data: reportLogsData,
+    loading: reportLogsLoading,
+    refreshing: reportLogsRefreshing,
+    execute: executeReportLogsRequest,
+  } = useRequestState<AgentReportLogsState>({
+    items: [],
+    total: 0,
+    limit: REPORT_LOGS_PAGE_SIZE_OPTIONS[1],
+    offset: 0,
+  }, { initialLoading: false })
   const [notFound, setNotFound] = useState(false)
   const [resolvedAgentId, setResolvedAgentId] = useState("")
   const [agentDetail, setAgentDetail] = useState<AgentDetail | null>(null)
@@ -379,8 +565,54 @@ export default function AgentDetailPage() {
   const [preparingEdit, setPreparingEdit] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [reportLogsPageSize, setReportLogsPageSize] = useState<(typeof REPORT_LOGS_PAGE_SIZE_OPTIONS)[number]>(
+    REPORT_LOGS_PAGE_SIZE_OPTIONS[1]
+  )
+  const [reportLogsOffset, setReportLogsOffset] = useState(0)
+  const previousAgentRef = useRef<string | null>(null)
 
   const agentsPath = useMemo(() => withLocalePrefix("/agents", locale), [locale])
+
+  useEffect(() => {
+    const rawLimit = Number(
+      searchParams.get(REPORT_LOGS_LIMIT_QUERY_KEY) || String(REPORT_LOGS_PAGE_SIZE_OPTIONS[1])
+    )
+    const nextPageSize = REPORT_LOGS_PAGE_SIZE_OPTIONS.includes(
+      rawLimit as (typeof REPORT_LOGS_PAGE_SIZE_OPTIONS)[number]
+    )
+      ? (rawLimit as (typeof REPORT_LOGS_PAGE_SIZE_OPTIONS)[number])
+      : REPORT_LOGS_PAGE_SIZE_OPTIONS[1]
+    const rawOffset = Number(searchParams.get(REPORT_LOGS_OFFSET_QUERY_KEY) || "0")
+    const nextOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
+
+    setReportLogsPageSize((prev) => (prev === nextPageSize ? prev : nextPageSize))
+    setReportLogsOffset((prev) => (prev === nextOffset ? prev : nextOffset))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (reportLogsPageSize !== REPORT_LOGS_PAGE_SIZE_OPTIONS[1]) {
+      nextParams.set(REPORT_LOGS_LIMIT_QUERY_KEY, String(reportLogsPageSize))
+    } else {
+      nextParams.delete(REPORT_LOGS_LIMIT_QUERY_KEY)
+    }
+
+    if (reportLogsOffset > 0) {
+      nextParams.set(REPORT_LOGS_OFFSET_QUERY_KEY, String(reportLogsOffset))
+    } else {
+      nextParams.delete(REPORT_LOGS_OFFSET_QUERY_KEY)
+    }
+
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery === currentQuery) {
+      return
+    }
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }, [pathname, reportLogsOffset, reportLogsPageSize, router, searchParams])
 
   const fetchAgentDetail = useCallback(async () => {
     if (!agentRef) {
@@ -493,6 +725,62 @@ export default function AgentDetailPage() {
     [agentDetail, agentRef, execute, setMetrics, t]
   )
 
+  const fetchReportLogs = useCallback(
+    async (silent = false) => {
+      if (!agentRef) {
+        return
+      }
+
+      await executeReportLogsRequest(
+        async () => {
+          const query = {
+            limit: reportLogsPageSize,
+            offset: reportLogsOffset,
+          }
+
+          const tryFetch = async (target: string) => {
+            try {
+              return await api.getAgentReportLogs(target, query)
+            } catch (error) {
+              if (error instanceof ApiRequestError && error.status === 404) {
+                return null
+              }
+
+              throw error
+            }
+          }
+
+          const direct = await tryFetch(agentRef)
+          if (direct) {
+            return direct
+          }
+
+          const fallbackId = agentDetail?.agent_id || resolvedAgentId
+          if (fallbackId && fallbackId !== agentRef) {
+            const fallback = await tryFetch(fallbackId)
+            if (fallback) {
+              return fallback
+            }
+          }
+
+          return {
+            items: [],
+            total: 0,
+            limit: reportLogsPageSize,
+            offset: reportLogsOffset,
+          }
+        },
+        {
+          silent,
+          onError: (error) => {
+            toastApiError(error, t("agentDetail.toastFetchReportLogsError"))
+          },
+        }
+      )
+    },
+    [agentDetail, agentRef, executeReportLogsRequest, reportLogsOffset, reportLogsPageSize, resolvedAgentId, t]
+  )
+
   useEffect(() => {
     fetchAgentDetail()
   }, [fetchAgentDetail])
@@ -524,6 +812,22 @@ export default function AgentDetailPage() {
   useEffect(() => {
     fetchLatestMetrics()
   }, [fetchLatestMetrics])
+
+  useEffect(() => {
+    fetchReportLogs()
+  }, [fetchReportLogs])
+
+  useEffect(() => {
+    if (previousAgentRef.current === null) {
+      previousAgentRef.current = agentRef
+      return
+    }
+
+    if (previousAgentRef.current !== agentRef) {
+      setReportLogsOffset(0)
+      previousAgentRef.current = agentRef
+    }
+  }, [agentRef])
 
   const openEditDialog = async () => {
     if (!agentRef) {
@@ -635,6 +939,17 @@ export default function AgentDetailPage() {
       valueClass: resolveValueColor(load),
     },
   ]
+  const reportLogsPagination = useServerOffsetPagination({
+    offset: reportLogsOffset,
+    limit: reportLogsPageSize,
+    currentItemsCount: reportLogsData.items.length,
+    totalItems: reportLogsData.total,
+  })
+  const reportLogsBusy = reportLogsLoading || reportLogsRefreshing
+  const reportLogsPageSizeOptionLabel = useCallback(
+    (size: number) => (locale === "zh" ? `${size} / 页` : `${size} / page`),
+    [locale]
+  )
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -652,10 +967,10 @@ export default function AgentDetailPage() {
         <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:justify-end">
           <Button
             variant="outline"
-            onClick={() => fetchLatestMetrics(true)}
-            disabled={loading || refreshing || !agentRef}
+            onClick={() => Promise.all([fetchLatestMetrics(true), fetchReportLogs(true)])}
+            disabled={loading || refreshing || reportLogsRefreshing || !agentRef}
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing || reportLogsRefreshing ? "animate-spin" : ""}`} />
             {t("agentDetail.refreshButton")}
           </Button>
           <Button
@@ -701,7 +1016,7 @@ export default function AgentDetailPage() {
         <>
           <div className="flex flex-wrap items-center gap-3">
             <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600">{t("agentDetail.updatedBadge")}</Badge>
-            <span className="text-sm text-muted-foreground">{t("agentDetail.updatedAt", { time: formatUpdatedAt(metrics) })}</span>
+            <span className="text-sm text-muted-foreground">{t("agentDetail.updatedAt", { time: formatUpdatedAt(metrics, locale) })}</span>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:gap-6">
@@ -742,15 +1057,133 @@ export default function AgentDetailPage() {
                           </p>
                           <p className="font-mono text-xs text-muted-foreground">{metric.metric_name}</p>
                         </div>
-                        <span className="text-sm">{metric.value}</span>
+                        <span className="text-sm">{formatMetricValue(metric.value, metric.metric_name, { ratioToPercent: true })}</span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {t("agentDetail.rawTime", { time: new Date(metric.timestamp).toLocaleString() })}
+                        {t("agentDetail.rawTime", { time: formatDateTimeByLocale(metric.timestamp, locale) })}
                       </p>
                     </div>
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+              <div className="space-y-1">
+                <CardTitle>{t("agentDetail.reportLogsTitle")}</CardTitle>
+                <CardDescription>{t("agentDetail.reportLogsDescription")}</CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fetchReportLogs(true)}
+                disabled={reportLogsBusy}
+              >
+                {reportLogsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                {t("agentDetail.reportLogsRefreshButton")}
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="w-full overflow-x-auto">
+                <Table className="min-w-[980px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("agentDetail.reportLogsColTime")}</TableHead>
+                      <TableHead>{t("agentDetail.reportLogsColHost")}</TableHead>
+                      <TableHead>{t("agentDetail.reportLogsColSystem")}</TableHead>
+                      <TableHead>{t("agentDetail.reportLogsColResource")}</TableHead>
+                      <TableHead>{t("agentDetail.reportLogsColMetricCount")}</TableHead>
+                      <TableHead>{t("agentDetail.reportLogsColStatus")}</TableHead>
+                      <TableHead>{t("agentDetail.reportLogsColSummary")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reportLogsLoading ? (
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell colSpan={7} className="h-14 text-muted-foreground">
+                            {t("agentDetail.reportLogsLoading")}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : reportLogsData.items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                          {t("agentDetail.reportLogsEmpty")}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      reportLogsData.items.map((log, index) => {
+                        const timestamp = getAgentReportLogTimestamp(log)
+                        const status = getAgentReportLogStatus(log) || t("agentDetail.reportLogsStatusUnknown")
+                        const summary = getAgentReportLogMessage(log) || t("agentDetail.reportLogsSummaryEmpty")
+                        const metricCount = getAgentReportLogMetricCount(log)
+                        const hostname = getAgentReportLogHostname(log) || "-"
+                        const system = getAgentReportLogSystem(log) || "-"
+                        const resource = getAgentReportLogResource(log) || "-"
+                        const itemKey = typeof log.id === "string" && log.id
+                          ? log.id
+                          : `${timestamp || "unknown"}-${status || "unknown"}-${index}`
+
+                        return (
+                          <TableRow key={itemKey}>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {formatDateTimeByLocale(timestamp, locale)}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{hostname}</TableCell>
+                            <TableCell className="text-sm">{system}</TableCell>
+                            <TableCell className="text-xs">{resource}</TableCell>
+                            <TableCell className="text-xs">
+                              {metricCount === null ? "-" : metricCount}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{status}</Badge>
+                            </TableCell>
+                            <TableCell className="max-w-[360px]">
+                              <p className="line-clamp-2 break-all text-xs text-muted-foreground">{summary}</p>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <PaginationControls
+                pageSize={reportLogsPageSize}
+                pageSizeOptions={[...REPORT_LOGS_PAGE_SIZE_OPTIONS]}
+                onPageSizeChange={(value) => {
+                  const normalized = value as (typeof REPORT_LOGS_PAGE_SIZE_OPTIONS)[number]
+                  if (normalized === reportLogsPageSize) {
+                    return
+                  }
+
+                  setReportLogsPageSize(normalized)
+                  setReportLogsOffset(0)
+                }}
+                {...buildTranslatedPaginationTextBundle({
+                  t,
+                  summaryKey: "agentDetail.reportLogsPaginationSummary",
+                  total: reportLogsData.total,
+                  start: reportLogsPagination.rangeStart,
+                  end: reportLogsPagination.rangeEnd,
+                  pageKey: "agentDetail.reportLogsPaginationPage",
+                  currentPage: reportLogsPagination.currentPage,
+                  totalPages: reportLogsPagination.totalPages,
+                  prevKey: "agentDetail.reportLogsPaginationPrev",
+                  nextKey: "agentDetail.reportLogsPaginationNext",
+                })}
+                pageSizePlaceholder={t("agentDetail.reportLogsPageSizePlaceholder")}
+                onPrevPage={() => setReportLogsOffset((prev) => Math.max(0, prev - reportLogsPageSize))}
+                onNextPage={() => setReportLogsOffset((prev) => prev + reportLogsPageSize)}
+                prevDisabled={reportLogsBusy || !reportLogsPagination.canGoPrev}
+                nextDisabled={reportLogsBusy || !reportLogsPagination.canGoNext}
+                pageSizeOptionLabel={reportLogsPageSizeOptionLabel}
+              />
             </CardContent>
           </Card>
         </>

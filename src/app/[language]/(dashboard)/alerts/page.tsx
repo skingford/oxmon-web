@@ -42,7 +42,8 @@ import {
   Info,
 } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
-import { joinFilteredPaginationSummaryText } from "@/lib/pagination-summary"
+import { formatDateTimeByLocale } from "@/lib/date-time"
+import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   AreaChart,
@@ -143,7 +144,7 @@ function formatTimestamp(
       return t("active.timeMinutesAgo", { count: Math.floor(diff / minute) })
     }
 
-    return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    return formatDateTimeByLocale(timestamp, locale, timestamp, {
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -776,25 +777,21 @@ export default function ActiveAlertsPage() {
             <PaginationControls
               className="mt-4"
               pageSize={limit}
-              summaryText={joinFilteredPaginationSummaryText({
-                summaryText: t("active.paginationSummary", {
-                  total: alertsTotal,
-                  start: pagination.rangeStart,
-                  end: pagination.rangeEnd,
-                }),
-                filteredSummaryText: t("active.paginationShown", {
-                  filtered: filteredAlerts.length,
-                  total: alerts.length,
-                }),
-                filteredCount: filteredAlerts.length,
-                totalCount: alerts.length,
+              {...buildTranslatedPaginationTextBundle({
+                t,
+                summaryKey: "active.paginationSummary",
+                total: alertsTotal,
+                start: pagination.rangeStart,
+                end: pagination.rangeEnd,
+                shownKey: "active.paginationShown",
+                filtered: filteredAlerts.length,
+                unfilteredTotal: alerts.length,
+                pageKey: "active.paginationPage",
+                currentPage: pagination.currentPage,
+                totalPages: pagination.totalPages,
+                prevKey: "active.paginationPrev",
+                nextKey: "active.paginationNext",
               })}
-              pageIndicatorText={t("active.paginationPage", {
-                current: pagination.currentPage,
-                total: pagination.totalPages,
-              })}
-              prevLabel={t("active.paginationPrev")}
-              nextLabel={t("active.paginationNext")}
               onPrevPage={() => setOffset(Math.max(0, offset - limit))}
               onNextPage={() => setOffset(offset + limit)}
               prevDisabled={!pagination.canGoPrev}
