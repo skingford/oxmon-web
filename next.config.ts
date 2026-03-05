@@ -22,14 +22,7 @@ const nextConfig: NextConfig = {
       '.next/cache/**',
     ],
   },
-  async rewrites() {
-    return [
-      {
-        source: "/v1/:path*",
-        destination: "http://localhost:8080/v1/:path*",
-      },
-    ];
-  },
+  
 };
 
 
