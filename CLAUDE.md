@@ -36,9 +36,6 @@ bun run start
 ```bash
 # Copy example env file
 cp .env.example .env.local
-
-# Required: Add your Gemini API key to .env.local
-GEMINI_API_KEY=your_key_here
 ```
 
 The development server runs on `http://localhost:3000` and uses Next.js 16's Turbopack for fast rebuilds.
