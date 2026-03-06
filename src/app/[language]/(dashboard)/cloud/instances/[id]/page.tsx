@@ -17,6 +17,7 @@ import { toast, toastApiError, toastCopied, toastStatusError } from "@/lib/toast
 import { ApiRequestError, api } from "@/lib/api"
 import { copyApiCurlCommand } from "@/lib/api-curl"
 import { formatDateTimeByLocale } from "@/lib/date-time"
+import { formatMetricValue as formatMetricValueByName } from "@/lib/metric-format"
 import {
   buildFallbackCloudProviderOptions,
   normalizeCloudProvider,
@@ -56,12 +57,6 @@ const HISTORY_RANGE_OPTIONS = ["1h", "6h", "24h", "7d"] as const
 const INSTANCE_AI_CHECK_JOBS_LIMIT = 6
 const AI_CHECK_POLL_INTERVAL_OPTIONS = [5, 15, 30] as const
 const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
-
-function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  return formatDateTimeByLocale(value, locale, value || "-", {
-    hour12: false,
-  })
-}
 
 function formatChartTime(value: string, locale: "zh" | "en") {
   return formatDateTimeByLocale(value, locale, value, {
@@ -127,46 +122,6 @@ function formatNumber(value: number | null | undefined, digits = 2) {
     maximumFractionDigits: digits,
     minimumFractionDigits: 0,
   })
-}
-
-function formatBytesPerSecond(value: number) {
-  const units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"] as const
-  let nextValue = value
-  let unitIndex = 0
-
-  while (Math.abs(nextValue) >= 1024 && unitIndex < units.length - 1) {
-    nextValue /= 1024
-    unitIndex += 1
-  }
-
-  const digits = Math.abs(nextValue) >= 100 ? 0 : Math.abs(nextValue) >= 10 ? 1 : 2
-  return `${formatNumber(nextValue, digits)} ${units[unitIndex]}`
-}
-
-function formatMetricValue(metric: MetricLatestValue | null | undefined, metricKey: string) {
-  if (!metric) {
-    return "-"
-  }
-
-  if (/(network_(in|out)_bytes|network\.(in_bytes|out_bytes))/.test(metricKey)) {
-    return formatBytesPerSecond(metric.value)
-  }
-
-  const value = formatNumber(metric.value, 2)
-
-  if (/usage/.test(metricKey)) {
-    return `${value}%`
-  }
-
-  if (/(disk_iops_|disk\.iops_)/.test(metricKey)) {
-    return `${value} IOPS`
-  }
-
-  if (metricKey === "connections" || metricKey === "cloud.connections") {
-    return `${value}`
-  }
-
-  return value
 }
 
 function resolveHistoryRangeStart(range: (typeof HISTORY_RANGE_OPTIONS)[number]) {
@@ -389,6 +344,19 @@ function resolveInstanceTitle(instance: CloudInstanceDetailResponse | null) {
   return instance.instance_name?.trim() || instance.instance_id
 }
 
+function buildAICheckJobTypeCandidates(instanceDbId: string, cloudInstanceId?: string | null) {
+  const candidateIds = [instanceDbId, cloudInstanceId || ""]
+  const deduped = Array.from(new Set(candidateIds.map((value) => value.trim()).filter(Boolean)))
+
+  return deduped.map((value) => `cloud_instance:${value}`)
+}
+
+function sortAICheckJobsByCreatedAtDesc(left: CloudAICheckJobResponse, right: CloudAICheckJobResponse) {
+  const leftTime = new Date(left.created_at).getTime()
+  const rightTime = new Date(right.created_at).getTime()
+  return rightTime - leftTime
+}
+
 function FieldItem({
   label,
   value,
@@ -555,13 +523,31 @@ export default function CloudInstanceDetailPage() {
 
     await executeAICheckJobsRequest(
       async () => {
-        const page = await api.listCloudAICheckJobsPage({
-          job_type: `cloud_instance:${instanceId}`,
-          limit: INSTANCE_AI_CHECK_JOBS_LIMIT,
-          offset: 0,
-        })
+        const jobTypeCandidates = buildAICheckJobTypeCandidates(instanceId, instance?.instance_id)
+        const pages = await Promise.all(
+          jobTypeCandidates.map((jobType) => api.listCloudAICheckJobsPage({
+            job_type: jobType,
+            limit: INSTANCE_AI_CHECK_JOBS_LIMIT,
+            offset: 0,
+          }))
+        )
+        const dedupedItems: CloudAICheckJobResponse[] = []
+        const seenJobIds = new Set<string>()
 
-        return page.items
+        for (const page of pages) {
+          for (const item of page.items) {
+            if (seenJobIds.has(item.id)) {
+              continue
+            }
+
+            seenJobIds.add(item.id)
+            dedupedItems.push(item)
+          }
+        }
+
+        return dedupedItems
+          .sort(sortAICheckJobsByCreatedAtDesc)
+          .slice(0, INSTANCE_AI_CHECK_JOBS_LIMIT)
       },
       {
         silent,
@@ -572,7 +558,7 @@ export default function CloudInstanceDetailPage() {
         },
       }
     )
-  }, [executeAICheckJobsRequest, instanceId, t])
+  }, [executeAICheckJobsRequest, instance?.instance_id, instanceId, t])
 
   useEffect(() => {
     fetchAICheckJobs()
@@ -764,6 +750,7 @@ export default function CloudInstanceDetailPage() {
       })),
     [t]
   )
+  const instanceStatus = useMemo(() => resolveCloudInstanceStatus(instance), [instance])
 
   const handleCopyApiCurl = useCallback(async (insecure = false) => {
     try {
@@ -917,7 +904,9 @@ export default function CloudInstanceDetailPage() {
             </span>
           </div>
           <div className="mr-1 rounded-md border px-2 py-1 text-xs text-muted-foreground">
-            {t("cloud.instances.detailLastRefreshLabel")}: {formatDateTime(lastRefreshAt, locale)}
+            {t("cloud.instances.detailLastRefreshLabel")}: {formatDateTimeByLocale(lastRefreshAt, locale, lastRefreshAt || "-", {
+              hour12: false,
+            })}
           </div>
           <CopyCurlDropdown
             texts={{
@@ -969,8 +958,8 @@ export default function CloudInstanceDetailPage() {
           <FieldItem label={t("cloud.instances.detailFieldRegion")} value={instance.region} />
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">{t("cloud.instances.detailFieldStatus")}</p>
-            <Badge variant={getCloudInstanceStatusBadgeVariant(resolveCloudInstanceStatus(instance))}>
-              {getStatusLabel(resolveCloudInstanceStatus(instance), t)}
+            <Badge variant={getCloudInstanceStatusBadgeVariant(instanceStatus)}>
+              {getStatusLabel(instanceStatus, t)}
             </Badge>
           </div>
           <FieldItem label={t("cloud.instances.detailFieldOs")} value={instance.os || "-"} />
@@ -978,16 +967,30 @@ export default function CloudInstanceDetailPage() {
           <FieldItem label={t("cloud.instances.detailFieldPrivateIp")} value={instance.private_ip || "-"} mono />
           <FieldItem
             label={t("cloud.instances.detailFieldLastSeen")}
-            value={formatDateTime(instance.last_seen_at, locale)}
+            value={formatDateTimeByLocale(instance.last_seen_at, locale, instance.last_seen_at || "-", {
+              hour12: false,
+            })}
             hint={formatRelativeTime(instance.last_seen_at, locale)}
           />
           <FieldItem
             label={t("cloud.instances.detailFieldLastCollected")}
-            value={formatDateTime(instance.last_collected_at, locale)}
+            value={formatDateTimeByLocale(instance.last_collected_at, locale, instance.last_collected_at || "-", {
+              hour12: false,
+            })}
             hint={formatRelativeTime(instance.last_collected_at, locale)}
           />
-          <FieldItem label={t("cloud.instances.detailFieldCreatedAt")} value={formatDateTime(instance.created_at, locale)} />
-          <FieldItem label={t("cloud.instances.detailFieldUpdatedAt")} value={formatDateTime(instance.updated_at, locale)} />
+          <FieldItem
+            label={t("cloud.instances.detailFieldCreatedAt")}
+            value={formatDateTimeByLocale(instance.created_at, locale, instance.created_at || "-", {
+              hour12: false,
+            })}
+          />
+          <FieldItem
+            label={t("cloud.instances.detailFieldUpdatedAt")}
+            value={formatDateTimeByLocale(instance.updated_at, locale, instance.updated_at || "-", {
+              hour12: false,
+            })}
+          />
         </CardContent>
       </Card>
 
@@ -1006,7 +1009,14 @@ export default function CloudInstanceDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle>{t("cloud.instances.detailSectionMetrics")}</CardTitle>
-          <CardDescription>{t("cloud.instances.detailFieldLastCollected")}: {formatDateTime(instance.last_collected_at, locale)}</CardDescription>
+          <CardDescription>
+            {t("cloud.instances.detailFieldLastCollected")}: {formatDateTimeByLocale(
+              instance.last_collected_at,
+              locale,
+              instance.last_collected_at || "-",
+              { hour12: false }
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metricCards.map((item) => (
@@ -1018,7 +1028,7 @@ export default function CloudInstanceDetailPage() {
                   <>
               <p className="text-xs text-muted-foreground">{item.label}</p>
                     <p className={`mt-1 text-lg font-semibold ${getMetricValueClass(item.metric, item.key)}`}>
-                      {item.metric ? formatMetricValue(item.metric, item.key) : t("cloud.instances.detailMetricNoData")}
+                      {item.metric ? formatMetricValueByName(item.metric.value, item.key) : t("cloud.instances.detailMetricNoData")}
                     </p>
                     {usagePercent !== null ? (
                       <div className="mt-2">
@@ -1034,7 +1044,12 @@ export default function CloudInstanceDetailPage() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {item.metric
                         ? t("cloud.instances.detailMetricCollectedAt", {
-                          time: formatDateTime(item.metric.collected_at, locale),
+                          time: formatDateTimeByLocale(
+                            item.metric.collected_at,
+                            locale,
+                            item.metric.collected_at || "-",
+                            { hour12: false }
+                          ),
                         })
                         : "-"}
                     </p>
@@ -1151,8 +1166,8 @@ export default function CloudInstanceDetailPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{formatDateTime(job.started_at, locale)}</TableCell>
-                        <TableCell>{formatDateTime(job.finished_at, locale)}</TableCell>
+                        <TableCell>{formatDateTimeByLocale(job.started_at, locale, job.started_at || "-", { hour12: false })}</TableCell>
+                        <TableCell>{formatDateTimeByLocale(job.finished_at, locale, job.finished_at || "-", { hour12: false })}</TableCell>
                         <TableCell className="max-w-[280px]">
                           {job.report_id
                             ? <span className="font-mono text-xs">{job.report_id}</span>
@@ -1244,22 +1259,14 @@ export default function CloudInstanceDetailPage() {
                   <YAxis
                     tick={{ fontSize: 12 }}
                     width={94}
-                    tickFormatter={(value) => formatMetricValue(
-                      {
-                        metric_name: historyMetric,
-                        value: Number(value),
-                        collected_at: "",
-                      },
+                    tickFormatter={(value) => formatMetricValueByName(
+                      Number(value),
                       historyMetric
                     )}
                   />
                   <Tooltip
-                    formatter={(value: number) => formatMetricValue(
-                      {
-                        metric_name: historyMetric,
-                        value,
-                        collected_at: "",
-                      },
+                    formatter={(value: number) => formatMetricValueByName(
+                      value,
                       historyMetric
                     )}
                     labelFormatter={(label, payload) => payload?.[0]?.payload?.timestamp || String(label)}

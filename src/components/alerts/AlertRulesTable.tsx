@@ -3,19 +3,20 @@
 import { motion } from "framer-motion";
 import {
   AlertCircle,
-  AlertTriangle,
   Edit2,
-  Info,
   Loader2,
   Trash2,
 } from "lucide-react";
 import { AlertRuleResponse } from "@/types/api";
 import { getAlertRuleTypeLabelInfo } from "@/lib/alerts/rule-form";
-import {
-  useAppTranslations,
-  type AppNamespaceTranslator,
-} from "@/hooks/use-app-translations";
+import { normalizeMetricKey } from "@/lib/metric-name";
+import { useAppTranslations } from "@/hooks/use-app-translations";
 import { AlertRulesTableHeader } from "@/components/alerts/AlertRulesHeader";
+import {
+  getAlertSeverityBadgeClass,
+  getAlertSeverityIcon,
+  getAlertSeverityLabel,
+} from "@/components/alerts/alert-severity-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,75 +29,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-function getSeverityBadgeClass(severity: string) {
-  const normalized = severity.toLowerCase();
-
-  if (normalized === "critical") {
-    return "border-red-500/30 bg-red-500/10 text-red-600";
-  }
-
-  if (normalized === "warning") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-600";
-  }
-
-  if (normalized === "info") {
-    return "border-blue-500/30 bg-blue-500/10 text-blue-600";
-  }
-
-  return "border-muted bg-muted text-muted-foreground";
-}
-
-function getSeverityIcon(severity: string) {
-  const normalized = severity.toLowerCase();
-
-  if (normalized === "critical") {
-    return AlertCircle;
-  }
-
-  if (normalized === "warning") {
-    return AlertTriangle;
-  }
-
-  if (normalized === "info") {
-    return Info;
-  }
-
-  return AlertCircle;
-}
-
-function getSeverityText(
-  severity: string,
-  t: AppNamespaceTranslator<"alerts">,
-) {
-  const normalized = severity.toLowerCase();
-
-  if (normalized === "critical") {
-    return t("severity.critical");
-  }
-
-  if (normalized === "warning") {
-    return t("severity.warning");
-  }
-
-  if (normalized === "info") {
-    return t("severity.info");
-  }
-
-  return severity;
-}
-
-function getRuleTypeText(
-  ruleType: string,
-  t: AppNamespaceTranslator<"alerts">,
-) {
-  const labelInfo = getAlertRuleTypeLabelInfo(ruleType);
-  return t(labelInfo.key, labelInfo.values);
-}
-
-function normalizeMetricKey(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
 
 type AlertRulesTableProps = {
   loading: boolean;
@@ -160,7 +92,8 @@ export function AlertRulesTable({
                 </TableRow>
               ) : (
                 rules.map((rule, index) => {
-                  const SeverityIcon = getSeverityIcon(rule.severity);
+                  const SeverityIcon = getAlertSeverityIcon(rule.severity);
+                  const ruleTypeLabelInfo = getAlertRuleTypeLabelInfo(rule.rule_type);
                   const metricLabel =
                     metricLabelMap[rule.metric] ||
                     metricLabelMap[normalizeMetricKey(rule.metric)] ||
@@ -176,7 +109,7 @@ export function AlertRulesTable({
                     >
                       <TableCell className="font-medium">{rule.name}</TableCell>
                       <TableCell className="text-sm">
-                        {getRuleTypeText(rule.rule_type, t)}
+                        {t(ruleTypeLabelInfo.key, ruleTypeLabelInfo.values)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
@@ -192,9 +125,9 @@ export function AlertRulesTable({
                         {rule.agent_pattern}
                       </TableCell>
                       <TableCell>
-                        <Badge className={getSeverityBadgeClass(rule.severity)}>
+                        <Badge className={getAlertSeverityBadgeClass(rule.severity)}>
                           <SeverityIcon className="mr-1 h-3 w-3" />
-                          {getSeverityText(rule.severity, t)}
+                          {getAlertSeverityLabel(rule.severity, t)}
                         </Badge>
                       </TableCell>
                       <TableCell>-</TableCell>

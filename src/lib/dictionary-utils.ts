@@ -1,4 +1,4 @@
-import { formatDateTimeByLocale } from "@/lib/date-time"
+import { formatFullDateTimeByLocale } from "@/lib/date-time"
 
 export function normalizeNullableText(value: string) {
   const trimmed = value.trim()
@@ -22,12 +22,5 @@ export function parseOptionalSortOrder(value: string) {
 }
 
 export function formatDateTime(value: string, locale: "zh" | "en") {
-  return formatDateTimeByLocale(value, locale, "-", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
+  return formatFullDateTimeByLocale(value, locale, "-")
 }

@@ -3,98 +3,43 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { api } from "@/lib/api"
+import { api, ApiRequestError } from "@/lib/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   useAppTranslations,
-  type AppNamespaceTranslator,
 } from "@/hooks/use-app-translations"
-import { AlertEventResponse, MetricSourceItemResponse } from "@/types/api"
+import { useRefreshState } from "@/hooks/use-refresh-state"
+import { AlertEventResponse } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, CheckCheck, CheckCircle, Loader2 } from "lucide-react"
-import { toast, toastApiError } from "@/lib/toast"
+import { ArrowLeft, CheckCheck, CheckCircle, Loader2, RefreshCw } from "lucide-react"
+import { toast } from "@/lib/toast"
 import { formatDateTimeByLocale } from "@/lib/date-time"
+import { getMetricDisplayName } from "@/components/pages/metrics/metrics-utils"
+import { executeAlertRequest } from "@/components/alerts/alert-request-utils"
 import {
-  buildMetricNameLabelMap,
-  getMetricDisplayName,
-} from "@/components/pages/metrics/metrics-utils"
-
-function getSeverityBadgeClass(severity: string) {
-  const normalized = severity.toLowerCase()
-
-  if (normalized === "critical") {
-    return "border-red-500/30 bg-red-500/10 text-red-600"
-  }
-
-  if (normalized === "warning") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-600"
-  }
-
-  if (normalized === "info") {
-    return "border-blue-500/30 bg-blue-500/10 text-blue-600"
-  }
-
-  return "border-muted bg-muted text-muted-foreground"
-}
-
-function getSeverityLabel(
-  severity: string,
-  t: AppNamespaceTranslator<"alerts">
-) {
-  const normalized = severity.toLowerCase()
-
-  if (normalized === "critical") {
-    return t("severity.critical")
-  }
-
-  if (normalized === "warning") {
-    return t("severity.warning")
-  }
-
-  if (normalized === "info") {
-    return t("severity.info")
-  }
-
-  return severity
-}
-
-function formatFullTimestamp(timestamp: string, locale: "zh" | "en") {
-  return formatDateTimeByLocale(timestamp, locale, timestamp, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
-function buildSourceDisplayNameMap(items: MetricSourceItemResponse[]) {
-  const map: Record<string, string> = {}
-
-  items.forEach((item) => {
-    const name = item.display_name?.trim()
-    if (!name) {
-      return
-    }
-
-    if (item.id) {
-      map[item.id] = name
-    }
-
-    const cloudInstanceId = item.instance_id?.trim()
-    if (cloudInstanceId) {
-      map[cloudInstanceId] = name
-    }
-  })
-
-  return map
-}
+  getAlertSeverityBadgeClass,
+  getAlertSeverityLabel,
+} from "@/components/alerts/alert-severity-utils"
+import {
+  invalidateAlertDisplayMetadataCache,
+  useAlertDisplayMetadata,
+} from "@/hooks/use-alert-display-metadata"
 
 async function findAlertById(id: string) {
+  try {
+    const historyById = await api.getAlertHistoryById(id)
+    if (historyById) {
+      return historyById
+    }
+  } catch (error) {
+    if (!(error instanceof ApiRequestError && error.status === 404)) {
+      throw error
+    }
+  }
+
   const limit = 200
   let offset = 0
   const maxPages = 25
@@ -145,72 +90,31 @@ export default function AlertDetailPage() {
   const params = useParams<{ id: string }>()
   const alertId = typeof params.id === "string" ? params.id : ""
 
-  const [loading, setLoading] = useState(true)
+  const { loading, refreshing, runWithRefresh, setLoading } = useRefreshState()
   const [actionInProgress, setActionInProgress] = useState<"ack" | "resolve" | null>(null)
   const [alertDetail, setAlertDetail] = useState<AlertEventResponse | null>(null)
-  const [sourceDisplayNameMap, setSourceDisplayNameMap] = useState<Record<string, string>>({})
-  const [metricNameLabelMap, setMetricNameLabelMap] = useState<Record<string, string>>({})
+  const [metadataRefreshKey, setMetadataRefreshKey] = useState(0)
+  const { sourceDisplayNameMap, metricNameLabelMap } = useAlertDisplayMetadata(locale, {
+    refreshKey: metadataRefreshKey,
+  })
 
-  const fetchAlert = useCallback(async () => {
+  const fetchAlert = useCallback(async (options?: { silent?: boolean }) => {
     if (!alertId) {
       setLoading(false)
       return
     }
 
-    setLoading(true)
-
-    try {
-      const matched = await findAlertById(alertId)
-      setAlertDetail(matched)
-    } catch (error) {
-      toastApiError(error, t("active.detailFetchError"))
-    } finally {
-      setLoading(false)
-    }
-  }, [alertId, t])
+    await runWithRefresh(async () => {
+      await executeAlertRequest(async () => {
+        const matched = await findAlertById(alertId)
+        setAlertDetail(matched)
+      }, t("active.detailFetchError"))
+    }, options)
+  }, [alertId, runWithRefresh, setLoading, t])
 
   useEffect(() => {
     fetchAlert()
   }, [fetchAlert])
-
-  useEffect(() => {
-    let active = true
-
-    const fetchDisplayMetadata = async () => {
-      try {
-        const [sources, metricLabelItems] = await Promise.all([
-          api.getMetricSources(),
-          api.listDictionariesByType("metric_name", true),
-        ])
-
-        if (!active) {
-          return
-        }
-
-        setSourceDisplayNameMap(buildSourceDisplayNameMap(sources))
-        setMetricNameLabelMap(
-          buildMetricNameLabelMap(
-            metricLabelItems.map((item) => ({
-              dict_key: item.dict_key || "",
-              dict_label: item.dict_label || "",
-            }))
-          )
-        )
-      } catch {
-        if (!active) {
-          return
-        }
-        setSourceDisplayNameMap({})
-        setMetricNameLabelMap({})
-      }
-    }
-
-    fetchDisplayMetadata()
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   const canAcknowledge = useMemo(() => {
     if (!alertDetail) {
@@ -250,15 +154,14 @@ export default function AlertDetailPage() {
     }
 
     setActionInProgress("ack")
-
-    try {
+    const ok = await executeAlertRequest(async () => {
       await api.acknowledgeAlert(alertDetail.id)
       toast.success(t("active.toastAcknowledged"))
-      await fetchAlert()
-    } catch (error) {
-      toastApiError(error, t("active.toastAckError"))
-    } finally {
-      setActionInProgress(null)
+      await fetchAlert({ silent: true })
+    }, t("active.toastAckError"))
+    setActionInProgress(null)
+    if (!ok) {
+      return
     }
   }
 
@@ -268,17 +171,22 @@ export default function AlertDetailPage() {
     }
 
     setActionInProgress("resolve")
-
-    try {
+    const ok = await executeAlertRequest(async () => {
       await api.resolveAlert(alertDetail.id)
       toast.success(t("active.toastResolved"))
-      await fetchAlert()
-    } catch (error) {
-      toastApiError(error, t("active.toastResolveError"))
-    } finally {
-      setActionInProgress(null)
+      await fetchAlert({ silent: true })
+    }, t("active.toastResolveError"))
+    setActionInProgress(null)
+    if (!ok) {
+      return
     }
   }
+
+  const handleRefresh = useCallback(async () => {
+    invalidateAlertDisplayMetadataCache()
+    setMetadataRefreshKey((prev) => prev + 1)
+    await fetchAlert({ silent: true })
+  }, [fetchAlert])
 
   if (loading) {
     return (
@@ -328,6 +236,10 @@ export default function AlertDetailPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={handleRefresh} disabled={loading || refreshing || actionInProgress !== null}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          {t("active.detailRefreshButton")}
+        </Button>
         <Button onClick={handleAcknowledge} disabled={!canAcknowledge || actionInProgress !== null}>
           {actionInProgress === "ack" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
           {t("active.btnAcknowledge")}
@@ -343,9 +255,9 @@ export default function AlertDetailPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">{t("active.colSeverity")}</p>
-              <Badge className={getSeverityBadgeClass(alertDetail.severity)}>
-                {getSeverityLabel(alertDetail.severity, t)}
-              </Badge>
+                <Badge className={getAlertSeverityBadgeClass(alertDetail.severity)}>
+                  {getAlertSeverityLabel(alertDetail.severity, t)}
+                </Badge>
             </div>
             <div className="space-y-1 text-right">
               <p className="text-sm font-medium text-muted-foreground">{t("active.ruleIdLabel")}</p>
@@ -397,7 +309,16 @@ export default function AlertDetailPage() {
             <div className="space-y-2 border-l-2 border-muted pl-4">
               <div className="pb-2">
                 <p className="text-xs text-muted-foreground">{t("active.createdAt")}</p>
-                <p className="text-sm font-medium">{formatFullTimestamp(alertDetail.timestamp, locale)}</p>
+                <p className="text-sm font-medium">
+                  {formatDateTimeByLocale(alertDetail.timestamp, locale, alertDetail.timestamp, {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
+                </p>
               </div>
             </div>
           </div>

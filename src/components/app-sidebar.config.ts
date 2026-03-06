@@ -10,6 +10,7 @@ import {
   Settings,
   Cloud,
   User,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 import { DEFAULT_APP_LOCALE, type AppLocale } from "@/components/app-locale";
@@ -179,6 +180,12 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/ai/reports/": ["/v1/ai/reports"],
   "/system": ["/v1/system/config"],
   "/system/dictionaries": ["/v1/dictionaries"],
+  "/system/admin-users": [
+    "/v1/admin/users",
+    "/v1/admin/users/{id}",
+    "/v1/admin/users/{id}/password",
+  ],
+  "/system/audit-logs": ["/v1/audit/logs"],
 };
 
 const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
@@ -338,6 +345,18 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
         titleKey: "itemSystemDictionaries",
         url: "/system/dictionaries",
         icon: BookText,
+        exact: true,
+      },
+      {
+        titleKey: "itemAdminUsers",
+        url: "/system/admin-users",
+        icon: User,
+        exact: true,
+      },
+      {
+        titleKey: "itemAuditLogs",
+        url: "/system/audit-logs",
+        icon: Shield,
         exact: true,
       },
     ],

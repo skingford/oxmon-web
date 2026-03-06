@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
-import { AlertEventResponse, AlertSummary, MetricSourceItemResponse } from "@/types/api"
+import { AlertEventResponse, AlertSummary } from "@/types/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   useAppTranslations,
-  type AppNamespaceTranslator,
 } from "@/hooks/use-app-translations"
+import { useRefreshState } from "@/hooks/use-refresh-state"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { ActiveAlertsListHeader, ActiveAlertsTopControls } from "@/components/alerts/ActiveAlertsHeader"
 import { Badge } from "@/components/ui/badge"
@@ -38,17 +38,23 @@ import {
   ExternalLink,
   MoreHorizontal,
   Loader2,
-  AlertTriangle,
-  Info,
+  X,
 } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
-import { formatDateTimeByLocale } from "@/lib/date-time"
+import { formatRecentOrDateTimeByLocale } from "@/lib/date-time"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { motion, AnimatePresence } from "framer-motion"
+import { getMetricDisplayName } from "@/components/pages/metrics/metrics-utils"
 import {
-  buildMetricNameLabelMap,
-  getMetricDisplayName,
-} from "@/components/pages/metrics/metrics-utils"
+  getAlertSeverityBadgeClass,
+  getAlertSeverityIcon,
+  getAlertSeverityLabel,
+} from "@/components/alerts/alert-severity-utils"
+import { executeAlertRequest } from "@/components/alerts/alert-request-utils"
+import {
+  invalidateAlertDisplayMetadataCache,
+  useAlertDisplayMetadata,
+} from "@/hooks/use-alert-display-metadata"
 import {
   AreaChart,
   Area,
@@ -92,131 +98,24 @@ function TableRowSkeleton() {
   )
 }
 
-function getSeverityBadgeClass(severity: string) {
-  const normalized = severity.toLowerCase()
-
-  if (normalized === "critical") {
-    return "border-red-500/30 bg-red-500/10 text-red-600"
-  }
-
-  if (normalized === "warning") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-600"
-  }
-
-  if (normalized === "info") {
-    return "border-blue-500/30 bg-blue-500/10 text-blue-600"
-  }
-
-  return "border-muted bg-muted text-muted-foreground"
-}
-
-function getSeverityIcon(severity: string) {
-  const normalized = severity.toLowerCase()
-
-  if (normalized === "critical") {
-    return AlertCircle
-  }
-
-  if (normalized === "warning") {
-    return AlertTriangle
-  }
-
-  if (normalized === "info") {
-    return Info
-  }
-
-  return AlertCircle
-}
-
-function formatTimestamp(
-  timestamp: string,
-  locale: "zh" | "en",
-  t: AppNamespaceTranslator<"alerts">
-) {
-  const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) {
-    return timestamp
-  }
-
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minute = 60 * 1000
-  const hour = 60 * minute
-
-  if (diff < minute) {
-    return t("active.timeJustNow")
-  }
-
-  if (diff < hour) {
-    return t("active.timeMinutesAgo", { count: Math.floor(diff / minute) })
-  }
-
-  return formatDateTimeByLocale(timestamp, locale, timestamp, {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-function getSeverityLabel(
-  severity: string,
-  t: AppNamespaceTranslator<"alerts">
-) {
-  const normalized = severity.toLowerCase()
-
-  if (normalized === "critical") {
-    return t("severity.critical")
-  }
-
-  if (normalized === "warning") {
-    return t("severity.warning")
-  }
-
-  if (normalized === "info") {
-    return t("severity.info")
-  }
-
-  return severity
-}
-
-function buildSourceDisplayNameMap(items: MetricSourceItemResponse[]) {
-  const map: Record<string, string> = {}
-
-  items.forEach((item) => {
-    const name = item.display_name?.trim()
-    if (!name) {
-      return
-    }
-
-    if (item.id) {
-      map[item.id] = name
-    }
-
-    const cloudInstanceId = item.instance_id?.trim()
-    if (cloudInstanceId) {
-      map[cloudInstanceId] = name
-    }
-  })
-
-  return map
-}
-
 export default function ActiveAlertsPage() {
   const router = useRouter()
   const { t, locale } = useAppTranslations("alerts")
   const [alerts, setAlerts] = useState<AlertEventResponse[]>([])
   const [alertsTotal, setAlertsTotal] = useState(0)
   const [summary, setSummary] = useState<AlertSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
+  const { loading, refreshing, runWithRefresh } = useRefreshState()
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
-  const [sourceDisplayNameMap, setSourceDisplayNameMap] = useState<Record<string, string>>({})
-  const [metricNameLabelMap, setMetricNameLabelMap] = useState<Record<string, string>>({})
+  const [metadataRefreshKey, setMetadataRefreshKey] = useState(0)
+  const { sourceDisplayNameMap, metricNameLabelMap, sourceOptions } = useAlertDisplayMetadata(
+    locale,
+    { refreshKey: metadataRefreshKey }
+  )
   const [offset, setOffset] = useState(0)
   const limit = 20
 
   // 搜索和筛选
+  const [selectedSourceId, setSelectedSourceId] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
 
   // 自动刷新
@@ -227,73 +126,25 @@ export default function ActiveAlertsPage() {
 
   const fetchData = useCallback(
     async (silent = false) => {
-      if (silent) {
-        setRefreshing(true)
-      } else {
-        setLoading(true)
-      }
+      await runWithRefresh(async () => {
+        await executeAlertRequest(async () => {
+          const [alertsData, summaryData] = await Promise.all([
+            api.getActiveAlerts({ limit, offset }),
+            api.getAlertSummary(),
+          ])
 
-      try {
-        const [alertsData, summaryData] = await Promise.all([
-          api.getActiveAlerts({ limit, offset }),
-          api.getAlertSummary(),
-        ])
-
-        setAlerts(alertsData.items)
-        setAlertsTotal(alertsData.total)
-        setSummary(summaryData)
-      } catch (error) {
-        toastApiError(error, t("active.toastFetchError"))
-      } finally {
-        setLoading(false)
-        setRefreshing(false)
-      }
+          setAlerts(alertsData.items)
+          setAlertsTotal(alertsData.total)
+          setSummary(summaryData)
+        }, t("active.toastFetchError"))
+      }, { silent })
     },
-    [limit, offset, t]
+    [limit, offset, runWithRefresh, t]
   )
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
-
-  useEffect(() => {
-    let active = true
-
-    const fetchDisplayMetadata = async () => {
-      try {
-        const [sources, metricLabelItems] = await Promise.all([
-          api.getMetricSources(),
-          api.listDictionariesByType("metric_name", true),
-        ])
-
-        if (!active) {
-          return
-        }
-
-        setSourceDisplayNameMap(buildSourceDisplayNameMap(sources))
-        setMetricNameLabelMap(
-          buildMetricNameLabelMap(
-            metricLabelItems.map((item) => ({
-              dict_key: item.dict_key || "",
-              dict_label: item.dict_label || "",
-            }))
-          )
-        )
-      } catch {
-        if (!active) {
-          return
-        }
-        setSourceDisplayNameMap({})
-        setMetricNameLabelMap({})
-      }
-    }
-
-    fetchDisplayMetadata()
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   // 自动刷新逻辑
   useEffect(() => {
@@ -308,18 +159,26 @@ export default function ActiveAlertsPage() {
 
   // 搜索筛选
   const filteredAlerts = useMemo(() => {
-    if (!searchQuery.trim()) return alerts
-
     const query = searchQuery.toLowerCase().trim()
-    return alerts.filter(
-      (alert) =>
+
+    return alerts.filter((alert) => {
+      if (selectedSourceId && alert.agent_id !== selectedSourceId) {
+        return false
+      }
+
+      if (!query) {
+        return true
+      }
+
+      return (
         alert.agent_id.toLowerCase().includes(query) ||
         (sourceDisplayNameMap[alert.agent_id] || "").toLowerCase().includes(query) ||
         alert.message.toLowerCase().includes(query) ||
         alert.metric_name.toLowerCase().includes(query) ||
         getMetricDisplayName(alert.metric_name, metricNameLabelMap).toLowerCase().includes(query)
-    )
-  }, [alerts, metricNameLabelMap, searchQuery, sourceDisplayNameMap])
+      )
+    })
+  }, [alerts, metricNameLabelMap, searchQuery, selectedSourceId, sourceDisplayNameMap])
 
   const handleAcknowledge = async (id: string) => {
     setActionInProgress(id)
@@ -407,6 +266,12 @@ export default function ActiveAlertsPage() {
     })
   }
 
+  const handleRefresh = useCallback(async () => {
+    invalidateAlertDisplayMetadataCache()
+    setMetadataRefreshKey((prev) => prev + 1)
+    await fetchData(true)
+  }, [fetchData])
+
   const handleSelectAll = () => {
     if (selectedAlerts.size === filteredAlerts.length) {
       setSelectedAlerts(new Set())
@@ -414,6 +279,8 @@ export default function ActiveAlertsPage() {
       setSelectedAlerts(new Set(filteredAlerts.map((alert) => alert.id)))
     }
   }
+
+  const hasActiveFilters = Boolean(selectedSourceId || searchQuery.trim())
 
   const handleViewDetails = (alert: AlertEventResponse) => {
     router.push(withLocalePrefix(`/alerts/${alert.id}`, locale))
@@ -483,7 +350,7 @@ export default function ActiveAlertsPage() {
         loading={loading}
         refreshing={refreshing}
         onAutoRefreshChange={setAutoRefresh}
-        onRefresh={() => fetchData(true)}
+        onRefresh={handleRefresh}
       />
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -632,8 +499,31 @@ export default function ActiveAlertsPage() {
       )}
 
       <Card className="glass-card">
-        <ActiveAlertsListHeader searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
+        <ActiveAlertsListHeader
+          sourceId={selectedSourceId}
+          sourceOptions={sourceOptions}
+          searchQuery={searchQuery}
+          onSourceIdChange={setSelectedSourceId}
+          onSearchQueryChange={setSearchQuery}
+        />
         <CardContent>
+          {hasActiveFilters ? (
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-muted bg-muted/30 p-3">
+              <p className="text-sm text-muted-foreground">{t("active.filtersActiveHint")}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedSourceId("")
+                  setSearchQuery("")
+                }}
+              >
+                <X className="mr-2 h-4 w-4" />
+                {t("active.clearFilters")}
+              </Button>
+            </div>
+          ) : null}
+
           {selectedAlerts.size > 0 && (
             <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
               <div className="flex items-center gap-2 text-sm">
@@ -711,7 +601,7 @@ export default function ActiveAlertsPage() {
                 ) : (
                   <AnimatePresence mode="popLayout">
                     {filteredAlerts.map((alert) => {
-                      const SeverityIcon = getSeverityIcon(alert.severity)
+                      const SeverityIcon = getAlertSeverityIcon(alert.severity)
                       const isActionDisabled = actionInProgress === alert.id || actionInProgress === "bulk"
                       const isSelected = selectedAlerts.has(alert.id)
                       const sourceName = sourceDisplayNameMap[alert.agent_id]?.trim() || alert.agent_id
@@ -739,9 +629,9 @@ export default function ActiveAlertsPage() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Badge className={getSeverityBadgeClass(alert.severity)}>
+                            <Badge className={getAlertSeverityBadgeClass(alert.severity)}>
                               <SeverityIcon className="mr-1 h-3 w-3" />
-                              {getSeverityLabel(alert.severity, t)}
+                              {getAlertSeverityLabel(alert.severity, t)}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -762,7 +652,18 @@ export default function ActiveAlertsPage() {
                             </p>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {formatTimestamp(alert.timestamp, locale, t)}
+                            {formatRecentOrDateTimeByLocale(alert.timestamp, locale, alert.timestamp, {
+                              dateTimeOptions: {
+                                month: "2-digit",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                              texts: {
+                                justNow: t("active.timeJustNow"),
+                                minutesAgo: (count) => t("active.timeMinutesAgo", { count }),
+                              },
+                            })}
                           </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="hidden items-center justify-end gap-1 sm:flex">

@@ -29,6 +29,10 @@ import {
   AIReportQueryParams,
   AIReportRow,
   ActiveAlertQueryParams,
+  AdminUserQueryParams,
+  AdminUserResponse,
+  AuditLogItem,
+  AuditLogQueryParams,
   AlertEventResponse,
   AlertRuleQueryParams,
   AlertRuleDetailResponse,
@@ -60,6 +64,8 @@ import {
   NotificationLogSummaryResponse,
   NotificationLogQueryParams,
   NotificationLogSummaryQueryParams,
+  CreateAdminUserRequest,
+  ResetAdminPasswordRequest,
   CreateAlertRuleRequest,
   UpdateAlertRuleRequest,
   DashboardOverview,
@@ -505,18 +511,27 @@ export const api = {
 
   getAlertHistory: (
     params: PaginationParams & {
+      source_id__eq?: string;
       agent_id__eq?: string;
       severity__eq?: string;
       timestamp__gte?: string;
       timestamp__lte?: string;
     } = {},
-  ) =>
-    request<unknown>(`/v1/alerts/history${buildQueryString(params)}`).then(
+  ) => {
+    const normalizedParams = {
+      ...params,
+      agent_id__eq: params.agent_id__eq || params.source_id__eq,
+    };
+
+    delete (normalizedParams as { source_id__eq?: string }).source_id__eq;
+
+    return request<unknown>(`/v1/alerts/history${buildQueryString(normalizedParams)}`).then(
       (payload) => normalizeListResponse<AlertEventResponse>(payload, {
         fallbackLimit: params.limit ?? 0,
         fallbackOffset: params.offset ?? 0,
       }),
-    ),
+    );
+  },
 
   getAlertHistoryById: (id: string) =>
     request<AlertEventResponse>(`/v1/alerts/history/${id}`),
@@ -879,6 +894,66 @@ export const api = {
 
   deleteSystemConfig: (id: string) =>
     request<IdResponse>(`/v1/system/configs/${id}`, { method: "DELETE" }),
+
+  listAdminUsersPage: (params: AdminUserQueryParams = {}) =>
+    request<unknown>(`/v1/admin/users${buildQueryString(params)}`).then(
+      (payload) =>
+        normalizeListResponse<AdminUserResponse>(payload, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
+    ),
+
+  listAdminUsers: (params?: AdminUserQueryParams) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<unknown>(
+        `/v1/admin/users${buildQueryString(params || {})}`,
+      ).then((payload) => extractListItems<AdminUserResponse>(payload));
+    }
+
+    const queryParams = {
+      username__contains: params?.username__contains,
+    };
+
+    return requestAllPages<AdminUserResponse>((page) =>
+      request<unknown>(
+        `/v1/admin/users${buildQueryString({ ...queryParams, ...page })}`,
+      ).then((payload) => extractListItems<AdminUserResponse>(payload)),
+    );
+  },
+
+  getAdminUserById: (id: string) =>
+    request<AdminUserResponse>(`/v1/admin/users/${id}`),
+
+  createAdminUser: (data: CreateAdminUserRequest) =>
+    request<IdResponse>("/v1/admin/users", {
+      method: "POST",
+      body: data,
+    }),
+
+  deleteAdminUser: (id: string) =>
+    request<IdResponse>(`/v1/admin/users/${id}`, {
+      method: "DELETE",
+      allowEmptyResponse: true,
+    }),
+
+  resetAdminUserPassword: (id: string, data: ResetAdminPasswordRequest) =>
+    request<IdResponse>(`/v1/admin/users/${id}/password`, {
+      method: "POST",
+      body: data,
+      allowEmptyResponse: true,
+    }),
+
+  listAuditLogsPage: (params: AuditLogQueryParams = {}) =>
+    request<unknown>(`/v1/audit/logs${buildQueryString(params)}`).then(
+      (payload) =>
+        normalizeListResponse<AuditLogItem>(payload, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
+    ),
+
+  getAuditLogById: (id: string) => request<AuditLogItem>(`/v1/audit/logs/${id}`),
 
   listDictionaryTypes: (params?: DictionaryTypeQueryParams) => {
     if (hasExplicitPaginationParams(params)) {

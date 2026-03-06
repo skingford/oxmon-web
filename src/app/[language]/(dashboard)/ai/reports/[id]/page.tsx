@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
@@ -26,10 +26,61 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { JsonTextarea } from "@/components/ui/json-textarea";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Code2, Expand, Loader2, RefreshCw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+function parsePreviewThreshold(
+  envKey: "NEXT_PUBLIC_AI_HTML_PREVIEW_LAZY_THRESHOLD" | "NEXT_PUBLIC_AI_HTML_PREVIEW_MANUAL_THRESHOLD",
+  fallback: number,
+) {
+  const value = process.env[envKey];
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+const HTML_PREVIEW_LAZY_THRESHOLD = parsePreviewThreshold(
+  "NEXT_PUBLIC_AI_HTML_PREVIEW_LAZY_THRESHOLD",
+  180_000,
+);
+const HTML_PREVIEW_MANUAL_THRESHOLD = Math.max(
+  parsePreviewThreshold(
+    "NEXT_PUBLIC_AI_HTML_PREVIEW_MANUAL_THRESHOLD",
+    480_000,
+  ),
+  HTML_PREVIEW_LAZY_THRESHOLD + 1,
+);
+
+function resolvePreviewThresholdFactor() {
+  if (typeof navigator === "undefined") {
+    return 1;
+  }
+
+  const cpuCores = navigator.hardwareConcurrency ?? 8;
+  const memoryGB = (navigator as Navigator & { deviceMemory?: number })
+    .deviceMemory;
+
+  if (cpuCores <= 2 || (typeof memoryGB === "number" && memoryGB <= 2)) {
+    return 2.2;
+  }
+
+  if (cpuCores <= 4 || (typeof memoryGB === "number" && memoryGB <= 4)) {
+    return 1.6;
+  }
+
+  return 1;
+}
 
 function formatJsonText(value?: string | null) {
   if (!value) return "";
@@ -38,6 +89,20 @@ function formatJsonText(value?: string | null) {
   } catch {
     return value;
   }
+}
+
+function buildHtmlPreviewDoc(value?: string | null) {
+  const html = value?.trim();
+
+  if (!html) {
+    return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head><body></body></html>`;
+  }
+
+  if (/<html[\s>]/i.test(html)) {
+    return html;
+  }
+
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><style>html,body{margin:0;padding:0}body{padding:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.6;color:#111827}img,video,iframe{max-width:100%;height:auto}pre{overflow:auto}</style></head><body>${html}</body></html>`;
 }
 
 function MetaItem({
@@ -61,6 +126,40 @@ function MetaItem({
   );
 }
 
+const HtmlPreviewFrame = memo(function HtmlPreviewFrame({
+  title,
+  src,
+  className,
+  loading = "eager",
+  loadingText,
+}: {
+  title: string;
+  src: string;
+  className: string;
+  loading?: "eager" | "lazy";
+  loadingText: string;
+}) {
+  if (!src) {
+    return (
+      <div className={className}>
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          {loadingText}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      title={title}
+      src={src}
+      className={className}
+      sandbox="allow-same-origin"
+      loading={loading}
+    />
+  );
+});
+
 export default function AIReportDetailPage() {
   const { t } = useAppTranslations("ai");
   const locale = useAppLocale();
@@ -68,6 +167,15 @@ export default function AIReportDetailPage() {
   const id = String(params?.id || "");
   const [report, setReport] = useState<AIReportRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [detailTab, setDetailTab] = useState<"analysis" | "html">("analysis");
+  const [htmlTab, setHtmlTab] = useState<"preview" | "source">("preview");
+  const [previewFullscreenOpen, setPreviewFullscreenOpen] = useState(false);
+  const [htmlPreviewUrl, setHtmlPreviewUrl] = useState("");
+  const [htmlPreviewRequested, setHtmlPreviewRequested] = useState(false);
+  const htmlPreviewCacheRef = useRef<{
+    raw: string;
+    url: string;
+  } | null>(null);
   const riskLevel = useMemo(
     () => resolveRiskLevel(report?.risk_level || ""),
     [report?.risk_level],
@@ -77,8 +185,113 @@ export default function AIReportDetailPage() {
     () => formatJsonText(report?.raw_metrics_json),
     [report?.raw_metrics_json],
   );
+  const isDev = process.env.NODE_ENV !== "production";
+  const htmlRawContent = report?.html_content || "";
+  const htmlSource = htmlRawContent.trim();
+  const previewThresholdFactor = useMemo(resolvePreviewThresholdFactor, []);
+  const adaptiveLazyThreshold = Math.round(
+    HTML_PREVIEW_LAZY_THRESHOLD * previewThresholdFactor,
+  );
+  const adaptiveManualThreshold = Math.max(
+    Math.round(HTML_PREVIEW_MANUAL_THRESHOLD * previewThresholdFactor),
+    adaptiveLazyThreshold + 1,
+  );
+  const htmlSize = htmlRawContent.length;
+  const shouldLazyLoadLargePreview = htmlSize > adaptiveLazyThreshold;
+  const shouldManualLoadPreview = htmlSize > adaptiveManualThreshold;
+  const previewMode: "eager" | "idle" | "manual" = shouldManualLoadPreview
+    ? "manual"
+    : shouldLazyLoadLargePreview
+      ? "idle"
+      : "eager";
+  const canRenderHtmlPreview =
+    !shouldLazyLoadLargePreview || htmlPreviewRequested || !shouldManualLoadPreview;
+  const needHtmlPreview =
+    canRenderHtmlPreview &&
+    (previewFullscreenOpen || (detailTab === "html" && htmlTab === "preview"));
 
-  const fetchDetail = async () => {
+  useEffect(() => {
+    setHtmlPreviewRequested(false);
+  }, [report?.id]);
+
+  useEffect(() => {
+    if (
+      !shouldLazyLoadLargePreview ||
+      shouldManualLoadPreview ||
+      htmlPreviewRequested ||
+      detailTab !== "html" ||
+      htmlTab !== "preview"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let idleId: number | null = null;
+    const win = typeof window !== "undefined" ? window : null;
+    const loadPreviewWhenIdle = () => {
+      if (!cancelled) {
+        setHtmlPreviewRequested(true);
+      }
+    };
+
+    if (win && "requestIdleCallback" in win) {
+      idleId = win.requestIdleCallback(loadPreviewWhenIdle, { timeout: 600 });
+    } else {
+      timeoutId = setTimeout(loadPreviewWhenIdle, 180);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId !== null && win && "cancelIdleCallback" in win) {
+        win.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [
+    detailTab,
+    htmlTab,
+    htmlPreviewRequested,
+    shouldLazyLoadLargePreview,
+    shouldManualLoadPreview,
+  ]);
+
+  useEffect(() => {
+    if (!needHtmlPreview) {
+      return;
+    }
+
+    if (htmlPreviewCacheRef.current && htmlPreviewCacheRef.current.raw === htmlRawContent) {
+      setHtmlPreviewUrl(htmlPreviewCacheRef.current.url);
+      return;
+    }
+
+    const htmlPreviewDoc = buildHtmlPreviewDoc(htmlRawContent);
+    const blob = new Blob([htmlPreviewDoc], {
+      type: "text/html;charset=utf-8",
+    });
+    const objectUrl = URL.createObjectURL(blob);
+    if (htmlPreviewCacheRef.current) {
+      URL.revokeObjectURL(htmlPreviewCacheRef.current.url);
+    }
+    htmlPreviewCacheRef.current = {
+      raw: htmlRawContent,
+      url: objectUrl,
+    };
+    setHtmlPreviewUrl(objectUrl);
+  }, [htmlRawContent, needHtmlPreview]);
+
+  useEffect(() => {
+    return () => {
+      if (htmlPreviewCacheRef.current) {
+        URL.revokeObjectURL(htmlPreviewCacheRef.current.url);
+      }
+    };
+  }, []);
+
+  const fetchDetail = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
@@ -89,11 +302,11 @@ export default function AIReportDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, t]);
 
   useEffect(() => {
     void fetchDetail();
-  }, [id]);
+  }, [fetchDetail]);
 
   if (loading && !report) {
     return (
@@ -223,7 +436,11 @@ export default function AIReportDetailPage() {
           <CardTitle>{t("reports.detailSectionAnalysis")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="analysis" className="space-y-4">
+          <Tabs
+            value={detailTab}
+            onValueChange={(value) => setDetailTab(value as "analysis" | "html")}
+            className="space-y-4"
+          >
             <TabsList>
               <TabsTrigger value="analysis">
                 {t("reports.detailSectionAnalysis")}
@@ -242,12 +459,88 @@ export default function AIReportDetailPage() {
             </TabsContent>
 
             <TabsContent value="html">
-              <iframe
-                title={`ai-report-${report.id}`}
-                srcDoc={report.html_content || "<html><body></body></html>"}
-                className="h-[520px] w-full rounded-md border bg-white"
-                sandbox="allow-same-origin"
-              />
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Tabs
+                    value={htmlTab}
+                    onValueChange={(value) => setHtmlTab(value as "preview" | "source")}
+                  >
+                    <TabsList>
+                      <TabsTrigger value="preview">
+                        {t("reports.detailHtmlTabPreview")}
+                      </TabsTrigger>
+                      <TabsTrigger value="source">
+                        <Code2 className="mr-1 h-4 w-4" />
+                        {t("reports.detailHtmlTabSource")}
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (!canRenderHtmlPreview) {
+                        setHtmlPreviewRequested(true);
+                      }
+                      setPreviewFullscreenOpen(true);
+                    }}
+                    disabled={htmlTab !== "preview"}
+                  >
+                    <Expand className="mr-2 h-4 w-4" />
+                    {t("reports.detailHtmlFullscreen")}
+                  </Button>
+                </div>
+                {isDev && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("reports.detailHtmlDebugInfo", {
+                      mode: t(`reports.detailHtmlMode_${previewMode}`),
+                      size: String(htmlSize),
+                      lazyThreshold: String(adaptiveLazyThreshold),
+                      manualThreshold: String(adaptiveManualThreshold),
+                    })}
+                  </p>
+                )}
+
+                {htmlTab === "preview" && !canRenderHtmlPreview ? (
+                  <div className="flex h-[65vh] min-h-[520px] w-full flex-col items-center justify-center gap-4 rounded-md border bg-muted/20 px-6 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      {shouldManualLoadPreview
+                        ? t("reports.detailHtmlLargeHint")
+                        : t("reports.detailHtmlPreloadHint")}
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => setHtmlPreviewRequested(true)}
+                    >
+                      {t("reports.detailHtmlLoadPreview")}
+                    </Button>
+                  </div>
+                ) : htmlTab === "preview" && !previewFullscreenOpen ? (
+                  <HtmlPreviewFrame
+                    title={`ai-report-${report.id}`}
+                    src={htmlPreviewUrl}
+                    className="h-[65vh] min-h-[520px] w-full rounded-md border bg-white"
+                    loading="lazy"
+                    loadingText={t("reports.detailHtmlLoading")}
+                  />
+                ) : htmlTab === "preview" ? (
+                  <div className="flex h-[65vh] min-h-[520px] w-full items-center justify-center rounded-md border bg-muted/20 text-sm text-muted-foreground">
+                    {t("reports.detailHtmlFullscreenHint")}
+                  </div>
+                ) : (
+                  <Textarea
+                    readOnly
+                    value={htmlSource}
+                    className="min-h-[520px] font-mono text-xs"
+                  />
+                )}
+
+                {!htmlSource && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("reports.detailHtmlEmpty")}
+                  </p>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -266,6 +559,34 @@ export default function AIReportDetailPage() {
           />
         </CardContent>
       </Card>
+
+      <Dialog
+        open={previewFullscreenOpen}
+        onOpenChange={setPreviewFullscreenOpen}
+      >
+        <DialogContent
+          className="top-0 left-0 h-screen w-screen max-h-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none"
+          showCloseButton
+        >
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle>{t("reports.detailHtmlFullscreen")}</DialogTitle>
+          </DialogHeader>
+          <div className="h-[calc(100vh-4.5rem)] w-full">
+            {canRenderHtmlPreview ? (
+              <HtmlPreviewFrame
+                title={`ai-report-fullscreen-${report.id}`}
+                src={htmlPreviewUrl}
+                className="h-full w-full border-0 bg-white"
+                loadingText={t("reports.detailHtmlLoading")}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-muted/20 px-6 text-center text-sm text-muted-foreground">
+                {t("reports.detailHtmlLoading")}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

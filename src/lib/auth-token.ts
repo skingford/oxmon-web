@@ -28,6 +28,16 @@ function decodeJwtPayload(token: string) {
   return decodeJwtPayloadRaw(token)
 }
 
+export function getAuthTokenPayload() {
+  const token = getAuthToken()
+
+  if (!token) {
+    return null
+  }
+
+  return decodeJwtPayload(token)
+}
+
 export function normalizeAuthToken(rawToken?: string | null) {
   if (!rawToken) {
     return null

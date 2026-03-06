@@ -2,11 +2,13 @@
 
 import { RefreshCw, X } from "lucide-react"
 import { useAppTranslations } from "@/hooks/use-app-translations"
+import { ALERTS_ALL_SOURCE_VALUE } from "@/components/alerts/constants"
 import { Button } from "@/components/ui/button"
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { SearchableCombobox, type SearchableComboboxOption } from "@/components/ui/searchable-combobox"
 
 type ActiveAlertsTopControlsProps = {
   autoRefresh: boolean
@@ -17,7 +19,10 @@ type ActiveAlertsTopControlsProps = {
 }
 
 type ActiveAlertsListHeaderProps = {
+  sourceId: string
+  sourceOptions: SearchableComboboxOption[]
   searchQuery: string
+  onSourceIdChange: (value: string) => void
   onSearchQueryChange: (value: string) => void
 }
 
@@ -62,8 +67,18 @@ export function ActiveAlertsTopControls({
   )
 }
 
-export function ActiveAlertsListHeader({ searchQuery, onSearchQueryChange }: ActiveAlertsListHeaderProps) {
+export function ActiveAlertsListHeader({
+  sourceId,
+  sourceOptions,
+  searchQuery,
+  onSourceIdChange,
+  onSearchQueryChange,
+}: ActiveAlertsListHeaderProps) {
   const { t } = useAppTranslations("alerts")
+  const sourceSelectOptions: SearchableComboboxOption[] = [
+    { value: ALERTS_ALL_SOURCE_VALUE, label: t("active.filterSourceAll") },
+    ...sourceOptions,
+  ]
 
   return (
     <CardHeader>
@@ -72,13 +87,26 @@ export function ActiveAlertsListHeader({ searchQuery, onSearchQueryChange }: Act
           <CardTitle>{t("active.title")}</CardTitle>
           <CardDescription>{t("active.description")}</CardDescription>
         </div>
-        <div className="w-full md:w-80">
+        <div className="grid w-full gap-3 md:w-[560px] md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="active-alert-source">{t("active.filterSource")}</Label>
+            <SearchableCombobox
+              inputId="active-alert-source"
+              value={sourceId || ALERTS_ALL_SOURCE_VALUE}
+              options={sourceSelectOptions}
+              onValueChange={(value) => onSourceIdChange(value === ALERTS_ALL_SOURCE_VALUE ? "" : value)}
+              placeholder={t("active.filterSourcePlaceholder")}
+              emptyText={t("active.filterSourceEmpty")}
+              inputClassName="h-10"
+            />
+          </div>
           <FilterToolbar
             className="md:grid-cols-1 xl:grid-cols-1"
             search={{
               value: searchQuery,
               onValueChange: onSearchQueryChange,
               placeholder: t("active.searchPlaceholder"),
+              label: t("active.filterKeyword"),
               inputClassName: "h-10",
               trailing: searchQuery ? (
                 <button

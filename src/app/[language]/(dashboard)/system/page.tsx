@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, getApiErrorMessage } from "@/lib/api";
-import { formatDateTimeByLocale } from "@/lib/date-time";
+import { formatFullDateTimeByLocale } from "@/lib/date-time";
 import { clearAuthToken } from "@/lib/auth-token";
 import {
   clearGlobalConfigCache,
@@ -246,17 +246,6 @@ export default function SystemPage() {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     return t("uptimeFormat", { days, hours });
-  };
-
-  const formatDateTime = (value: string) => {
-    return formatDateTimeByLocale(value, locale, "-", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
   };
 
   const formatConfigJsonPreview = (value: unknown) => {
@@ -724,7 +713,7 @@ export default function SystemPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
-                              {formatDateTime(item.updated_at)}
+                              {formatFullDateTimeByLocale(item.updated_at, locale, "-")}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">

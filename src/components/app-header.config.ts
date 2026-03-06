@@ -104,6 +104,14 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "itemSystemDictionaries",
     descriptionKey: "systemDictionariesDescription",
   },
+  "/system/admin-users": {
+    titleKey: "itemAdminUsers",
+    descriptionKey: "adminUsersDescription",
+  },
+  "/system/audit-logs": {
+    titleKey: "itemAuditLogs",
+    descriptionKey: "auditLogsDescription",
+  },
   "/profile": {
     titleKey: "itemProfile",
     descriptionKey: "profileDescription",
@@ -147,6 +155,13 @@ const headerMetaByPrefix: Array<{
     meta: {
       titleKey: "itemAIReports",
       descriptionKey: "aiReportsDescription",
+    },
+  },
+  {
+    prefix: "/system/audit-logs/",
+    meta: {
+      titleKey: "itemAuditLogs",
+      descriptionKey: "auditLogsDescription",
     },
   },
 ];

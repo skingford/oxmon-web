@@ -6,6 +6,7 @@ import { useAlertRulesActions } from "@/hooks/use-alert-rules-actions";
 import { useAlertRulesData } from "@/hooks/use-alert-rules-data";
 import { useAlertRulesDialogState } from "@/hooks/use-alert-rules-dialog-state";
 import { api } from "@/lib/api";
+import { normalizeMetricKey } from "@/lib/metric-name";
 import { AlertRuleDeleteDialog } from "@/components/alerts/AlertRuleDeleteDialog";
 import { AlertRuleFormFields } from "@/components/alerts/AlertRuleFormFields";
 import { AlertRulesPageHeader } from "@/components/alerts/AlertRulesHeader";
@@ -21,10 +22,6 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { toast, toastApiError } from "@/lib/toast";
-
-function normalizeMetricKey(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
 
 export default function AlertRulesPage() {
   const { t } = useAppTranslations("alerts");

@@ -39,6 +39,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
   Table,
   TableBody,
   TableCell,
@@ -46,7 +54,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertCircle, ArrowLeft, Gauge, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
+import { AlertCircle, ArrowLeft, Check, ChevronDown, Gauge, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
 import { toast, toastApiError, toastCopied, toastDeleted, toastSaved } from "@/lib/toast"
 
 const REPORT_LOGS_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -61,6 +69,11 @@ type AgentReportLogsState = {
   limit: number
   offset: number
 }
+
+type ReportLogsCurlCopyMode = "current" | "first" | "agentOnly"
+
+const REPORT_LOGS_CURL_PREF_KEY = "agent-detail:report-logs-curl-pref"
+const REPORT_LOGS_CURL_LAST_COPIED_AT_KEY_PREFIX = "agent-detail:report-logs-curl-last-copied-at:"
 
 function toFiniteNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -521,6 +534,30 @@ function getAgentReportLogMetricCount(log: AgentReportLogItem) {
   return null
 }
 
+function formatRelativeTimeFromNow(timestamp: string, locale: "zh" | "en", nowMs: number) {
+  const targetMs = new Date(timestamp).getTime()
+  if (!Number.isFinite(targetMs)) {
+    return formatDateTimeByLocale(timestamp, locale)
+  }
+
+  const diffSeconds = Math.round((targetMs - nowMs) / 1000)
+  const absSeconds = Math.abs(diffSeconds)
+  const rtf = new Intl.RelativeTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    numeric: "auto",
+  })
+
+  if (absSeconds < 60) {
+    return rtf.format(diffSeconds, "second")
+  }
+  if (absSeconds < 3600) {
+    return rtf.format(Math.round(diffSeconds / 60), "minute")
+  }
+  if (absSeconds < 86400) {
+    return rtf.format(Math.round(diffSeconds / 3600), "hour")
+  }
+  return rtf.format(Math.round(diffSeconds / 86400), "day")
+}
+
 export default function AgentDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -572,10 +609,23 @@ export default function AgentDetailPage() {
     REPORT_LOGS_PAGE_SIZE_OPTIONS[1]
   )
   const [reportLogsOffset, setReportLogsOffset] = useState(0)
+  const [reportLogsCurlLastCopiedAt, setReportLogsCurlLastCopiedAt] = useState<string | null>(null)
+  const [reportLogsCurlNowTick, setReportLogsCurlNowTick] = useState(() => Date.now())
+  const [reportLogsCurlPreference, setReportLogsCurlPreference] = useState<{
+    mode: ReportLogsCurlCopyMode
+    insecure: boolean
+  }>({
+    mode: "current",
+    insecure: false,
+  })
   const [expandedReportLogKeys, setExpandedReportLogKeys] = useState<Record<string, boolean>>({})
   const previousAgentRef = useRef<string | null>(null)
 
   const agentsPath = useMemo(() => withLocalePrefix("/agents", locale), [locale])
+  const reportLogsCurlLastCopiedStorageKey = useMemo(() => {
+    const scopeId = agentRef || resolvedAgentId || "unknown"
+    return `${REPORT_LOGS_CURL_LAST_COPIED_AT_KEY_PREFIX}${scopeId}`
+  }, [agentRef, resolvedAgentId])
 
   useEffect(() => {
     const rawLimit = Number(
@@ -831,6 +881,67 @@ export default function AgentDetailPage() {
   }, [fetchReportLogs])
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    try {
+      const raw = window.localStorage.getItem(REPORT_LOGS_CURL_PREF_KEY)
+      if (!raw) {
+        return
+      }
+
+      const parsed = JSON.parse(raw) as { mode?: unknown; insecure?: unknown }
+      const nextMode: ReportLogsCurlCopyMode =
+        parsed.mode === "current" || parsed.mode === "first" || parsed.mode === "agentOnly"
+          ? parsed.mode
+          : "current"
+      const nextInsecure = typeof parsed.insecure === "boolean" ? parsed.insecure : false
+      setReportLogsCurlPreference({
+        mode: nextMode,
+        insecure: nextInsecure,
+      })
+    } catch {
+      // ignore invalid preference payload
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const stored = window.localStorage.getItem(reportLogsCurlLastCopiedStorageKey)
+    if (!stored) {
+      setReportLogsCurlLastCopiedAt(null)
+      return
+    }
+
+    const parsedAt = new Date(stored).getTime()
+    if (!Number.isFinite(parsedAt)) {
+      setReportLogsCurlLastCopiedAt(null)
+      return
+    }
+
+    setReportLogsCurlLastCopiedAt(new Date(parsedAt).toISOString())
+    setReportLogsCurlNowTick(Date.now())
+  }, [reportLogsCurlLastCopiedStorageKey])
+
+  useEffect(() => {
+    if (!reportLogsCurlLastCopiedAt) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      setReportLogsCurlNowTick(Date.now())
+    }, 60000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [reportLogsCurlLastCopiedAt])
+
+  useEffect(() => {
     if (previousAgentRef.current === null) {
       previousAgentRef.current = agentRef
       return
@@ -964,25 +1075,96 @@ export default function AgentDetailPage() {
     (size: number) => (locale === "zh" ? `${size} / 页` : `${size} / page`),
     [locale]
   )
-  const copyReportLogsCurl = useCallback(async () => {
+  const getReportLogsCurlLabel = useCallback((mode: ReportLogsCurlCopyMode, insecure: boolean) => {
+    if (insecure) {
+      if (mode === "current") {
+        return t("agentDetail.reportLogsCurlCopyCurrentInsecure")
+      }
+      if (mode === "first") {
+        return t("agentDetail.reportLogsCurlCopyFirstPageInsecure")
+      }
+      return t("agentDetail.reportLogsCurlCopyAgentOnlyInsecure")
+    }
+
+    if (mode === "current") {
+      return t("agentDetail.reportLogsCurlCopyCurrent")
+    }
+    if (mode === "first") {
+      return t("agentDetail.reportLogsCurlCopyFirstPage")
+    }
+    return t("agentDetail.reportLogsCurlCopyAgentOnly")
+  }, [t])
+  const getReportLogsCurlParamsText = useCallback((mode: ReportLogsCurlCopyMode) => {
+    if (mode === "agentOnly") {
+      return t("agentDetail.reportLogsCurlPrimaryNoParams")
+    }
+
+    const effectiveOffset = mode === "first" ? 0 : reportLogsOffset
+    return `limit=${reportLogsPageSize}, offset=${effectiveOffset}`
+  }, [reportLogsOffset, reportLogsPageSize, t])
+
+  const copyReportLogsCurl = useCallback(async (
+    mode: ReportLogsCurlCopyMode = "current",
+    insecure = false
+  ) => {
     const id = agentRef || resolvedAgentId
     if (!id) {
       return
     }
 
+    setReportLogsCurlPreference({ mode, insecure })
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        REPORT_LOGS_CURL_PREF_KEY,
+        JSON.stringify({ mode, insecure })
+      )
+    }
+
     try {
+      const query = mode === "agentOnly"
+        ? undefined
+        : new URLSearchParams({
+          limit: String(reportLogsPageSize),
+          offset: mode === "first" ? "0" : String(reportLogsOffset),
+        })
+
       await copyApiCurlCommand({
         path: `/v1/agents/${encodeURIComponent(id)}/report-logs`,
-        query: new URLSearchParams({
-          limit: String(reportLogsPageSize),
-          offset: String(reportLogsOffset),
-        }),
+        query,
+        insecure,
       })
-      toastCopied(t("agentDetail.reportLogsCurlCopied"))
+      const copiedAt = new Date().toISOString()
+      setReportLogsCurlLastCopiedAt(copiedAt)
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(reportLogsCurlLastCopiedStorageKey, copiedAt)
+      }
+      toastCopied(t("agentDetail.reportLogsCurlCopiedWithActionAndParams", {
+        action: getReportLogsCurlLabel(mode, insecure),
+        params: getReportLogsCurlParamsText(mode),
+      }))
     } catch {
       toast.error(t("agentDetail.reportLogsCurlCopyFailed"))
     }
-  }, [agentRef, reportLogsOffset, reportLogsPageSize, resolvedAgentId, t])
+  }, [agentRef, getReportLogsCurlLabel, getReportLogsCurlParamsText, reportLogsCurlLastCopiedStorageKey, reportLogsOffset, reportLogsPageSize, resolvedAgentId, t])
+
+  const reportLogsCurlPrimaryLabel = useMemo(
+    () => getReportLogsCurlLabel(reportLogsCurlPreference.mode, reportLogsCurlPreference.insecure),
+    [getReportLogsCurlLabel, reportLogsCurlPreference.insecure, reportLogsCurlPreference.mode]
+  )
+  const reportLogsCurlPrimaryParamsText = useMemo(
+    () => getReportLogsCurlParamsText(reportLogsCurlPreference.mode),
+    [getReportLogsCurlParamsText, reportLogsCurlPreference.mode]
+  )
+  const reportLogsCurlLastCopiedRelativeText = useMemo(() => {
+    if (!reportLogsCurlLastCopiedAt) {
+      return ""
+    }
+    return formatRelativeTimeFromNow(reportLogsCurlLastCopiedAt, locale, reportLogsCurlNowTick)
+  }, [locale, reportLogsCurlLastCopiedAt, reportLogsCurlNowTick])
+
+  const copyReportLogsCurlByPreference = useCallback(() => {
+    void copyReportLogsCurl(reportLogsCurlPreference.mode, reportLogsCurlPreference.insecure)
+  }, [copyReportLogsCurl, reportLogsCurlPreference.insecure, reportLogsCurlPreference.mode])
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -1109,15 +1291,106 @@ export default function AgentDetailPage() {
                 <CardDescription>{t("agentDetail.reportLogsDescription")}</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={copyReportLogsCurl}
-                  disabled={!agentRef && !resolvedAgentId}
-                >
-                  {t("agentDetail.reportLogsCurlCopyAction")}
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <DropdownMenu>
+                      <TooltipTrigger asChild>
+                        <div className="inline-flex items-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-r-none border-r-0"
+                            onClick={copyReportLogsCurlByPreference}
+                            disabled={!agentRef && !resolvedAgentId}
+                          >
+                            {reportLogsCurlPrimaryLabel}
+                          </Button>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-l-none px-2"
+                              disabled={!agentRef && !resolvedAgentId}
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                        </div>
+                      </TooltipTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => copyReportLogsCurl("current")}
+                          className={reportLogsCurlPreference.mode === "current" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                        >
+                          {reportLogsCurlPreference.mode === "current" && !reportLogsCurlPreference.insecure ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : null}
+                          {t("agentDetail.reportLogsCurlCopyCurrent")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => copyReportLogsCurl("first")}
+                          className={reportLogsCurlPreference.mode === "first" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                        >
+                          {reportLogsCurlPreference.mode === "first" && !reportLogsCurlPreference.insecure ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : null}
+                          {t("agentDetail.reportLogsCurlCopyFirstPage")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => copyReportLogsCurl("agentOnly")}
+                          className={reportLogsCurlPreference.mode === "agentOnly" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                        >
+                          {reportLogsCurlPreference.mode === "agentOnly" && !reportLogsCurlPreference.insecure ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : null}
+                          {t("agentDetail.reportLogsCurlCopyAgentOnly")}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => copyReportLogsCurl("current", true)}
+                          className={reportLogsCurlPreference.mode === "current" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                        >
+                          {reportLogsCurlPreference.mode === "current" && reportLogsCurlPreference.insecure ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : null}
+                          {t("agentDetail.reportLogsCurlCopyCurrentInsecure")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => copyReportLogsCurl("first", true)}
+                          className={reportLogsCurlPreference.mode === "first" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                        >
+                          {reportLogsCurlPreference.mode === "first" && reportLogsCurlPreference.insecure ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : null}
+                          {t("agentDetail.reportLogsCurlCopyFirstPageInsecure")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => copyReportLogsCurl("agentOnly", true)}
+                          className={reportLogsCurlPreference.mode === "agentOnly" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                        >
+                          {reportLogsCurlPreference.mode === "agentOnly" && reportLogsCurlPreference.insecure ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : null}
+                          {t("agentDetail.reportLogsCurlCopyAgentOnlyInsecure")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <TooltipContent side="top">
+                      <div className="space-y-1">
+                        <div>{t("agentDetail.reportLogsCurlPrimaryTooltip", {
+                          action: reportLogsCurlPrimaryLabel,
+                        })}</div>
+                        <div className="text-xs text-background/85">
+                          {t("agentDetail.reportLogsCurlPrimaryTooltipParams", {
+                            params: reportLogsCurlPrimaryParamsText,
+                          })}
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button
                   type="button"
                   variant="outline"
@@ -1129,6 +1402,14 @@ export default function AgentDetailPage() {
                   {t("agentDetail.reportLogsRefreshButton")}
                 </Button>
               </div>
+              {reportLogsCurlLastCopiedAt ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("agentDetail.reportLogsCurlLastCopiedAt", {
+                    time: formatDateTimeByLocale(reportLogsCurlLastCopiedAt, locale),
+                  })}
+                  {` · ${reportLogsCurlLastCopiedRelativeText}`}
+                </p>
+              ) : null}
             </CardHeader>
             <CardContent className="p-0">
               <div className="w-full overflow-x-auto">

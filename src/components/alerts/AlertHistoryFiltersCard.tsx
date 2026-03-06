@@ -1,16 +1,16 @@
 "use client"
 
 import { Filter, X } from "lucide-react"
-import {
-  useAppTranslations,
-  type AppNamespaceTranslator,
-} from "@/hooks/use-app-translations"
+import { useMemo } from "react"
+import { useAppTranslations } from "@/hooks/use-app-translations"
+import { formatDateTimeByLocale } from "@/lib/date-time"
+import { ALERTS_ALL_SOURCE_VALUE } from "@/components/alerts/constants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FilterToolbar } from "@/components/ui/filter-toolbar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SearchableCombobox, type SearchableComboboxOption } from "@/components/ui/searchable-combobox"
 import {
   Select,
   SelectContent,
@@ -18,15 +18,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { getAlertSeverityLabel } from "@/components/alerts/alert-severity-utils"
+import { getAlertHistoryStatusFilterLabel } from "@/components/alerts/alert-status-utils"
+
+function formatFilterDate(value: string, locale: "zh" | "en") {
+  const parsed = new Date(value)
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return formatDateTimeByLocale(parsed.toISOString(), locale, value, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+}
 
 type AlertHistoryFiltersCardProps = {
-  filterAgentId: string
+  filterSourceId: string
   filterSeverity: string
   filterStatus: string
   filterTimeFrom: string
   filterTimeTo: string
+  sourceOptions: SearchableComboboxOption[]
   hasActiveFilters: boolean
-  onFilterAgentIdChange: (value: string) => void
+  onFilterSourceIdChange: (value: string) => void
   onFilterSeverityChange: (value: string) => void
   onFilterStatusChange: (value: string) => void
   onFilterTimeFromChange: (value: string) => void
@@ -35,46 +52,15 @@ type AlertHistoryFiltersCardProps = {
   onResetFilters: () => void
 }
 
-function getStatusText(status: string, t: AppNamespaceTranslator<"alerts">) {
-  if (status === "resolved") {
-    return t("history.statusResolved")
-  }
-
-  if (status === "acknowledged") {
-    return t("history.statusAcknowledged")
-  }
-
-  if (status === "open") {
-    return t("history.statusOpen")
-  }
-
-  return status
-}
-
-function getSeverityText(severity: string, t: AppNamespaceTranslator<"alerts">) {
-  if (severity === "critical") {
-    return t("severity.critical")
-  }
-
-  if (severity === "warning") {
-    return t("severity.warning")
-  }
-
-  if (severity === "info") {
-    return t("severity.info")
-  }
-
-  return severity
-}
-
 export function AlertHistoryFiltersCard({
-  filterAgentId,
+  filterSourceId,
   filterSeverity,
   filterStatus,
   filterTimeFrom,
   filterTimeTo,
+  sourceOptions,
   hasActiveFilters,
-  onFilterAgentIdChange,
+  onFilterSourceIdChange,
   onFilterSeverityChange,
   onFilterStatusChange,
   onFilterTimeFromChange,
@@ -82,7 +68,25 @@ export function AlertHistoryFiltersCard({
   onApplyFilters,
   onResetFilters,
 }: AlertHistoryFiltersCardProps) {
-  const { t } = useAppTranslations("alerts")
+  const { t, locale } = useAppTranslations("alerts")
+  const sourceSelectOptions: SearchableComboboxOption[] = [
+    { value: ALERTS_ALL_SOURCE_VALUE, label: t("history.filterSourceAll") },
+    ...sourceOptions,
+  ]
+  const selectedSourceLabel = useMemo(() => {
+    if (!filterSourceId) {
+      return ""
+    }
+
+    const matched = sourceOptions.find((option) => option.value === filterSourceId)
+    if (!matched) {
+      return filterSourceId
+    }
+
+    return matched.label === filterSourceId
+      ? filterSourceId
+      : `${matched.label} (${filterSourceId})`
+  }, [filterSourceId, sourceOptions])
 
   return (
     <Card className="glass-card">
@@ -105,16 +109,22 @@ export function AlertHistoryFiltersCard({
       </CardHeader>
 
       <CardContent>
-        <FilterToolbar
-          className="gap-4 md:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5"
-          search={{
-            value: filterAgentId,
-            onValueChange: onFilterAgentIdChange,
-            placeholder: t("history.filterAgentPlaceholder"),
-            label: t("history.filterAgent"),
-            inputClassName: "h-10",
-          }}
-        >
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5">
+          <div className="space-y-2">
+            <Label htmlFor="filter-agent">{t("history.filterAgent")}</Label>
+            <SearchableCombobox
+              inputId="filter-agent"
+              value={filterSourceId || ALERTS_ALL_SOURCE_VALUE}
+              options={sourceSelectOptions}
+              onValueChange={(value) =>
+                onFilterSourceIdChange(value === ALERTS_ALL_SOURCE_VALUE ? "" : value)
+              }
+              placeholder={t("history.filterAgentPlaceholder")}
+              emptyText={t("history.filterSourceEmpty")}
+              inputClassName="h-10"
+            />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="filter-severity">{t("history.filterSeverity")}</Label>
             <Select value={filterSeverity} onValueChange={onFilterSeverityChange}>
@@ -166,7 +176,7 @@ export function AlertHistoryFiltersCard({
               className="h-10"
             />
           </div>
-        </FilterToolbar>
+        </div>
 
         <div className="mt-4 flex items-center gap-2">
           <Button onClick={onApplyFilters}>
@@ -181,10 +191,10 @@ export function AlertHistoryFiltersCard({
         {hasActiveFilters ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">{t("history.activeFiltersLabel")}</span>
-            {filterAgentId ? (
+            {filterSourceId ? (
               <Badge variant="secondary" className="gap-1">
-                {t("history.activeFilterAgent", { value: filterAgentId })}
-                <button onClick={() => onFilterAgentIdChange("")} className="ml-1 hover:text-foreground">
+                {t("history.activeFilterAgent", { value: selectedSourceLabel })}
+                <button onClick={() => onFilterSourceIdChange("")} className="ml-1 hover:text-foreground">
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
@@ -192,7 +202,7 @@ export function AlertHistoryFiltersCard({
 
             {filterSeverity && filterSeverity !== "all" ? (
               <Badge variant="secondary" className="gap-1">
-                {t("history.activeFilterSeverity", { value: getSeverityText(filterSeverity, t) })}
+                {t("history.activeFilterSeverity", { value: getAlertSeverityLabel(filterSeverity, t) })}
                 <button onClick={() => onFilterSeverityChange("")} className="ml-1 hover:text-foreground">
                   <X className="h-3 w-3" />
                 </button>
@@ -201,7 +211,7 @@ export function AlertHistoryFiltersCard({
 
             {filterStatus && filterStatus !== "all" ? (
               <Badge variant="secondary" className="gap-1">
-                {t("history.activeFilterStatus", { value: getStatusText(filterStatus, t) })}
+                {t("history.activeFilterStatus", { value: getAlertHistoryStatusFilterLabel(filterStatus, t) })}
                 <button onClick={() => onFilterStatusChange("")} className="ml-1 hover:text-foreground">
                   <X className="h-3 w-3" />
                 </button>
@@ -210,7 +220,9 @@ export function AlertHistoryFiltersCard({
 
             {filterTimeFrom ? (
               <Badge variant="secondary" className="gap-1">
-                {t("history.activeFilterStart", { value: new Date(filterTimeFrom).toLocaleDateString() })}
+                {t("history.activeFilterStart", {
+                  value: formatFilterDate(filterTimeFrom, locale),
+                })}
                 <button onClick={() => onFilterTimeFromChange("")} className="ml-1 hover:text-foreground">
                   <X className="h-3 w-3" />
                 </button>
@@ -219,7 +231,9 @@ export function AlertHistoryFiltersCard({
 
             {filterTimeTo ? (
               <Badge variant="secondary" className="gap-1">
-                {t("history.activeFilterEnd", { value: new Date(filterTimeTo).toLocaleDateString() })}
+                {t("history.activeFilterEnd", {
+                  value: formatFilterDate(filterTimeTo, locale),
+                })}
                 <button onClick={() => onFilterTimeToChange("")} className="ml-1 hover:text-foreground">
                   <X className="h-3 w-3" />
                 </button>

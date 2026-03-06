@@ -260,6 +260,18 @@ export interface SystemConfigQueryParams extends PaginationParams {
   enabled?: boolean;
 }
 
+export interface AdminUserQueryParams extends PaginationParams {
+  username__contains?: string;
+}
+
+export interface AuditLogQueryParams extends PaginationParams {
+  user_id?: string;
+  action?: string;
+  resource_type?: string;
+  start_time?: string;
+  end_time?: string;
+}
+
 export interface CloudAccountQueryParams extends PaginationParams {
   provider?: string;
   enabled?: boolean;
@@ -611,6 +623,36 @@ export interface NotificationLogSummaryQueryParams {
   channel_type?: string;
   start_time?: number;
   end_time?: number;
+}
+
+export interface AdminUserResponse {
+  id: string;
+  username: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAdminUserRequest {
+  username: string;
+  encrypted_password: string;
+}
+
+export interface ResetAdminPasswordRequest {
+  encrypted_new_password: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  user_id?: string | null;
+  username?: string | null;
+  action?: string | null;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  detail?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  created_at: string;
+  [key: string]: unknown;
 }
 
 export interface SetRecipientsRequest {
