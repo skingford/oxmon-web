@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api } from "@/lib/api"
@@ -49,8 +49,10 @@ import { AlertCircle, ArrowLeft, Gauge, Loader2, Pencil, RefreshCw, Trash2 } fro
 import { toast, toastApiError, toastDeleted, toastSaved } from "@/lib/toast"
 
 const REPORT_LOGS_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
-const REPORT_LOGS_LIMIT_QUERY_KEY = "report_limit"
-const REPORT_LOGS_OFFSET_QUERY_KEY = "report_offset"
+const PAGINATION_LIMIT_QUERY_KEY = "limit"
+const PAGINATION_OFFSET_QUERY_KEY = "offset"
+const LEGACY_REPORT_LOGS_LIMIT_QUERY_KEY = "report_limit"
+const LEGACY_REPORT_LOGS_OFFSET_QUERY_KEY = "report_offset"
 
 type AgentReportLogsState = {
   items: AgentReportLogItem[]
@@ -569,21 +571,29 @@ export default function AgentDetailPage() {
     REPORT_LOGS_PAGE_SIZE_OPTIONS[1]
   )
   const [reportLogsOffset, setReportLogsOffset] = useState(0)
+  const [expandedReportLogKeys, setExpandedReportLogKeys] = useState<Record<string, boolean>>({})
   const previousAgentRef = useRef<string | null>(null)
 
   const agentsPath = useMemo(() => withLocalePrefix("/agents", locale), [locale])
 
   useEffect(() => {
     const rawLimit = Number(
-      searchParams.get(REPORT_LOGS_LIMIT_QUERY_KEY) || String(REPORT_LOGS_PAGE_SIZE_OPTIONS[1])
+      searchParams.get(PAGINATION_LIMIT_QUERY_KEY)
+      || searchParams.get(LEGACY_REPORT_LOGS_LIMIT_QUERY_KEY)
+      || String(REPORT_LOGS_PAGE_SIZE_OPTIONS[1])
     )
     const nextPageSize = REPORT_LOGS_PAGE_SIZE_OPTIONS.includes(
       rawLimit as (typeof REPORT_LOGS_PAGE_SIZE_OPTIONS)[number]
     )
       ? (rawLimit as (typeof REPORT_LOGS_PAGE_SIZE_OPTIONS)[number])
       : REPORT_LOGS_PAGE_SIZE_OPTIONS[1]
-    const rawOffset = Number(searchParams.get(REPORT_LOGS_OFFSET_QUERY_KEY) || "0")
-    const nextOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
+    const rawOffset = Number(
+      searchParams.get(PAGINATION_OFFSET_QUERY_KEY)
+      || searchParams.get(LEGACY_REPORT_LOGS_OFFSET_QUERY_KEY)
+      || "0"
+    )
+    const normalizedOffset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0
+    const nextOffset = Math.floor(normalizedOffset / nextPageSize) * nextPageSize
 
     setReportLogsPageSize((prev) => (prev === nextPageSize ? prev : nextPageSize))
     setReportLogsOffset((prev) => (prev === nextOffset ? prev : nextOffset))
@@ -593,16 +603,18 @@ export default function AgentDetailPage() {
     const nextParams = new URLSearchParams(searchParams.toString())
 
     if (reportLogsPageSize !== REPORT_LOGS_PAGE_SIZE_OPTIONS[1]) {
-      nextParams.set(REPORT_LOGS_LIMIT_QUERY_KEY, String(reportLogsPageSize))
+      nextParams.set(PAGINATION_LIMIT_QUERY_KEY, String(reportLogsPageSize))
     } else {
-      nextParams.delete(REPORT_LOGS_LIMIT_QUERY_KEY)
+      nextParams.delete(PAGINATION_LIMIT_QUERY_KEY)
     }
+    nextParams.delete(LEGACY_REPORT_LOGS_LIMIT_QUERY_KEY)
 
     if (reportLogsOffset > 0) {
-      nextParams.set(REPORT_LOGS_OFFSET_QUERY_KEY, String(reportLogsOffset))
+      nextParams.set(PAGINATION_OFFSET_QUERY_KEY, String(reportLogsOffset))
     } else {
-      nextParams.delete(REPORT_LOGS_OFFSET_QUERY_KEY)
+      nextParams.delete(PAGINATION_OFFSET_QUERY_KEY)
     }
+    nextParams.delete(LEGACY_REPORT_LOGS_OFFSET_QUERY_KEY)
 
     const nextQuery = nextParams.toString()
     const currentQuery = searchParams.toString()
@@ -825,6 +837,7 @@ export default function AgentDetailPage() {
 
     if (previousAgentRef.current !== agentRef) {
       setReportLogsOffset(0)
+      setExpandedReportLogKeys({})
       previousAgentRef.current = agentRef
     }
   }, [agentRef])
@@ -1127,25 +1140,58 @@ export default function AgentDetailPage() {
                         const itemKey = typeof log.id === "string" && log.id
                           ? log.id
                           : `${timestamp || "unknown"}-${status || "unknown"}-${index}`
+                        const expanded = Boolean(expandedReportLogKeys[itemKey])
 
                         return (
-                          <TableRow key={itemKey}>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {formatDateTimeByLocale(timestamp, locale)}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">{hostname}</TableCell>
-                            <TableCell className="text-sm">{system}</TableCell>
-                            <TableCell className="text-xs">{resource}</TableCell>
-                            <TableCell className="text-xs">
-                              {metricCount === null ? "-" : metricCount}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{status}</Badge>
-                            </TableCell>
-                            <TableCell className="max-w-[360px]">
-                              <p className="line-clamp-2 break-all text-xs text-muted-foreground">{summary}</p>
-                            </TableCell>
-                          </TableRow>
+                          <Fragment key={itemKey}>
+                            <TableRow>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {formatDateTimeByLocale(timestamp, locale)}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">{hostname}</TableCell>
+                              <TableCell className="text-sm">{system}</TableCell>
+                              <TableCell className="text-xs">{resource}</TableCell>
+                              <TableCell className="text-xs">
+                                {metricCount === null ? "-" : metricCount}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{status}</Badge>
+                              </TableCell>
+                              <TableCell className="max-w-[360px] space-y-2">
+                                <p className="line-clamp-2 break-all text-xs text-muted-foreground">{summary}</p>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() =>
+                                    setExpandedReportLogKeys((prev) => ({
+                                      ...prev,
+                                      [itemKey]: !prev[itemKey],
+                                    }))
+                                  }
+                                >
+                                  {expanded
+                                    ? t("agentDetail.reportLogsActionCollapse")
+                                    : t("agentDetail.reportLogsActionExpand")}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {expanded ? (
+                              <TableRow>
+                                <TableCell colSpan={7}>
+                                  <div className="space-y-2">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                      {t("agentDetail.reportLogsRawTitle")}
+                                    </p>
+                                    <pre className="max-h-64 overflow-auto rounded-md border bg-muted/20 p-3 text-xs">
+                                      {JSON.stringify(log, null, 2)}
+                                    </pre>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : null}
+                          </Fragment>
                         )
                       })
                     )}

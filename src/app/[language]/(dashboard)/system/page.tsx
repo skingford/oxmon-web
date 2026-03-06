@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, getApiErrorMessage } from "@/lib/api";
+import { formatDateTimeByLocale } from "@/lib/date-time";
 import { clearAuthToken } from "@/lib/auth-token";
 import {
   clearGlobalConfigCache,
@@ -248,13 +249,7 @@ export default function SystemPage() {
   };
 
   const formatDateTime = (value: string) => {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return "-";
-    }
-
-    return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+    return formatDateTimeByLocale(value, locale, "-", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

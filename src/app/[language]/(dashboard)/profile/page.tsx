@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getAuthToken, clearAuthToken } from "@/lib/auth-token"
+import { formatDateTimeByLocale } from "@/lib/date-time"
 import { clearGlobalConfigCache } from "@/lib/global-config-cache"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,14 @@ export default function ProfilePage() {
   const [token, setToken] = useState<string | null>(null)
   const [user, setUser] = useState<JwtPayload | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const formatUnixSeconds = (value?: number) => {
+    if (!value) {
+      return "N/A"
+    }
+
+    return formatDateTimeByLocale(new Date(value * 1000).toISOString(), locale, "N/A")
+  }
 
   useEffect(() => {
     const t = getAuthToken()
@@ -147,7 +156,7 @@ export default function ProfilePage() {
                 <Label className="text-sm font-medium">{t("fieldIssuedAt")}</Label>
                 <Input
                   readOnly
-                  value={user?.iat ? new Date(user.iat * 1000).toLocaleString() : "N/A"}
+                  value={formatUnixSeconds(user?.iat)}
                   className="bg-muted font-mono text-sm"
                 />
               </div>
@@ -156,7 +165,7 @@ export default function ProfilePage() {
                 <Label className="text-sm font-medium">{t("fieldExpires")}</Label>
                 <Input
                   readOnly
-                  value={user?.exp ? new Date(user.exp * 1000).toLocaleString() : "N/A"}
+                  value={formatUnixSeconds(user?.exp)}
                   className="bg-muted font-mono text-sm"
                 />
               </div>

@@ -129,30 +129,30 @@ function formatTimestamp(
   locale: "zh" | "en",
   t: AppNamespaceTranslator<"alerts">
 ) {
-  try {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minute = 60 * 1000
-    const hour = 60 * minute
-
-    if (diff < minute) {
-      return t("active.timeJustNow")
-    }
-
-    if (diff < hour) {
-      return t("active.timeMinutesAgo", { count: Math.floor(diff / minute) })
-    }
-
-    return formatDateTimeByLocale(timestamp, locale, timestamp, {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  } catch {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) {
     return timestamp
   }
+
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const minute = 60 * 1000
+  const hour = 60 * minute
+
+  if (diff < minute) {
+    return t("active.timeJustNow")
+  }
+
+  if (diff < hour) {
+    return t("active.timeMinutesAgo", { count: Math.floor(diff / minute) })
+  }
+
+  return formatDateTimeByLocale(timestamp, locale, timestamp, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
 function getSeverityLabel(

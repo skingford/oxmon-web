@@ -155,17 +155,13 @@ function getStatusBadge(alert: AlertEventResponse, t: AppNamespaceTranslator<"al
 }
 
 function formatTimestamp(timestamp: string, locale: "zh" | "en") {
-  try {
-    return formatDateTimeByLocale(timestamp, locale, timestamp, {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  } catch {
-    return timestamp
-  }
+  return formatDateTimeByLocale(timestamp, locale, timestamp, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
 export default function AlertHistoryPage() {
