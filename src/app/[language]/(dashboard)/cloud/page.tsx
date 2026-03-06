@@ -57,12 +57,6 @@ const DEFAULT_FORM_STATE: CloudAccountFormState = {
 
 const CLOUD_PROVIDER_DICT_TYPE = "cloud_provider"
 
-function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  return formatDateTimeByLocale(value, locale, value || "-", {
-    hour12: false,
-  })
-}
-
 function parseDelimitedValues(value: string): string[] {
   return Array.from(
     new Set(
@@ -753,7 +747,10 @@ export default function CloudAccountsPage() {
         onEdit={openEditDialog}
         onDelete={setDeleteTarget}
         getProviderLabel={getProviderLabel}
-        formatDateTime={formatDateTime}
+        formatDateTime={(value, nextLocale) =>
+          formatDateTimeByLocale(value, nextLocale, value || "-", {
+            hour12: false,
+          })}
         texts={{
           title: t("cloud.accounts.tableTitle"),
           description: t("cloud.accounts.tableDescription"),

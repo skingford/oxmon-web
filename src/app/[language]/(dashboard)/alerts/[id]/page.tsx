@@ -9,7 +9,7 @@ import {
   useAppTranslations,
   type AppNamespaceTranslator,
 } from "@/hooks/use-app-translations"
-import { AlertEventResponse } from "@/types/api"
+import { AlertEventResponse, MetricSourceItemResponse } from "@/types/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +17,10 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, CheckCheck, CheckCircle, Loader2 } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
 import { formatDateTimeByLocale } from "@/lib/date-time"
+import {
+  buildMetricNameLabelMap,
+  getMetricDisplayName,
+} from "@/components/pages/metrics/metrics-utils"
 
 function getSeverityBadgeClass(severity: string) {
   const normalized = severity.toLowerCase()
@@ -66,6 +70,28 @@ function formatFullTimestamp(timestamp: string, locale: "zh" | "en") {
     minute: "2-digit",
     second: "2-digit",
   })
+}
+
+function buildSourceDisplayNameMap(items: MetricSourceItemResponse[]) {
+  const map: Record<string, string> = {}
+
+  items.forEach((item) => {
+    const name = item.display_name?.trim()
+    if (!name) {
+      return
+    }
+
+    if (item.id) {
+      map[item.id] = name
+    }
+
+    const cloudInstanceId = item.instance_id?.trim()
+    if (cloudInstanceId) {
+      map[cloudInstanceId] = name
+    }
+  })
+
+  return map
 }
 
 async function findAlertById(id: string) {
@@ -122,6 +148,8 @@ export default function AlertDetailPage() {
   const [loading, setLoading] = useState(true)
   const [actionInProgress, setActionInProgress] = useState<"ack" | "resolve" | null>(null)
   const [alertDetail, setAlertDetail] = useState<AlertEventResponse | null>(null)
+  const [sourceDisplayNameMap, setSourceDisplayNameMap] = useState<Record<string, string>>({})
+  const [metricNameLabelMap, setMetricNameLabelMap] = useState<Record<string, string>>({})
 
   const fetchAlert = useCallback(async () => {
     if (!alertId) {
@@ -145,6 +173,45 @@ export default function AlertDetailPage() {
     fetchAlert()
   }, [fetchAlert])
 
+  useEffect(() => {
+    let active = true
+
+    const fetchDisplayMetadata = async () => {
+      try {
+        const [sources, metricLabelItems] = await Promise.all([
+          api.getMetricSources(),
+          api.listDictionariesByType("metric_name", true),
+        ])
+
+        if (!active) {
+          return
+        }
+
+        setSourceDisplayNameMap(buildSourceDisplayNameMap(sources))
+        setMetricNameLabelMap(
+          buildMetricNameLabelMap(
+            metricLabelItems.map((item) => ({
+              dict_key: item.dict_key || "",
+              dict_label: item.dict_label || "",
+            }))
+          )
+        )
+      } catch {
+        if (!active) {
+          return
+        }
+        setSourceDisplayNameMap({})
+        setMetricNameLabelMap({})
+      }
+    }
+
+    fetchDisplayMetadata()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   const canAcknowledge = useMemo(() => {
     if (!alertDetail) {
       return false
@@ -160,6 +227,22 @@ export default function AlertDetailPage() {
 
     return alertDetail.status !== 3
   }, [alertDetail])
+
+  const sourceName = useMemo(() => {
+    if (!alertDetail) {
+      return "-"
+    }
+
+    return sourceDisplayNameMap[alertDetail.agent_id]?.trim() || alertDetail.agent_id
+  }, [alertDetail, sourceDisplayNameMap])
+
+  const metricDisplayName = useMemo(() => {
+    if (!alertDetail) {
+      return "-"
+    }
+
+    return getMetricDisplayName(alertDetail.metric_name, metricNameLabelMap)
+  }, [alertDetail, metricNameLabelMap])
 
   const handleAcknowledge = async () => {
     if (!alertDetail) {
@@ -275,11 +358,19 @@ export default function AlertDetailPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">{t("active.colAgent")}</p>
-              <p className="font-mono text-sm">{alertDetail.agent_id}</p>
+              <div className="space-y-0.5">
+                <p className="text-sm">{sourceName}</p>
+                {sourceName !== alertDetail.agent_id ? (
+                  <p className="font-mono text-xs text-muted-foreground">{alertDetail.agent_id}</p>
+                ) : null}
+              </div>
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">{t("active.colMetric")}</p>
-              <p className="text-sm">{alertDetail.metric_name}</p>
+              <p className="text-sm">{metricDisplayName}</p>
+              {metricDisplayName !== alertDetail.metric_name ? (
+                <p className="font-mono text-xs text-muted-foreground">{alertDetail.metric_name}</p>
+              ) : null}
             </div>
           </div>
 

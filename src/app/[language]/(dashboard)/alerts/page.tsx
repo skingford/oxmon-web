@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
-import { AlertEventResponse, AlertSummary } from "@/types/api"
+import { AlertEventResponse, AlertSummary, MetricSourceItemResponse } from "@/types/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   useAppTranslations,
@@ -45,6 +45,10 @@ import { toast, toastApiError } from "@/lib/toast"
 import { formatDateTimeByLocale } from "@/lib/date-time"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { motion, AnimatePresence } from "framer-motion"
+import {
+  buildMetricNameLabelMap,
+  getMetricDisplayName,
+} from "@/components/pages/metrics/metrics-utils"
 import {
   AreaChart,
   Area,
@@ -176,6 +180,28 @@ function getSeverityLabel(
   return severity
 }
 
+function buildSourceDisplayNameMap(items: MetricSourceItemResponse[]) {
+  const map: Record<string, string> = {}
+
+  items.forEach((item) => {
+    const name = item.display_name?.trim()
+    if (!name) {
+      return
+    }
+
+    if (item.id) {
+      map[item.id] = name
+    }
+
+    const cloudInstanceId = item.instance_id?.trim()
+    if (cloudInstanceId) {
+      map[cloudInstanceId] = name
+    }
+  })
+
+  return map
+}
+
 export default function ActiveAlertsPage() {
   const router = useRouter()
   const { t, locale } = useAppTranslations("alerts")
@@ -185,6 +211,8 @@ export default function ActiveAlertsPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
+  const [sourceDisplayNameMap, setSourceDisplayNameMap] = useState<Record<string, string>>({})
+  const [metricNameLabelMap, setMetricNameLabelMap] = useState<Record<string, string>>({})
   const [offset, setOffset] = useState(0)
   const limit = 20
 
@@ -228,6 +256,45 @@ export default function ActiveAlertsPage() {
     fetchData()
   }, [fetchData])
 
+  useEffect(() => {
+    let active = true
+
+    const fetchDisplayMetadata = async () => {
+      try {
+        const [sources, metricLabelItems] = await Promise.all([
+          api.getMetricSources(),
+          api.listDictionariesByType("metric_name", true),
+        ])
+
+        if (!active) {
+          return
+        }
+
+        setSourceDisplayNameMap(buildSourceDisplayNameMap(sources))
+        setMetricNameLabelMap(
+          buildMetricNameLabelMap(
+            metricLabelItems.map((item) => ({
+              dict_key: item.dict_key || "",
+              dict_label: item.dict_label || "",
+            }))
+          )
+        )
+      } catch {
+        if (!active) {
+          return
+        }
+        setSourceDisplayNameMap({})
+        setMetricNameLabelMap({})
+      }
+    }
+
+    fetchDisplayMetadata()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   // 自动刷新逻辑
   useEffect(() => {
     if (!autoRefresh) return
@@ -247,10 +314,12 @@ export default function ActiveAlertsPage() {
     return alerts.filter(
       (alert) =>
         alert.agent_id.toLowerCase().includes(query) ||
+        (sourceDisplayNameMap[alert.agent_id] || "").toLowerCase().includes(query) ||
         alert.message.toLowerCase().includes(query) ||
-        alert.metric_name.toLowerCase().includes(query)
+        alert.metric_name.toLowerCase().includes(query) ||
+        getMetricDisplayName(alert.metric_name, metricNameLabelMap).toLowerCase().includes(query)
     )
-  }, [alerts, searchQuery])
+  }, [alerts, metricNameLabelMap, searchQuery, sourceDisplayNameMap])
 
   const handleAcknowledge = async (id: string) => {
     setActionInProgress(id)
@@ -645,6 +714,9 @@ export default function ActiveAlertsPage() {
                       const SeverityIcon = getSeverityIcon(alert.severity)
                       const isActionDisabled = actionInProgress === alert.id || actionInProgress === "bulk"
                       const isSelected = selectedAlerts.has(alert.id)
+                      const sourceName = sourceDisplayNameMap[alert.agent_id]?.trim() || alert.agent_id
+                      const metricLabel = getMetricDisplayName(alert.metric_name, metricNameLabelMap)
+                      const metricSubtitle = metricLabel === alert.metric_name ? "" : alert.metric_name
 
                       return (
                         <motion.tr
@@ -672,9 +744,22 @@ export default function ActiveAlertsPage() {
                               {getSeverityLabel(alert.severity, t)}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{alert.agent_id}</TableCell>
+                          <TableCell>
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-medium">{sourceName}</p>
+                              {sourceName !== alert.agent_id ? (
+                                <p className="font-mono text-[11px] text-muted-foreground">
+                                  {alert.agent_id}
+                                </p>
+                              ) : null}
+                            </div>
+                          </TableCell>
                           <TableCell className="max-w-xs truncate" title={alert.message}>
-                            {alert.message}
+                            <p>{alert.message}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {metricLabel}
+                              {metricSubtitle ? ` (${metricSubtitle})` : ""}
+                            </p>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {formatTimestamp(alert.timestamp, locale, t)}

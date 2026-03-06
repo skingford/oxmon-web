@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api } from "@/lib/api"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
+import { copyApiCurlCommand } from "@/lib/api-curl"
 import { AgentDetail, AgentReportLogItem, LatestMetric } from "@/types/api"
 import { formatDateTimeByLocale } from "@/lib/date-time"
 import { formatMetricValue } from "@/lib/metric-format"
@@ -46,7 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { AlertCircle, ArrowLeft, Gauge, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
-import { toast, toastApiError, toastDeleted, toastSaved } from "@/lib/toast"
+import { toast, toastApiError, toastCopied, toastDeleted, toastSaved } from "@/lib/toast"
 
 const REPORT_LOGS_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const PAGINATION_LIMIT_QUERY_KEY = "limit"
@@ -963,6 +964,25 @@ export default function AgentDetailPage() {
     (size: number) => (locale === "zh" ? `${size} / 页` : `${size} / page`),
     [locale]
   )
+  const copyReportLogsCurl = useCallback(async () => {
+    const id = agentRef || resolvedAgentId
+    if (!id) {
+      return
+    }
+
+    try {
+      await copyApiCurlCommand({
+        path: `/v1/agents/${encodeURIComponent(id)}/report-logs`,
+        query: new URLSearchParams({
+          limit: String(reportLogsPageSize),
+          offset: String(reportLogsOffset),
+        }),
+      })
+      toastCopied(t("agentDetail.reportLogsCurlCopied"))
+    } catch {
+      toast.error(t("agentDetail.reportLogsCurlCopyFailed"))
+    }
+  }, [agentRef, reportLogsOffset, reportLogsPageSize, resolvedAgentId, t])
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -1088,16 +1108,27 @@ export default function AgentDetailPage() {
                 <CardTitle>{t("agentDetail.reportLogsTitle")}</CardTitle>
                 <CardDescription>{t("agentDetail.reportLogsDescription")}</CardDescription>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fetchReportLogs(true)}
-                disabled={reportLogsBusy}
-              >
-                {reportLogsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                {t("agentDetail.reportLogsRefreshButton")}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyReportLogsCurl}
+                  disabled={!agentRef && !resolvedAgentId}
+                >
+                  {t("agentDetail.reportLogsCurlCopyAction")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchReportLogs(true)}
+                  disabled={reportLogsBusy}
+                >
+                  {reportLogsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                  {t("agentDetail.reportLogsRefreshButton")}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="w-full overflow-x-auto">
@@ -1141,6 +1172,7 @@ export default function AgentDetailPage() {
                           ? log.id
                           : `${timestamp || "unknown"}-${status || "unknown"}-${index}`
                         const expanded = Boolean(expandedReportLogKeys[itemKey])
+                        const rawJson = JSON.stringify(log, null, 2)
 
                         return (
                           <Fragment key={itemKey}>
@@ -1181,11 +1213,56 @@ export default function AgentDetailPage() {
                               <TableRow>
                                 <TableCell colSpan={7}>
                                   <div className="space-y-2">
-                                    <p className="text-xs font-medium text-muted-foreground">
-                                      {t("agentDetail.reportLogsRawTitle")}
-                                    </p>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-medium text-muted-foreground">
+                                        {t("agentDetail.reportLogsRawTitle")}
+                                      </p>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 px-2 text-xs"
+                                          onClick={async () => {
+                                            try {
+                                              await navigator.clipboard.writeText(rawJson)
+                                              toastCopied(t("agentDetail.reportLogsRawCopied"))
+                                            } catch {
+                                              toast.error(t("agentDetail.reportLogsRawCopyFailed"))
+                                            }
+                                          }}
+                                        >
+                                          {t("agentDetail.reportLogsRawCopyAction")}
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 px-2 text-xs"
+                                          onClick={() => {
+                                            try {
+                                              const blob = new Blob([rawJson], { type: "application/json;charset=utf-8" })
+                                              const url = URL.createObjectURL(blob)
+                                              const link = document.createElement("a")
+                                              const safeKey = itemKey.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80) || "log"
+                                              link.href = url
+                                              link.download = `agent-report-log-${safeKey}.json`
+                                              document.body.appendChild(link)
+                                              link.click()
+                                              link.remove()
+                                              URL.revokeObjectURL(url)
+                                              toast.success(t("agentDetail.reportLogsRawDownloaded"))
+                                            } catch {
+                                              toast.error(t("agentDetail.reportLogsRawDownloadFailed"))
+                                            }
+                                          }}
+                                        >
+                                          {t("agentDetail.reportLogsRawDownloadAction")}
+                                        </Button>
+                                      </div>
+                                    </div>
                                     <pre className="max-h-64 overflow-auto rounded-md border bg-muted/20 p-3 text-xs">
-                                      {JSON.stringify(log, null, 2)}
+                                      {rawJson}
                                     </pre>
                                   </div>
                                 </TableCell>

@@ -59,17 +59,6 @@ type TokenDialogState = {
 }
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
-function formatTimestamp(timestamp: string | null, locale: "zh" | "en") {
-  return formatDateTimeByLocale(timestamp, locale, "-", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
 function getStatusMeta(
   status: string,
   t: TranslateFn
@@ -580,11 +569,25 @@ export default function WhitelistPage() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {agent.last_seen
-                            ? formatTimestamp(agent.last_seen, locale)
+                            ? formatDateTimeByLocale(agent.last_seen, locale, "-", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })
                             : t("whitelist.lastSeenNA")}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {formatTimestamp(agent.updated_at, locale)}
+                          {formatDateTimeByLocale(agent.updated_at, locale, "-", {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">

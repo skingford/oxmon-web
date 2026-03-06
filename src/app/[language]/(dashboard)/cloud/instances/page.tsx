@@ -65,12 +65,6 @@ function normalizeAICheckJobStatus(value: string | null | undefined) {
   return "unknown"
 }
 
-function formatDateTime(value: string | null | undefined, locale: "zh" | "en") {
-  return formatDateTimeByLocale(value, locale, value || "-", {
-    hour12: false,
-  })
-}
-
 function resolveStatusText(status: CloudInstanceStatusKey, t: ReturnType<typeof useAppTranslations>["t"]) {
   if (status === "running") {
     return t("cloud.instances.statusRunning")
@@ -939,8 +933,8 @@ export default function CloudInstancesPage() {
                             {resolveAICheckJobStatusText(job.status, t)}
                           </Badge>
                         </TableCell>
-                        <TableCell>{formatDateTime(job.started_at, locale)}</TableCell>
-                        <TableCell>{formatDateTime(job.finished_at, locale)}</TableCell>
+                        <TableCell>{formatDateTimeByLocale(job.started_at, locale, job.started_at || "-", { hour12: false })}</TableCell>
+                        <TableCell>{formatDateTimeByLocale(job.finished_at, locale, job.finished_at || "-", { hour12: false })}</TableCell>
                         <TableCell className="max-w-[280px]">
                           {job.report_id
                             ? <span className="font-mono text-xs">{job.report_id}</span>
@@ -1049,7 +1043,10 @@ export default function CloudInstancesPage() {
         description={t("cloud.instances.tableDescription")}
         getStatusLabel={getTableStatusLabel}
         getProviderLabel={getProviderLabel}
-        formatDateTime={formatDateTime}
+        formatDateTime={(value, nextLocale) =>
+          formatDateTimeByLocale(value, nextLocale, value || "-", {
+            hour12: false,
+          })}
         tableTexts={{
           colInstance: t("cloud.instances.tableColInstance"),
           colProvider: t("cloud.instances.tableColProvider"),
