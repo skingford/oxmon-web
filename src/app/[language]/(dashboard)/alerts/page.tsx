@@ -40,7 +40,7 @@ import {
   Loader2,
   X,
 } from "lucide-react"
-import { toast, toastApiError } from "@/lib/toast"
+import { toast } from "@/lib/toast"
 import { formatRecentOrDateTimeByLocale } from "@/lib/date-time"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { motion, AnimatePresence } from "framer-motion"
@@ -180,78 +180,84 @@ export default function ActiveAlertsPage() {
     })
   }, [alerts, metricNameLabelMap, searchQuery, selectedSourceId, sourceDisplayNameMap])
 
-  const handleAcknowledge = async (id: string) => {
-    setActionInProgress(id)
-
-    try {
-      await api.acknowledgeAlert(id)
-      toast.success(t("active.toastAcknowledged"))
-      await fetchData(true)
-      setSelectedAlerts((prev) => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-    } catch (error) {
-      toastApiError(error, t("active.toastAckError"))
-    } finally {
+  const runAlertAction = useCallback(
+    async (
+      progressKey: string,
+      task: () => Promise<void>,
+      errorMessage: string
+    ) => {
+      setActionInProgress(progressKey)
+      const ok = await executeAlertRequest(task, errorMessage)
       setActionInProgress(null)
-    }
+      return ok
+    },
+    []
+  )
+
+  const handleAcknowledge = async (id: string) => {
+    await runAlertAction(
+      id,
+      async () => {
+        await api.acknowledgeAlert(id)
+        toast.success(t("active.toastAcknowledged"))
+        await fetchData(true)
+        setSelectedAlerts((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      },
+      t("active.toastAckError")
+    )
   }
 
   const handleResolve = async (id: string) => {
-    setActionInProgress(id)
-
-    try {
-      await api.resolveAlert(id)
-      toast.success(t("active.toastResolved"))
-      await fetchData(true)
-      setSelectedAlerts((prev) => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-    } catch (error) {
-      toastApiError(error, t("active.toastResolveError"))
-    } finally {
-      setActionInProgress(null)
-    }
+    await runAlertAction(
+      id,
+      async () => {
+        await api.resolveAlert(id)
+        toast.success(t("active.toastResolved"))
+        await fetchData(true)
+        setSelectedAlerts((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      },
+      t("active.toastResolveError")
+    )
   }
 
   const handleBulkAcknowledge = async () => {
     if (selectedAlerts.size === 0) return
 
     const ids = Array.from(selectedAlerts)
-    setActionInProgress("bulk")
-
-    try {
-      await Promise.all(ids.map((id) => api.acknowledgeAlert(id)))
-      toast.success(`${ids.length} ${t("active.toastBulkAcknowledged")}`)
-      await fetchData(true)
-      setSelectedAlerts(new Set())
-    } catch (error) {
-      toastApiError(error, t("active.toastBulkAckError"))
-    } finally {
-      setActionInProgress(null)
-    }
+    await runAlertAction(
+      "bulk",
+      async () => {
+        await Promise.all(ids.map((id) => api.acknowledgeAlert(id)))
+        toast.success(`${ids.length} ${t("active.toastBulkAcknowledged")}`)
+        await fetchData(true)
+        setSelectedAlerts(new Set())
+      },
+      t("active.toastBulkAckError")
+    )
   }
 
   const handleBulkResolve = async () => {
     if (selectedAlerts.size === 0) return
 
     const ids = Array.from(selectedAlerts)
-    setActionInProgress("bulk")
-
-    try {
-      await Promise.all(ids.map((id) => api.resolveAlert(id)))
-      toast.success(`${ids.length} ${t("active.toastBulkResolved")}`)
-      await fetchData(true)
-      setSelectedAlerts(new Set())
-    } catch (error) {
-      toastApiError(error, t("active.toastBulkResolveError"))
-    } finally {
-      setActionInProgress(null)
-    }
+    await runAlertAction(
+      "bulk",
+      async () => {
+        await Promise.all(ids.map((id) => api.resolveAlert(id)))
+        toast.success(`${ids.length} ${t("active.toastBulkResolved")}`)
+        await fetchData(true)
+        setSelectedAlerts(new Set())
+      },
+      t("active.toastBulkResolveError")
+    )
   }
 
   const handleToggleSelect = (id: string) => {
