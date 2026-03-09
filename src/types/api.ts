@@ -628,6 +628,10 @@ export interface NotificationLogSummaryQueryParams {
 export interface AdminUserResponse {
   id: string;
   username: string;
+  status: string;
+  avatar?: string | null;
+  phone?: string | null;
+  email?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -639,6 +643,13 @@ export interface CreateAdminUserRequest {
 
 export interface ResetAdminPasswordRequest {
   encrypted_new_password: string;
+}
+
+export interface UpdateAdminUserRequest {
+  status?: string | null;
+  avatar?: string | null;
+  phone?: string | null;
+  email?: string | null;
 }
 
 export interface AuditLogItem {

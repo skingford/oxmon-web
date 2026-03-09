@@ -10,7 +10,10 @@ import type { AdminUserResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
-import { toast, toastApiError, toastCreated, toastDeleted, toastSaved, toastStatusError } from "@/lib/toast"
+import { toast, toastApiError, toastCreated, toastSaved, toastStatusError } from "@/lib/toast"
+import Link from "next/link"
+import { withLocalePrefix } from "@/components/app-locale"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -65,6 +68,10 @@ function getDefaultResetForm(): ResetPasswordForm {
   }
 }
 
+function resolveUserStatusBadgeVariant(status: string) {
+  return status === "disabled" ? "destructive" as const : "success" as const
+}
+
 export default function SystemAdminUsersPage() {
   const { t, locale } = useAppTranslations("system")
   const [keyword, setKeyword] = useState("")
@@ -78,8 +85,8 @@ export default function SystemAdminUsersPage() {
   const [resetTarget, setResetTarget] = useState<AdminUserResponse | null>(null)
   const [resetSubmitting, setResetSubmitting] = useState(false)
   const [resetForm, setResetForm] = useState<ResetPasswordForm>(getDefaultResetForm)
-  const [deleteTarget, setDeleteTarget] = useState<AdminUserResponse | null>(null)
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  const [toggleStatusTarget, setToggleStatusTarget] = useState<AdminUserResponse | null>(null)
+  const [togglingStatusUserId, setTogglingStatusUserId] = useState<string | null>(null)
   const authPayload = useMemo(() => getAuthTokenPayload(), [])
 
   const fetchUsers = useCallback(async (silent = false) => {
@@ -221,24 +228,27 @@ export default function SystemAdminUsersPage() {
     }
   }
 
-  const handleDeleteUser = async () => {
-    if (!deleteTarget) {
+  const handleToggleUserStatus = async (item: AdminUserResponse) => {
+    const nextStatus = item.status === "disabled" ? "active" : "disabled"
+    setTogglingStatusUserId(item.id)
+    try {
+      await api.updateAdminUser(item.id, { status: nextStatus })
+      toastSaved(nextStatus === "disabled" ? t("adminUsersToastDisableSuccess") : t("adminUsersToastEnableSuccess"))
+      await fetchUsers(true)
+    } catch (error) {
+      toastApiError(error, t("adminUsersToastToggleStatusError"))
+    } finally {
+      setTogglingStatusUserId(null)
+    }
+  }
+
+  const handleConfirmToggleUserStatus = async () => {
+    if (!toggleStatusTarget) {
       return
     }
 
-    setDeleteSubmitting(true)
-    try {
-      await api.deleteAdminUser(deleteTarget.id)
-      toastDeleted(t("adminUsersToastDeleteSuccess"))
-      setDeleteTarget(null)
-      await fetchUsers(true)
-    } catch (error) {
-      toastStatusError(error, t("adminUsersToastDeleteError"), {
-        400: t("adminUsersToastDeleteSelfForbidden"),
-      })
-    } finally {
-      setDeleteSubmitting(false)
-    }
+    await handleToggleUserStatus(toggleStatusTarget)
+    setToggleStatusTarget(null)
   }
 
   return (
@@ -317,6 +327,7 @@ export default function SystemAdminUsersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("adminUsersTableColUsername")}</TableHead>
+                  <TableHead>{t("adminUsersTableColStatus")}</TableHead>
                   <TableHead>{t("adminUsersTableColId")}</TableHead>
                   <TableHead>{t("adminUsersTableColCreatedAt")}</TableHead>
                   <TableHead>{t("adminUsersTableColUpdatedAt")}</TableHead>
@@ -326,13 +337,13 @@ export default function SystemAdminUsersPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       {t("adminUsersTableLoading")}
                     </TableCell>
                   </TableRow>
                 ) : data.items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       {t("adminUsersTableEmpty")}
                     </TableCell>
                   </TableRow>
@@ -347,12 +358,26 @@ export default function SystemAdminUsersPage() {
 
                       return (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.username}</TableCell>
+                          <TableCell className="font-medium">
+                            <Link className="hover:underline" href={withLocalePrefix(`/system/admin-users/${item.id}`, locale)}>
+                              {item.username}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={resolveUserStatusBadgeVariant(item.status)}>
+                              {item.status === "disabled" ? t("adminUsersStatusDisabled") : t("adminUsersStatusActive")}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="font-mono text-xs">{item.id}</TableCell>
                           <TableCell>{formatDateTimeByLocale(item.created_at, locale, item.created_at || "-", { hour12: false })}</TableCell>
                           <TableCell>{formatDateTimeByLocale(item.updated_at, locale, item.updated_at || "-", { hour12: false })}</TableCell>
                           <TableCell>
                             <div className="flex justify-end gap-2">
+                              <Button asChild type="button" variant="outline" size="sm">
+                                <Link href={withLocalePrefix(`/system/admin-users/${item.id}`, locale)}>
+                                  {t("adminUsersActionDetails")}
+                                </Link>
+                              </Button>
                               <Button type="button" variant="outline" size="sm" onClick={() => setResetTarget(item)}>
                                 {t("adminUsersActionResetPassword")}
                               </Button>
@@ -360,11 +385,15 @@ export default function SystemAdminUsersPage() {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setDeleteTarget(item)}
+                                onClick={() => setToggleStatusTarget(item)}
                                 disabled={isCurrentUser}
-                                title={isCurrentUser ? t("adminUsersDeleteSelfHint") : undefined}
+                                title={isCurrentUser ? t("adminUsersToggleSelfHint") : undefined}
                               >
-                                {t("adminUsersActionDelete")}
+                                {togglingStatusUserId === item.id
+                                  ? t("adminUsersActionStatusUpdating")
+                                  : item.status === "disabled"
+                                    ? t("adminUsersActionEnable")
+                                    : t("adminUsersActionDisable")}
                               </Button>
                             </div>
                           </TableCell>
@@ -481,25 +510,30 @@ export default function SystemAdminUsersPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(nextOpen) => {
-        if (!nextOpen && !deleteSubmitting) {
-          setDeleteTarget(null)
-        }
-      }}>
+      <AlertDialog
+        open={Boolean(toggleStatusTarget)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && togglingStatusUserId === null) {
+            setToggleStatusTarget(null)
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("adminUsersDeleteDialogTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("adminUsersToggleStatusDialogTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("adminUsersDeleteDialogDescription", {
-                username: deleteTarget?.username || "-",
-              })}
+              {toggleStatusTarget?.status === "disabled"
+                ? t("adminUsersToggleStatusDialogEnableDescription", { username: toggleStatusTarget?.username || "-" })
+                : t("adminUsersToggleStatusDialogDisableDescription", { username: toggleStatusTarget?.username || "-" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteSubmitting}>{t("adminUsersDialogCancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} disabled={deleteSubmitting}>
-              {deleteSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t("adminUsersDeleteDialogConfirm")}
+            <AlertDialogCancel disabled={togglingStatusUserId !== null}>
+              {t("adminUsersDialogCancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmToggleUserStatus} disabled={togglingStatusUserId !== null}>
+              {togglingStatusUserId !== null ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t("adminUsersToggleStatusDialogConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

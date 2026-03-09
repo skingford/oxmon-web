@@ -164,6 +164,13 @@ const headerMetaByPrefix: Array<{
       descriptionKey: "auditLogsDescription",
     },
   },
+  {
+    prefix: "/system/admin-users/",
+    meta: {
+      titleKey: "itemAdminUsers",
+      descriptionKey: "adminUsersDescription",
+    },
+  },
 ];
 
 function resolveAppHeaderMeta(

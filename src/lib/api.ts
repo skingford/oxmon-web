@@ -66,6 +66,7 @@ import {
   NotificationLogSummaryQueryParams,
   CreateAdminUserRequest,
   ResetAdminPasswordRequest,
+  UpdateAdminUserRequest,
   CreateAlertRuleRequest,
   UpdateAlertRuleRequest,
   DashboardOverview,
@@ -325,6 +326,34 @@ function normalizeListResponse<T>(
     total,
     limit,
     offset,
+  };
+}
+
+function parseStrictAuditLogListResponse(
+  payload: unknown,
+  options: { fallbackLimit?: number; fallbackOffset?: number } = {},
+): ListResponse<AuditLogItem> {
+  const record =
+    payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : null;
+
+  if (!record || !Array.isArray(record.items)) {
+    throw new ApiRequestError("Invalid audit logs list response format");
+  }
+
+  if (typeof record.total !== "number") {
+    throw new ApiRequestError("Invalid audit logs total in response");
+  }
+
+  return {
+    items: record.items as AuditLogItem[],
+    total: record.total,
+    limit: typeof record.limit === "number" ? record.limit : options.fallbackLimit ?? 0,
+    offset:
+      typeof record.offset === "number"
+        ? record.offset
+        : options.fallbackOffset ?? 0,
   };
 }
 
@@ -931,6 +960,12 @@ export const api = {
       body: data,
     }),
 
+  updateAdminUser: (id: string, data: UpdateAdminUserRequest) =>
+    request<AdminUserResponse>(`/v1/admin/users/${id}`, {
+      method: "PUT",
+      body: data,
+    }),
+
   deleteAdminUser: (id: string) =>
     request<IdResponse>(`/v1/admin/users/${id}`, {
       method: "DELETE",
@@ -947,7 +982,7 @@ export const api = {
   listAuditLogsPage: (params: AuditLogQueryParams = {}) =>
     request<unknown>(`/v1/audit/logs${buildQueryString(params)}`).then(
       (payload) =>
-        normalizeListResponse<AuditLogItem>(payload, {
+        parseStrictAuditLogListResponse(payload, {
           fallbackLimit: params.limit ?? 0,
           fallbackOffset: params.offset ?? 0,
         }),
