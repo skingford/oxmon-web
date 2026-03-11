@@ -25,12 +25,16 @@ function finishProgress() {
 
 import {
   AIAccountResponse,
+  AIReportInstanceItem,
+  AIReportInstanceQueryParams,
   AIReportListItem,
   AIReportQueryParams,
   AIReportRow,
   ActiveAlertQueryParams,
   AdminUserQueryParams,
   AdminUserResponse,
+  AuditSecuritySummary,
+  AuditSecurityTimeseries,
   AuditLogItem,
   AuditLogQueryParams,
   AlertEventResponse,
@@ -65,7 +69,11 @@ import {
   NotificationLogQueryParams,
   NotificationLogSummaryQueryParams,
   CreateAdminUserRequest,
+  EmptySuccessResponse,
+  LoginThrottleListResponse,
+  LoginThrottleQueryParams,
   ResetAdminPasswordRequest,
+  UnlockLoginThrottleRequest,
   UpdateAdminUserRequest,
   CreateAlertRuleRequest,
   UpdateAlertRuleRequest,
@@ -81,8 +89,10 @@ import {
   TestConnectionResponse,
   CreateSystemConfigRequest,
   TriggerCollectionResponse,
+  TriggerAIReportResponse,
   TriggerCloudAICheckRequest,
   TriggerCloudAICheckResponse,
+  TriggerSingleInstanceAICheckResponse,
   UpdateAIAccountRequest,
   UpdateCloudAccountRequest,
   UpdateSystemConfigRequest,
@@ -92,6 +102,7 @@ import {
   CertCheckResult,
   CertSummary,
   CertStatusSummary,
+  CertDomainsBackfillResponse,
   CertDomainsSummary,
   CertDomain,
   CreateDomainRequest,
@@ -152,6 +163,7 @@ interface RequestConfig {
   token?: string;
   requiresAuth?: boolean;
   allowEmptyResponse?: boolean;
+  responseType?: "json" | "text";
 }
 
 type PaginationFetchConfig = {
@@ -251,29 +263,24 @@ function toPageFetchConfig(
   };
 }
 
-function extractListItems<T>(payload: unknown): T[] {
-  if (Array.isArray(payload)) {
-    return payload as T[];
+function extractArrayPayload<T>(payload: unknown): T[] {
+  if (!Array.isArray(payload)) {
+    throw new ApiRequestError("Invalid API list response format")
   }
 
-  const record = payload as any;
-  if (!record || typeof record !== "object") {
-    return [];
-  }
+  return payload as T[]
+}
 
-  if (Array.isArray(record.items)) {
-    return record.items;
+function toListResponse<T>(
+  items: T[],
+  options: { fallbackLimit?: number; fallbackOffset?: number } = {},
+): ListResponse<T> {
+  return {
+    items,
+    total: items.length,
+    limit: options.fallbackLimit ?? items.length,
+    offset: options.fallbackOffset ?? 0,
   }
-
-  if (Array.isArray(record.data)) {
-    return record.data;
-  }
-
-  if (Array.isArray(record.data?.items)) {
-    return record.data.items;
-  }
-
-  return [];
 }
 
 type ApiResponseEnvelopeLike = {
@@ -302,31 +309,6 @@ function getEnvelopePayload(payload: unknown): ApiResponseEnvelopeLike | null {
   }
 
   return record as ApiResponseEnvelopeLike;
-}
-
-function normalizeListResponse<T>(
-  payload: unknown,
-  options: { fallbackLimit?: number; fallbackOffset?: number } = {},
-): ListResponse<T> {
-  const record = payload as any;
-  let items: T[] = extractListItems<T>(payload);
-  let total = 0;
-
-  if (Array.isArray(payload)) {
-    total = items.length;
-  } else if (record && typeof record === 'object') {
-    total = record.total ?? record.data?.total ?? record.data?.length ?? items.length;
-  }
-
-  const limit = options.fallbackLimit ?? items.length;
-  const offset = options.fallbackOffset ?? 0;
-
-  return {
-    items,
-    total,
-    limit,
-    offset,
-  };
 }
 
 function parseStrictAuditLogListResponse(
@@ -367,6 +349,7 @@ async function request<T>(
     token,
     requiresAuth = true,
     allowEmptyResponse = false,
+    responseType = "json",
   } = config;
   const headers: Record<string, string> = {};
   headers["ox-app-id"] = getRequiredAppId();
@@ -389,6 +372,7 @@ async function request<T>(
           authToken: authToken || "",
           requiresAuth,
           allowEmptyResponse,
+          responseType,
         })
       : "";
 
@@ -415,7 +399,7 @@ async function request<T>(
     }
 
     if (response.status === 204) {
-      return {} as T;
+      return (responseType === "text" ? "" : {}) as T;
     }
 
     let payload: unknown = null;
@@ -461,6 +445,10 @@ async function request<T>(
           status: response.status,
         },
       );
+    }
+
+    if (responseType === "text") {
+      return responseText as T;
     }
 
     if (payload === null) {
@@ -531,36 +519,29 @@ export const api = {
   ...agentApi,
 
   getActiveAlerts: (params: ActiveAlertQueryParams = {}) =>
-    request<unknown>(`/v1/alerts/active${buildQueryString(params)}`).then(
-      (payload) => normalizeListResponse<AlertEventResponse>(payload, {
-        fallbackLimit: params.limit ?? 0,
-        fallbackOffset: params.offset ?? 0,
-      }),
+    request<AlertEventResponse[]>(`/v1/alerts/active${buildQueryString(params)}`).then(
+      (items) =>
+        toListResponse(items, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
     ),
 
   getAlertHistory: (
     params: PaginationParams & {
-      source_id__eq?: string;
       agent_id__eq?: string;
       severity__eq?: string;
       timestamp__gte?: string;
       timestamp__lte?: string;
     } = {},
-  ) => {
-    const normalizedParams = {
-      ...params,
-      agent_id__eq: params.agent_id__eq || params.source_id__eq,
-    };
-
-    delete (normalizedParams as { source_id__eq?: string }).source_id__eq;
-
-    return request<unknown>(`/v1/alerts/history${buildQueryString(normalizedParams)}`).then(
-      (payload) => normalizeListResponse<AlertEventResponse>(payload, {
-        fallbackLimit: params.limit ?? 0,
-        fallbackOffset: params.offset ?? 0,
-      }),
-    );
-  },
+  ) =>
+    request<AlertEventResponse[]>(`/v1/alerts/history${buildQueryString(params)}`).then(
+      (items) =>
+        toListResponse(items, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
+    ),
 
   getAlertHistoryById: (id: string) =>
     request<AlertEventResponse>(`/v1/alerts/history/${id}`),
@@ -579,9 +560,9 @@ export const api = {
 
   getAlertRules: (params?: AlertRuleQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return request<AlertRuleResponse[]>(
         `/v1/alerts/rules${buildQueryString(params || {})}`,
-      ).then((items) => (Array.isArray(items) ? items : ((items as any).items || (items as any).data || (items as any).data?.items || [])) as AlertRuleResponse[]);
+      )
     }
 
     const queryParams = {
@@ -590,13 +571,13 @@ export const api = {
       metric__contains: params?.metric__contains,
       severity__eq: params?.severity__eq,
       enabled__eq: params?.enabled__eq,
-    };
+    }
 
     return requestAllPages<AlertRuleResponse>((page) =>
-      request<unknown>(
+      request<AlertRuleResponse[]>(
         `/v1/alerts/rules${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as AlertRuleResponse[])
-    );
+      ),
+    )
   },
 
   createAlertRule: (data: CreateAlertRuleRequest) =>
@@ -615,11 +596,12 @@ export const api = {
       is_valid__eq?: boolean;
     } = {},
   ) =>
-    request<unknown>(`/v1/certificates${buildQueryString(params)}`).then(
-      (payload) => normalizeListResponse<CertificateDetails>(payload, {
-        fallbackLimit: params.limit ?? 0,
-        fallbackOffset: params.offset ?? 0,
-      })
+    request<CertificateDetails[]>(`/v1/certificates${buildQueryString(params)}`).then(
+      (items) =>
+        toListResponse(items, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
     ),
 
   getCertificate: (id: string) =>
@@ -627,9 +609,9 @@ export const api = {
 
   listChannels: (params?: NotificationChannelQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return request<ChannelOverview[]>(
         `/v1/notifications/channels${buildQueryString(params || {})}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as ChannelOverview[]);
+      )
     }
 
     const queryParams = {
@@ -637,43 +619,45 @@ export const api = {
       channel_type__eq: params?.channel_type__eq,
       enabled__eq: params?.enabled__eq,
       min_severity__eq: params?.min_severity__eq,
-    };
+    }
 
     return requestAllPages<ChannelOverview>((page) =>
-      request<unknown>(
+      request<ChannelOverview[]>(
         `/v1/notifications/channels${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as ChannelOverview[])
-    );
+      ),
+    )
   },
 
   listChannelsPage: (params: NotificationChannelQueryParams = {}) =>
-    request<unknown>(
+    request<ChannelOverview[]>(
       `/v1/notifications/channels${buildQueryString(params)}`,
-    ).then((payload) => normalizeListResponse<ChannelOverview>(payload, {
-      fallbackLimit: params.limit ?? 0,
-      fallbackOffset: params.offset ?? 0,
-    })),
+    ).then((items) =>
+      toListResponse(items, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
+    ),
 
   getChannelById: (id: string) =>
     request<ChannelOverview>(`/v1/notifications/channels/${id}`),
 
   listCloudAccounts: (params?: CloudAccountQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return request<CloudAccountResponse[]>(
         `/v1/cloud/accounts${buildQueryString(params || {})}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CloudAccountResponse[]);
+      )
     }
 
     const queryParams = {
       provider: params?.provider,
       enabled: params?.enabled,
-    };
+    }
 
     return requestAllPages<CloudAccountResponse>((page) =>
-      request<unknown>(
+      request<CloudAccountResponse[]>(
         `/v1/cloud/accounts${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CloudAccountResponse[])
-    );
+      ),
+    )
   },
 
   getCloudAccountById: (id: string) =>
@@ -715,9 +699,9 @@ export const api = {
 
   listCloudInstances: (params?: CloudInstanceQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return request<CloudInstanceResponse[]>(
         `/v1/cloud/instances${buildQueryString(params || {})}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CloudInstanceResponse[]);
+      )
     }
 
     const queryParams = {
@@ -725,21 +709,22 @@ export const api = {
       region: params?.region,
       status: params?.status,
       search: params?.search,
-    };
+    }
 
     return requestAllPages<CloudInstanceResponse>((page) =>
-      request<unknown>(
+      request<CloudInstanceResponse[]>(
         `/v1/cloud/instances${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CloudInstanceResponse[])
-    );
+      ),
+    )
   },
 
   listCloudInstancesPage: (params: CloudInstanceQueryParams = {}) =>
-    request<unknown>(`/v1/cloud/instances${buildQueryString(params)}`).then(
-      (payload) => normalizeListResponse<CloudInstanceResponse>(payload, {
-        fallbackLimit: params.limit ?? 0,
-        fallbackOffset: params.offset ?? 0,
-      }),
+    request<CloudInstanceResponse[]>(`/v1/cloud/instances${buildQueryString(params)}`).then(
+      (items) =>
+        toListResponse(items, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
     ),
 
   getCloudInstanceDetail: (id: string) =>
@@ -768,7 +753,7 @@ export const api = {
     id: string,
     data: TriggerCloudAICheckRequest = {},
   ) =>
-    request<TriggerCloudAICheckResponse>(`/v1/cloud/instances/${id}/ai-check`, {
+    request<TriggerSingleInstanceAICheckResponse>(`/v1/cloud/instances/${id}/ai-check`, {
       method: "POST",
       body: data,
     }),
@@ -776,10 +761,12 @@ export const api = {
   listCloudAICheckJobsPage: (params: CloudAICheckJobQueryParams = {}) =>
     request<unknown>(
       `/v1/cloud/instances/ai-check/jobs${buildQueryString(params)}`,
-    ).then((payload) => normalizeListResponse<CloudAICheckJobResponse>(payload, {
-      fallbackLimit: params.limit ?? 0,
-      fallbackOffset: params.offset ?? 0,
-    })),
+    ).then((payload) =>
+      toListResponse(extractArrayPayload<CloudAICheckJobResponse>(payload), {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
+    ),
 
   listCloudAICheckJobs: (
     params: CloudAICheckJobQueryParams = {},
@@ -787,7 +774,7 @@ export const api = {
     if (hasExplicitPaginationParams(params)) {
       return request<unknown>(
         `/v1/cloud/instances/ai-check/jobs${buildQueryString(params)}`,
-      ).then((payload) => extractListItems<CloudAICheckJobResponse>(payload))
+      ).then((payload) => extractArrayPayload<CloudAICheckJobResponse>(payload))
     }
 
     const queryParams = {
@@ -798,7 +785,7 @@ export const api = {
     return requestAllPages<CloudAICheckJobResponse>((page) =>
       request<unknown>(
         `/v1/cloud/instances/ai-check/jobs${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => extractListItems<CloudAICheckJobResponse>(payload))
+      ).then((payload) => extractArrayPayload<CloudAICheckJobResponse>(payload))
     )
   },
 
@@ -812,21 +799,21 @@ export const api = {
     } = {},
   ) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return request<AIAccountResponse[]>(
         `/v1/ai/accounts${buildQueryString(params || {})}`,
-      ).then((payload) => extractListItems<AIAccountResponse>(payload));
+      )
     }
 
     const queryParams = {
       provider: params?.provider,
       enabled: params?.enabled,
-    };
+    }
 
     return requestAllPages<AIAccountResponse>((page) =>
-      request<unknown>(
+      request<AIAccountResponse[]>(
         `/v1/ai/accounts${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => extractListItems<AIAccountResponse>(payload))
-    );
+      ),
+    )
   },
 
   getAIAccountById: (id: string) =>
@@ -845,24 +832,23 @@ export const api = {
     }),
 
   deleteAIAccount: (id: string) =>
-    request<IdResponse>(`/v1/ai/accounts/${id}`, {
+    request<EmptySuccessResponse>(`/v1/ai/accounts/${id}`, {
       method: "DELETE",
       allowEmptyResponse: true,
     }),
 
   listAIReportsPage: (params: AIReportQueryParams = {}) =>
-    request<unknown>(`/v1/ai/reports${buildQueryString(params)}`).then(
-      (payload) => normalizeListResponse<AIReportListItem>(payload, {
-        fallbackLimit: params.limit ?? 0,
-        fallbackOffset: params.offset ?? 0,
-      }),
+    request<AIReportListItem[]>(`/v1/ai/reports${buildQueryString(params)}`).then(
+      (items) =>
+        toListResponse(items, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
     ),
 
   listAIReports: (params: AIReportQueryParams = {}) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(`/v1/ai/reports${buildQueryString(params)}`).then(
-        (payload) => extractListItems<AIReportListItem>(payload),
-      )
+      return request<AIReportListItem[]>(`/v1/ai/reports${buildQueryString(params)}`)
     }
 
     const queryParams = {
@@ -871,42 +857,94 @@ export const api = {
     }
 
     return requestAllPages<AIReportListItem>((page) =>
-      request<unknown>(`/v1/ai/reports${buildQueryString({ ...queryParams, ...page })}`).then(
-        (payload) => extractListItems<AIReportListItem>(payload),
+      request<AIReportListItem[]>(`/v1/ai/reports${buildQueryString({ ...queryParams, ...page })}`),
+    )
+  },
+
+  triggerAIReport: (id: string) =>
+    request<TriggerAIReportResponse>(`/v1/ai/accounts/${id}/trigger`, {
+      method: "POST",
+    }),
+
+  getAIReportById: (id: string, excludeContent?: boolean) =>
+    request<AIReportRow>(
+      `/v1/ai/reports/${id}${buildQueryString(
+        excludeContent === undefined ? {} : { exclude_content: excludeContent },
+      )}`,
+    ),
+
+  listAIReportInstancesPage: (
+    id: string,
+    params: AIReportInstanceQueryParams = {},
+  ) =>
+    request<AIReportInstanceItem[]>(
+      `/v1/ai/reports/${id}/instances${buildQueryString(params)}`,
+    ).then((items) =>
+      toListResponse(items, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
+    ),
+
+  listAIReportInstances: (
+    id: string,
+    params: AIReportInstanceQueryParams = {},
+  ) => {
+    if (hasExplicitPaginationParams(params)) {
+      return request<AIReportInstanceItem[]>(
+        `/v1/ai/reports/${id}/instances${buildQueryString(params)}`,
+      )
+    }
+
+    const queryParams = {
+      risk_level: params.risk_level,
+    }
+
+    return requestAllPages<AIReportInstanceItem>((page) =>
+      request<AIReportInstanceItem[]>(
+        `/v1/ai/reports/${id}/instances${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
   },
 
-  getAIReportById: (id: string) => request<AIReportRow>(`/v1/ai/reports/${id}`),
+  getAIReportView: (id: string) =>
+    request<string>(`/v1/ai/reports/${id}/view`, {
+      responseType: "text",
+    }),
 
   getSystemConfig: () => request<RuntimeConfig>("/v1/system/config"),
 
   getStorageInfo: () => request<StorageInfo>("/v1/system/storage"),
 
   triggerCleanup: () =>
-    request("/v1/system/storage/cleanup", {
+    request<EmptySuccessResponse>("/v1/system/storage/cleanup", {
       method: "POST",
       allowEmptyResponse: true,
     }),
 
+  backfillCertDomains: (params: { dry_run?: boolean; preview_limit?: number } = {}) =>
+    request<CertDomainsBackfillResponse>(
+      `/v1/system/certs/backfill-domains${buildQueryString(params)}`,
+    ),
+
   listSystemConfigs: (params?: SystemConfigQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return request<SystemConfigResponse[]>(
         `/v1/system/configs${buildQueryString(params || {})}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as SystemConfigResponse[]);
+      )
     }
 
     const queryParams = {
       config_type: params?.config_type,
       config_key: params?.config_key,
       enabled: params?.enabled,
-    };
+    }
 
     return requestAllPages<SystemConfigResponse>((page) =>
-      request<unknown>(
+      request<SystemConfigResponse[]>(
         `/v1/system/configs${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as SystemConfigResponse[])
-    );
+      ),
+    )
   },
 
   getSystemConfigById: (id: string) =>
@@ -925,9 +963,9 @@ export const api = {
     request<IdResponse>(`/v1/system/configs/${id}`, { method: "DELETE" }),
 
   listAdminUsersPage: (params: AdminUserQueryParams = {}) =>
-    request<unknown>(`/v1/admin/users${buildQueryString(params)}`).then(
-      (payload) =>
-        normalizeListResponse<AdminUserResponse>(payload, {
+    request<AdminUserResponse[]>(`/v1/admin/users${buildQueryString(params)}`).then(
+      (items) =>
+        toListResponse(items, {
           fallbackLimit: params.limit ?? 0,
           fallbackOffset: params.offset ?? 0,
         }),
@@ -935,27 +973,27 @@ export const api = {
 
   listAdminUsers: (params?: AdminUserQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return request<AdminUserResponse[]>(
         `/v1/admin/users${buildQueryString(params || {})}`,
-      ).then((payload) => extractListItems<AdminUserResponse>(payload));
+      )
     }
 
     const queryParams = {
       username__contains: params?.username__contains,
-    };
+    }
 
     return requestAllPages<AdminUserResponse>((page) =>
-      request<unknown>(
+      request<AdminUserResponse[]>(
         `/v1/admin/users${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => extractListItems<AdminUserResponse>(payload)),
-    );
+      ),
+    )
   },
 
   getAdminUserById: (id: string) =>
     request<AdminUserResponse>(`/v1/admin/users/${id}`),
 
   createAdminUser: (data: CreateAdminUserRequest) =>
-    request<IdResponse>("/v1/admin/users", {
+    request<EmptySuccessResponse>("/v1/admin/users", {
       method: "POST",
       body: data,
     }),
@@ -967,16 +1005,27 @@ export const api = {
     }),
 
   deleteAdminUser: (id: string) =>
-    request<IdResponse>(`/v1/admin/users/${id}`, {
+    request<EmptySuccessResponse>(`/v1/admin/users/${id}`, {
       method: "DELETE",
       allowEmptyResponse: true,
     }),
 
   resetAdminUserPassword: (id: string, data: ResetAdminPasswordRequest) =>
-    request<IdResponse>(`/v1/admin/users/${id}/password`, {
+    request<EmptySuccessResponse>(`/v1/admin/users/${id}/password`, {
       method: "POST",
       body: data,
       allowEmptyResponse: true,
+    }),
+
+  listLoginThrottles: (params: LoginThrottleQueryParams = {}) =>
+    request<LoginThrottleListResponse>(
+      `/v1/admin/users/login-throttles${buildQueryString(params)}`,
+    ).then((payload) => payload),
+
+  unlockLoginThrottle: (data: UnlockLoginThrottleRequest) =>
+    request<EmptySuccessResponse>("/v1/admin/users/unlock-login-throttle", {
+      method: "POST",
+      body: data,
     }),
 
   listAuditLogsPage: (params: AuditLogQueryParams = {}) =>
@@ -990,22 +1039,32 @@ export const api = {
 
   getAuditLogById: (id: string) => request<AuditLogItem>(`/v1/audit/logs/${id}`),
 
+  getAuditSecuritySummary: (params: { hours?: number } = {}) =>
+    request<AuditSecuritySummary>(
+      `/v1/audit/logs/security-summary${buildQueryString(params)}`,
+    ),
+
+  getAuditSecurityTimeseries: (params: { hours?: number } = {}) =>
+    request<AuditSecurityTimeseries>(
+      `/v1/audit/logs/security-summary/timeseries${buildQueryString(params)}`,
+    ),
+
   listDictionaryTypes: (params?: DictionaryTypeQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return request<DictionaryTypeSummary[]>(
         `/v1/dictionaries/types${buildQueryString(params || {})}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as DictionaryTypeSummary[]);
+      )
     }
 
     const queryParams = {
       dict_type__contains: params?.dict_type__contains,
-    };
+    }
 
     return requestAllPages<DictionaryTypeSummary>((page) =>
-      request<unknown>(
+      request<DictionaryTypeSummary[]>(
         `/v1/dictionaries/types${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as DictionaryTypeSummary[])
-    );
+      ),
+    )
   },
 
   createDictionaryType: (data: CreateDictionaryTypeRequest) =>
@@ -1045,7 +1104,7 @@ export const api = {
     }
 
     const requestDictionaryPage = (page: Required<PaginationFetchConfig>) =>
-      request<unknown>(
+      request<DictionaryItem[]>(
         `/v1/dictionaries/types/all${buildQueryString({
           dict_type__in: normalizedDictTypes,
           enabled_only: enabledOnly,
@@ -1053,7 +1112,7 @@ export const api = {
           label__contains: filters?.label__contains,
           ...page,
         })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as DictionaryItem[]);
+      )
 
     if (params) {
       return requestDictionaryPage({
@@ -1080,8 +1139,14 @@ export const api = {
   deleteDictionary: (id: string) =>
     request<IdResponse>(`/v1/dictionaries/${id}`, { method: "DELETE" }),
 
+  logout: () =>
+    request<EmptySuccessResponse>("/v1/auth/logout", {
+      method: "POST",
+      allowEmptyResponse: true,
+    }),
+
   changePassword: (data: ChangePasswordRequest) =>
-    request("/v1/auth/password", {
+    request<EmptySuccessResponse>("/v1/auth/password", {
       method: "POST",
       body: data,
       allowEmptyResponse: true,
@@ -1091,9 +1156,7 @@ export const api = {
     request<CertificateChainInfo>(`/v1/certificates/${id}/chain`),
 
   checkAllDomains: () =>
-    request<unknown>("/v1/certs/check", { method: "POST" }).then(
-      (payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CertCheckResult[],
-    ),
+    request<CertCheckResult[]>("/v1/certs/check", { method: "POST" }),
 
   listDomains: (
     params: PaginationParams & {
@@ -1101,11 +1164,12 @@ export const api = {
       domain__contains?: string;
     } = {},
   ) =>
-    request<unknown>(`/v1/certs/domains${buildQueryString(params)}`).then(
-      (payload) => normalizeListResponse<CertDomain>(payload, {
-        fallbackLimit: params.limit ?? 0,
-        fallbackOffset: params.offset ?? 0,
-      }),
+    request<CertDomain[]>(`/v1/certs/domains${buildQueryString(params)}`).then(
+      (items) =>
+        toListResponse(items, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
     ),
 
   getCertDomainsSummary: () =>
@@ -1115,10 +1179,10 @@ export const api = {
     request<IdResponse>("/v1/certs/domains", { method: "POST", body: data }),
 
   createDomainsBatch: (data: BatchCreateDomainsRequest) =>
-    request<unknown>("/v1/certs/domains/batch", {
+    request<IdResponse[]>("/v1/certs/domains/batch", {
       method: "POST",
       body: data,
-    }).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as IdResponse[]),
+    }),
 
   getDomain: (id: string) => request<CertDomain>(`/v1/certs/domains/${id}`),
 
@@ -1137,16 +1201,17 @@ export const api = {
     }),
 
   getCertCheckHistory: (id: string, params: PaginationParams = {}) =>
-    request<unknown>(
+    request<CertCheckResult[]>(
       `/v1/certs/domains/${id}/history${buildQueryString(params)}`,
-    ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as CertCheckResult[]),
+    ),
 
   getCertStatusAll: (params: CertStatusQueryParams = {}) =>
-    request<unknown>(`/v1/certs/status${buildQueryString(params)}`).then(
-      (payload) => normalizeListResponse<CertCheckResult>(payload, {
-        fallbackLimit: params.limit ?? 0,
-        fallbackOffset: params.offset ?? 0,
-      }),
+    request<CertCheckResult[]>(`/v1/certs/status${buildQueryString(params)}`).then(
+      (items) =>
+        toListResponse(items, {
+          fallbackLimit: params.limit ?? 0,
+          fallbackOffset: params.offset ?? 0,
+        }),
     ),
 
   getCertStatusSummary: (
@@ -1161,6 +1226,12 @@ export const api = {
 
   getCertSummary: () => request<CertSummary>("/v1/certs/summary"),
 
+  testCertReport: () =>
+    request<EmptySuccessResponse>("/v1/notifications/test-cert-report", {
+      method: "POST",
+      allowEmptyResponse: true,
+    }),
+
   queryAllMetrics: (
     params: PaginationParams & {
       agent_id__eq?: string;
@@ -1169,19 +1240,17 @@ export const api = {
       timestamp__lte?: string;
     } = {},
   ) =>
-    request<unknown>(`/v1/metrics${buildQueryString(params)}`).then(
-      (payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as MetricDataPointResponse[],
-    ),
+    request<MetricDataPointResponse[]>(`/v1/metrics${buildQueryString(params)}`),
 
   getMetricAgents: (params?: MetricCatalogQueryParams) => {
     const requestMetricAgentPage = (page: Required<PaginationFetchConfig>) =>
-      request<unknown>(
+      request<string[]>(
         `/v1/metrics/agents${buildQueryString({
           timestamp__gte: params?.timestamp__gte,
           timestamp__lte: params?.timestamp__lte,
           ...page,
         })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as string[]);
+      )
 
     if (hasExplicitPaginationParams(params)) {
       return requestMetricAgentPage(toPageFetchConfig(params));
@@ -1194,7 +1263,7 @@ export const api = {
 
   getMetricSources: (params?: MetricSourceQueryParams) => {
     const requestMetricSourcePage = (page: Required<PaginationFetchConfig>) =>
-      request<unknown>(
+      request<MetricSourceItemResponse[]>(
         `/v1/metrics/sources${buildQueryString({
           timestamp__gte: params?.timestamp__gte,
           timestamp__lte: params?.timestamp__lte,
@@ -1205,7 +1274,7 @@ export const api = {
           status__eq: params?.status__eq,
           ...page,
         })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as MetricSourceItemResponse[]);
+      )
 
     if (hasExplicitPaginationParams(params)) {
       return requestMetricSourcePage(toPageFetchConfig(params));
@@ -1226,13 +1295,13 @@ export const api = {
 
   getMetricNames: (params?: MetricCatalogQueryParams) => {
     const requestMetricNamePage = (page: Required<PaginationFetchConfig>) =>
-      request<unknown>(
+      request<string[]>(
         `/v1/metrics/names${buildQueryString({
           timestamp__gte: params?.timestamp__gte,
           timestamp__lte: params?.timestamp__lte,
           ...page,
         })}`,
-      ).then((payload) => (Array.isArray(payload) ? payload : ((payload as any).items || (payload as any).data || (payload as any).data?.items || [])) as string[]);
+      )
 
     if (hasExplicitPaginationParams(params)) {
       return requestMetricNamePage(toPageFetchConfig(params));
@@ -1292,15 +1361,15 @@ export const api = {
     }),
 
   testChannel: (id: string) =>
-    request(`/v1/notifications/channels/${id}/test`, {
+    request<EmptySuccessResponse>(`/v1/notifications/channels/${id}/test`, {
       method: "POST",
       allowEmptyResponse: true,
     }),
 
   listSilenceWindows: (params: SilenceWindowQueryParams = {}) =>
-    request<unknown>(
+    request<SilenceWindow[]>(
       `/v1/notifications/silence-windows${buildQueryString(params)}`,
-    ).then((items) => (Array.isArray(items) ? items : ((items as any).items || (items as any).data || (items as any).data?.items || [])) as SilenceWindow[]),
+    ),
 
   getNotificationLogs: (params: NotificationLogQueryParams = {}) =>
     request<NotificationLogListResponse>(

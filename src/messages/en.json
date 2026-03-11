@@ -1463,7 +1463,7 @@
         "detailToastFetchError": "Failed to load cloud instance details",
         "detailToastCopyApiCurlSuccess": "Copied curl command",
         "detailToastCopyApiCurlError": "Failed to copy curl command",
-        "detailToastTriggerAICheckSuccess": "Instance AI check triggered, job ID: {jobId}",
+        "detailToastTriggerAICheckSuccess": "Instance AI check triggered, report ID: {reportId}",
         "detailToastTriggerAICheckError": "Failed to trigger instance AI check",
         "detailToastFetchAICheckJobsError": "Failed to load instance AI check jobs",
         "detailAICheckJobsTitle": "Instance AI Check Jobs",

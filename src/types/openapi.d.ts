@@ -4,6 +4,121 @@
  */
 
 export interface paths {
+    "/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取管理员用户列表。
+         *     鉴权：需要 Bearer Token。
+         */
+        get: operations["list_admin_users"];
+        put?: never;
+        /**
+         * 创建管理员用户。
+         *     鉴权：需要 Bearer Token。
+         */
+        post: operations["create_admin_user"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/login-throttles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取当前登录锁定列表。
+         *     鉴权：需要 Bearer Token。
+         */
+        get: operations["list_login_throttles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/unlock-login-throttle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 手动清除某个账号的登录失败锁定。
+         *     鉴权：需要 Bearer Token。
+         */
+        post: operations["unlock_login_throttle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取单个管理员用户详情。
+         *     鉴权：需要 Bearer Token。
+         */
+        get: operations["get_admin_user"];
+        /**
+         * 更新管理员用户信息（status / avatar / phone / email）。
+         *     鉴权：需要 Bearer Token。
+         */
+        put: operations["update_admin_user"];
+        post?: never;
+        /**
+         * 删除管理员用户。
+         *     鉴权：需要 Bearer Token。
+         *     不允许删除当前登录用户自身。
+         */
+        delete: operations["delete_admin_user"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 重置指定管理员用户密码。
+         *     鉴权：需要 Bearer Token。
+         *     密码使用 RSA-OAEP(SHA-256) 加密后以 Base64 传输。
+         *     重置后该用户所有 JWT 立即失效，需重新登录。
+         */
+        post: operations["reset_admin_user_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/agents": {
         parameters: {
             query?: never;
@@ -144,6 +259,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/agents/{id}/report-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取指定 Agent 的上报日志（分页）。
+         *     鉴权：需要 Bearer Token。
+         */
+        get: operations["agent_report_logs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ai/accounts": {
         parameters: {
             query?: never;
@@ -181,6 +316,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ai/accounts/{id}/trigger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["trigger_ai_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ai/reports": {
         parameters: {
             query?: never;
@@ -207,6 +358,26 @@ export interface paths {
         };
         /** 获取 AI 报告详情 (JSON) */
         get: operations["get_ai_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai/reports/{id}/instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分页获取报告中的实例指标列表
+         * @description 从报告的 raw_metrics_json 中解析实例数据并分页返回，支持按风险等级过滤。
+         */
+        get: operations["list_report_instances"];
         put?: never;
         post?: never;
         delete?: never;
@@ -397,6 +568,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/audit/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取审计日志列表（分页） */
+        get: operations["list_audit_logs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/logs/security-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取登录安全审计概览。 */
+        get: operations["get_audit_security_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/logs/security-summary/timeseries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取登录安全趋势（按小时聚合）。 */
+        get: operations["get_audit_security_timeseries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/logs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 按 ID 获取单条审计日志 */
+        get: operations["get_audit_log"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/login": {
         parameters: {
             query?: never;
@@ -412,6 +651,26 @@ export interface paths {
          *     密码需使用 RSA-OAEP(SHA-256) 加密后以 Base64 传输。
          */
         post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 当前登录用户登出。
+         *     鉴权：需要 Bearer Token。
+         */
+        post: operations["logout"];
         delete?: never;
         options?: never;
         head?: never;
@@ -845,6 +1104,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cloud/instances/ai-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 手动触发所有云实例 AI 检测（异步）
+         * @description 立即返回任务 ID，AI 分析在后台执行以避免请求超时。
+         *     同类型任务正在运行时返回 409，不重复触发。
+         *     通过 `GET /v1/cloud/instances/ai-check/jobs/{id}` 查询任务状态。
+         */
+        post: operations["trigger_all_cloud_instances_ai_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cloud/instances/ai-check/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询 AI 检测任务列表
+         * @description 返回后台 AI 检测任务列表，可按状态和类型过滤。
+         */
+        get: operations["list_ai_check_jobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cloud/instances/ai-check/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询单个 AI 检测任务详情 */
+        get: operations["get_ai_check_job"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cloud/instances/chart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取所有云实例最新指标图表数据（X 轴 = 实例，Y 轴 = 指标值）
+         * @description 返回并行数组格式，适合直接传入 ECharts / Chart.js 等图表库渲染柱状图或雷达图。
+         *     每个实例取最近 2 天内的最新一条数据点。
+         */
+        get: operations["getCloudInstancesChart"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cloud/instances/{id}": {
         parameters: {
             query?: never;
@@ -854,6 +1193,43 @@ export interface paths {
         };
         /** 获取云实例详情（含最新指标数据） */
         get: operations["get_cloud_instance_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cloud/instances/{id}/ai-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 手动触发单个云实例 AI 检测
+         * @description 仅分析指定云实例，生成专项报告并通过通知渠道推送。
+         */
+        post: operations["trigger_single_instance_ai_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cloud/instances/{id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取云实例历史指标时间序列（用于折线图等可视化） */
+        get: operations["getCloudInstanceMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1269,7 +1645,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 获取运行时配置（敏感字段已脱敏）。
+         * 获取运行时配置。
          *     鉴权：需要 Bearer Token。
          */
         get: operations["get_system_config"];
@@ -1365,14 +1741,56 @@ export interface components {
         AIAccountResponse: {
             id: string;
             config_key: string;
-            provider?: string | null;
+            provider: string;
             display_name: string;
             description?: string | null;
+            api_key: string;
+            model?: string | null;
+            base_url?: string | null;
+            api_mode?: string | null;
+            /** Format: int32 */
+            timeout_secs?: number | null;
+            /** Format: int32 */
+            max_tokens?: number | null;
+            /** Format: float */
+            temperature?: number | null;
+            /** Format: int32 */
+            collection_interval_secs?: number | null;
             enabled: boolean;
-            /** @description 敏感字段已脱敏的配置 JSON */
-            config_json: unknown;
             created_at: string;
             updated_at: string;
+        };
+        /** @description AI 检测任务详情 */
+        AICheckJobResponse: {
+            id: string;
+            /** @description 任务类型："cloud_all" | "cloud_instance:{db_id}" */
+            job_type: string;
+            /** @description 任务状态："running" | "succeeded" | "failed" */
+            status: string;
+            ai_account_id: string;
+            /** @description 成功后的报告 ID */
+            report_id?: string | null;
+            /** @description 失败时的错误信息 */
+            error_message?: string | null;
+            started_at: string;
+            finished_at?: string | null;
+            created_at: string;
+        };
+        /** @description 报告实例分页条目 */
+        AIReportInstanceItem: {
+            agent_id: string;
+            instance_name?: string | null;
+            agent_type: string;
+            /** Format: double */
+            cpu_usage?: number | null;
+            /** Format: double */
+            memory_usage?: number | null;
+            /** Format: double */
+            disk_usage?: number | null;
+            /** @description 风险等级：high / medium / low / normal */
+            risk_level: string;
+            /** Format: int64 */
+            timestamp: number;
         };
         AIReportListItem: {
             id: string;
@@ -1431,12 +1849,62 @@ export interface components {
              */
             created_at: string;
         };
+        /** @description 管理员用户信息（对外暴露，屏蔽敏感字段） */
+        AdminUserResponse: {
+            /** @description 唯一标识 */
+            id: string;
+            /** @description 登录用户名 */
+            username: string;
+            /** @description 账号状态：active / disabled */
+            status: string;
+            /** @description 头像 URL */
+            avatar?: string | null;
+            /** @description 手机号 */
+            phone?: string | null;
+            /** @description 邮箱 */
+            email?: string | null;
+            /**
+             * Format: date-time
+             * @description 创建时间
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description 更新时间
+             */
+            updated_at: string;
+        };
         /** @description Agent 详细信息 */
         AgentDetail: {
             /** @description 数据库 ID */
             id: string;
             /** @description Agent 唯一标识 */
             agent_id: string;
+            /** @description 主机名（实例显示名称） */
+            hostname?: string | null;
+            /** @description 操作系统类型 */
+            os?: string | null;
+            /** @description 操作系统版本 */
+            os_version?: string | null;
+            /** @description CPU 架构 */
+            arch?: string | null;
+            /** @description 内核版本 */
+            kernel_version?: string | null;
+            /**
+             * Format: int32
+             * @description CPU 核心数
+             */
+            cpu_cores?: number | null;
+            /**
+             * Format: double
+             * @description 内存大小（GB）
+             */
+            memory_gb?: number | null;
+            /**
+             * Format: double
+             * @description 磁盘大小（GB）
+             */
+            disk_gb?: number | null;
             /**
              * Format: date-time
              * @description 首次上报时间
@@ -1471,12 +1939,61 @@ export interface components {
             /** @description 白名单条目 ID（如果在白名单中） */
             whitelist_id?: string | null;
         };
+        /** @description Agent 上报日志条目 */
+        AgentReportLogResponse: {
+            /** @description 记录 ID */
+            id: string;
+            /** @description Agent 唯一标识 */
+            agent_id: string;
+            /**
+             * Format: int32
+             * @description 本次上报的指标点数量
+             */
+            metric_count: number;
+            /** @description 主机名 */
+            hostname?: string | null;
+            /** @description 操作系统类型 */
+            os?: string | null;
+            /** @description 操作系统版本 */
+            os_version?: string | null;
+            /** @description CPU 架构 */
+            arch?: string | null;
+            /** @description 内核版本 */
+            kernel_version?: string | null;
+            /**
+             * Format: int32
+             * @description CPU 核心数
+             */
+            cpu_cores?: number | null;
+            /**
+             * Format: double
+             * @description 内存大小（GB）
+             */
+            memory_gb?: number | null;
+            /**
+             * Format: double
+             * @description 磁盘大小（GB）
+             */
+            disk_gb?: number | null;
+            /**
+             * Format: date-time
+             * @description 上报时间（来自 MetricBatch 时间戳）
+             */
+            reported_at: string;
+            /**
+             * Format: date-time
+             * @description 记录创建时间
+             */
+            created_at: string;
+        };
         /** @description Agent 信息 */
         AgentResponse: {
             /** @description 白名单条目 ID（仅白名单 agent 有值） */
             id?: string | null;
             /** @description Agent 唯一标识 */
             agent_id: string;
+            /** @description 主机名（实例显示名称） */
+            hostname?: string | null;
             /**
              * Format: date-time
              * @description 最后上报时间
@@ -1615,6 +2132,43 @@ export interface components {
             /** @description 链路追踪 ID（默认空字符串） */
             trace_id: string;
         };
+        AuditSecuritySummary: {
+            /** Format: int64 */
+            hours: number;
+            window_start: string;
+            /** Format: int64 */
+            login_success_count: number;
+            /** Format: int64 */
+            login_failed_count: number;
+            /** Format: int64 */
+            lock_triggered_count: number;
+            /** Format: int64 */
+            unique_failed_ips: number;
+            /** Format: int64 */
+            unique_failed_usernames: number;
+            top_failed_ips: components["schemas"]["AuditSecurityTopItem"][];
+            top_failed_usernames: components["schemas"]["AuditSecurityTopItem"][];
+        };
+        AuditSecurityTimeseries: {
+            /** Format: int64 */
+            hours: number;
+            window_start: string;
+            points: components["schemas"]["AuditSecurityTimeseriesPoint"][];
+        };
+        AuditSecurityTimeseriesPoint: {
+            hour: string;
+            /** Format: int64 */
+            login_success_count: number;
+            /** Format: int64 */
+            login_failed_count: number;
+            /** Format: int64 */
+            lock_triggered_count: number;
+        };
+        AuditSecurityTopItem: {
+            key: string;
+            /** Format: int64 */
+            count: number;
+        };
         /**
          * @description 批量导入云账户请求
          *
@@ -1631,7 +2185,7 @@ export interface components {
             text: string;
             /**
              * Format: int64
-             * @description 采集间隔（秒，默认 300）
+             * @description 采集间隔（秒，默认 3600）
              */
             collection_interval_secs?: number | null;
         };
@@ -1913,6 +2467,44 @@ export interface components {
             created_at: string;
             updated_at: string;
         };
+        /** @description 图表中单个实例的元信息（与 labels / series 数组下标一一对应） */
+        CloudInstanceChartMeta: {
+            /**
+             * @description 系统雪花ID（cloud_instances 表主键）
+             * @example 1234567890123456789
+             */
+            id: string;
+            /**
+             * @description 云厂商实例 ID（如 ins-abc123 / i-abc123456）
+             * @example ins-abc123
+             */
+            instance_id: string;
+            /**
+             * @description 实例显示名称
+             * @example web-server-01
+             */
+            instance_name?: string | null;
+            /**
+             * @description 云供应商（tencent / alibaba）
+             * @example tencent
+             */
+            provider: string;
+            /**
+             * @description 地域
+             * @example ap-shanghai
+             */
+            region: string;
+            /**
+             * @description 云厂商原始状态（如 RUNNING / Stopped）
+             * @example RUNNING
+             */
+            status?: string | null;
+            /**
+             * @description 归一化状态（running / stopped / pending / error / unknown）
+             * @example running
+             */
+            normalized_status: string;
+        };
         /** @description 云实例详情响应（包含实时指标） */
         CloudInstanceDetailResponse: {
             /** @description 数据库主键 */
@@ -1937,6 +2529,13 @@ export interface components {
             normalized_status: string;
             /** @description 实例状态（Running / Stopped 等） */
             status?: string | null;
+            /** @description 实例状态最近一次同步时间（来自云实例元数据同步） */
+            status_synced_at: string;
+            /**
+             * Format: int64
+             * @description 实例状态同步距今秒数（用于前端显示“同步延迟”）
+             */
+            status_sync_age_secs: number;
             /** @description 实例规格（如 S5.LARGE8） */
             instance_type?: string | null;
             /**
@@ -2029,6 +2628,33 @@ export interface components {
             /** @description 实例信息最后更新时间 */
             updated_at: string;
         };
+        /** @description 云实例历史指标响应 */
+        CloudInstanceMetricsResponse: {
+            /**
+             * @description 云厂商实例 ID（如 ins-abc123 / i-abc123456）
+             * @example ins-abc123
+             */
+            instance_id: string;
+            /**
+             * @description 实例显示名称
+             * @example web-server-01
+             */
+            instance_name?: string | null;
+            /**
+             * @description 时间序列数据，key 为完整指标名，value 为按时间升序排列的数据点数组。
+             *
+             *     常用 key：
+             *     - `cloud.cpu.usage` — CPU 使用率（%）
+             *     - `cloud.memory.usage` — 内存使用率（%）
+             *     - `cloud.disk.usage` — 磁盘使用率（%）
+             *     - `cloud.network.in_bytes` — 入流量（字节/秒）
+             *     - `cloud.network.out_bytes` — 出流量（字节/秒）
+             *     - `cloud.disk.iops_read` — 磁盘读 IOPS
+             *     - `cloud.disk.iops_write` — 磁盘写 IOPS
+             *     - `cloud.connections` — TCP 连接数
+             */
+            series: Record<string, never>;
+        };
         /** @description 云实例响应 */
         CloudInstanceResponse: {
             /**
@@ -2051,6 +2677,13 @@ export interface components {
             /** @description 原始云厂商状态归一化后的状态（running/pending/stopped/error/unknown） */
             normalized_status: string;
             status?: string | null;
+            /** @description 实例状态最近一次同步时间（来自云实例元数据同步） */
+            status_synced_at: string;
+            /**
+             * Format: int64
+             * @description 实例状态同步距今秒数（用于前端显示“同步延迟”）
+             */
+            status_sync_age_secs: number;
             last_seen_at: string;
             created_at: string;
             updated_at: string;
@@ -2120,6 +2753,33 @@ export interface components {
             /** @description 自动续费标识 */
             auto_renew_flag?: string | null;
         };
+        /**
+         * @description 所有实例最新指标图表响应
+         *
+         *     采用并行数组格式，`labels[i]`、`instances[i]`、`series[metric][i]` 三者下标对应同一台实例，
+         *     可直接传入 ECharts / Chart.js 等图表库使用。
+         */
+        CloudInstancesChartResponse: {
+            /**
+             * @description X 轴标签列表，优先使用实例名，无名称时使用实例 ID
+             * @example [
+             *       "web-server-01",
+             *       "db-primary",
+             *       "cache-01"
+             *     ]
+             */
+            labels: string[];
+            /** @description 实例元信息列表，与 labels 下标一一对应 */
+            instances: components["schemas"]["CloudInstanceChartMeta"][];
+            /**
+             * @description 各指标 Y 轴数据：完整指标名 → 各实例最新值数组。
+             *
+             *     - 数组长度与 `labels` 相同
+             *     - `null` 表示该实例在最近 2 天内没有该指标数据
+             *     - 常用 key：`cloud.cpu.usage` / `cloud.memory.usage` / `cloud.disk.usage`
+             */
+            series: Record<string, never>;
+        };
         CloudSummary: {
             /**
              * Format: int64
@@ -2167,8 +2827,34 @@ export interface components {
             provider: string;
             display_name: string;
             description?: string | null;
+            api_key: string;
+            model?: string | null;
+            base_url?: string | null;
+            api_mode?: string | null;
+            /** Format: int32 */
+            timeout_secs?: number | null;
+            /** Format: int32 */
+            max_tokens?: number | null;
+            /** Format: float */
+            temperature?: number | null;
+            /** Format: int32 */
+            collection_interval_secs?: number | null;
             enabled: boolean;
-            config: unknown;
+        };
+        /** @description 创建管理员用户请求 */
+        CreateAdminUserRequest: {
+            /** @description 登录用户名（必填，唯一） */
+            username: string;
+            /** @description RSA-OAEP 加密后的密码（Base64 编码，必填） */
+            encrypted_password: string;
+            /** @description 账号状态：active / disabled（默认 active） */
+            status?: string | null;
+            /** @description 头像 URL */
+            avatar?: string | null;
+            /** @description 手机号 */
+            phone?: string | null;
+            /** @description 邮箱 */
+            email?: string | null;
         };
         CreateAlertRuleRequest: {
             name: string;
@@ -2193,7 +2879,7 @@ export interface components {
         CreateCloudAccountRequest: {
             /** @description 配置标识（唯一，如 cloud_tencent_prod） */
             config_key: string;
-            /** @description 云供应商（tencent 或 alibaba） */
+            /** @description 云供应商（tencent / alibaba / sangfor） */
             provider: string;
             /** @description 显示名称 */
             display_name: string;
@@ -2201,15 +2887,17 @@ export interface components {
             description?: string | null;
             /** @description 云账号名称（如"主账号"、"子账号1"） */
             account_name: string;
-            /** @description API 密钥 ID（腾讯云 SecretId, 阿里云 AccessKeyId） */
+            /** @description API 密钥 ID（腾讯云 SecretId, 阿里云 AccessKeyId, 深信服 AK） */
             secret_id: string;
-            /** @description API 密钥 Secret（腾讯云 SecretKey, 阿里云 AccessKeySecret） */
+            /** @description API 密钥 Secret（腾讯云 SecretKey, 阿里云 AccessKeySecret, 深信服 SK） */
             secret_key: string;
-            /** @description 地域列表（如 ["ap-shanghai", "ap-guangzhou"]） */
+            /** @description 地域列表（公有云如 ["ap-shanghai"]；深信服 SCP 填资源池 ID 或留空查全部） */
             regions: string[];
+            /** @description 私有云访问地址（深信服 SCP 必填，如 "192.168.1.100" 或 "scp.example.com"） */
+            endpoint?: string | null;
             /**
              * Format: int64
-             * @description 采集间隔（秒，默认 300）
+             * @description 采集间隔（秒，默认 3600）
              */
             collection_interval_secs?: number | null;
         };
@@ -2366,6 +3054,34 @@ export interface components {
              */
             count: number;
         };
+        /**
+         * @example {
+         *       "data": null,
+         *       "err_code": 0,
+         *       "err_msg": "success",
+         *       "trace_id": "0195abcde1234567890"
+         *     }
+         */
+        EmptySuccessResponse: {
+            /**
+             * Format: int32
+             * @description 错误码（成功时为 0）
+             * @example 0
+             */
+            err_code: number;
+            /**
+             * @description 错误信息（成功时为 success 或具体成功提示）
+             * @example success
+             */
+            err_msg: string;
+            /**
+             * @description 链路追踪 ID（默认空字符串）
+             * @example 0195abcde1234567890
+             */
+            trace_id: string;
+            /** @description 空业务数据 */
+            data?: Record<string, never> | null;
+        };
         EnableRequest: {
             enabled: boolean;
         };
@@ -2407,6 +3123,18 @@ export interface components {
              */
             timestamp: string;
         };
+        LoginLockoutInfo: {
+            locked_until: string;
+            /** Format: int64 */
+            retry_after_seconds: number;
+        };
+        LoginLockoutResponse: {
+            /** Format: int32 */
+            err_code: number;
+            err_msg: string;
+            trace_id: string;
+            data: components["schemas"]["LoginLockoutInfo"];
+        };
         /** @description 登录请求 */
         LoginRequest: {
             /** @description 登录用户名（必填） */
@@ -2423,6 +3151,30 @@ export interface components {
              * @description Token 有效期（秒）
              */
             expires_in: number;
+        };
+        LoginThrottleItem: {
+            id: string;
+            username: string;
+            ip_address: string;
+            /** Format: int32 */
+            failure_count: number;
+            last_failed_at: string;
+            locked_until?: string | null;
+            updated_at: string;
+        };
+        LoginThrottleListData: {
+            items: components["schemas"]["LoginThrottleItem"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        LoginThrottleListResponse: {
+            /** Format: int32 */
+            err_code: number;
+            err_msg: string;
+            trace_id: string;
+            data: components["schemas"]["LoginThrottleListData"];
         };
         /** @description 指标数据点（完整） */
         MetricDataPointResponse: {
@@ -2546,7 +3298,12 @@ export interface components {
             /** @description 新生成的认证 token */
             token: string;
         };
-        /** @description 脱敏的运行时配置 */
+        /** @description 重置管理员密码请求 */
+        ResetAdminPasswordRequest: {
+            /** @description RSA-OAEP 加密后的新密码（Base64 编码，必填） */
+            encrypted_new_password: string;
+        };
+        /** @description 运行时配置 */
         RuntimeConfig: {
             /** Format: int32 */
             grpc_port: number;
@@ -2600,17 +3357,82 @@ export interface components {
             message: string;
             instance_count?: number | null;
         };
+        /** @description 手动触发 AI 报告生成 */
+        TriggerAIReportResponse: {
+            report_id: string;
+            message: string;
+        };
+        /** @description 手动触发 AI 检测请求体（所有字段可选，可传空 JSON `{}`） */
+        TriggerCloudAICheckRequest: {
+            /** @description AI 账号 ID（不传则使用第一个启用的账号） */
+            ai_account_id?: string | null;
+        };
+        /** @description 触发所有云实例 AI 检测响应（异步，立即返回 job_id） */
+        TriggerCloudAICheckResponse: {
+            /** @description 后台任务 ID，可通过 GET /v1/cloud/instances/ai-check/jobs/{id} 查询状态 */
+            job_id: string;
+            /** @description 提示信息 */
+            message: string;
+        };
         /** @description 触发采集响应 */
         TriggerCollectionResponse: {
             success: boolean;
             message: string;
             collected_count?: number | null;
         };
+        /** @description 触发单个云实例 AI 检测响应（同步，直接返回 report_id） */
+        TriggerSingleInstanceAICheckResponse: {
+            /** @description 生成的报告 ID */
+            report_id: string;
+            /** @description 提示信息 */
+            message: string;
+        };
+        /**
+         * @description 手动清除登录失败锁定请求
+         * @example {
+         *       "ip_address": "198.51.100.10",
+         *       "username": "admin"
+         *     }
+         */
+        UnlockLoginThrottleRequest: {
+            /**
+             * @description 用户名（必填）
+             * @example admin
+             */
+            username: string;
+            /**
+             * @description 指定 IP；为空时清除该用户名下所有 IP 的锁定记录
+             * @example 198.51.100.10
+             */
+            ip_address?: string | null;
+        };
         UpdateAIAccountRequest: {
             display_name?: string | null;
             description?: string | null;
+            api_key?: string | null;
+            model?: string | null;
+            base_url?: string | null;
+            api_mode?: string | null;
+            /** Format: int32 */
+            timeout_secs?: number | null;
+            /** Format: int32 */
+            max_tokens?: number | null;
+            /** Format: float */
+            temperature?: number | null;
+            /** Format: int32 */
+            collection_interval_secs?: number | null;
             enabled?: boolean | null;
-            config?: unknown;
+        };
+        /** @description 更新管理员用户信息请求（所有字段均可选，仅更新传入的字段） */
+        UpdateAdminUserRequest: {
+            /** @description 账号状态：active / disabled */
+            status?: string | null;
+            /** @description 头像 URL */
+            avatar?: string | null;
+            /** @description 手机号 */
+            phone?: string | null;
+            /** @description 邮箱 */
+            email?: string | null;
         };
         /** @description 更新 Agent 白名单请求 */
         UpdateAgentRequest: {
@@ -2652,6 +3474,8 @@ export interface components {
             secret_key?: string | null;
             /** @description 地域列表（传入则完整替换） */
             regions?: string[] | null;
+            /** @description 私有云访问地址（传入则更新） */
+            endpoint?: string | null;
             /** Format: int64 */
             collection_interval_secs?: number | null;
             enabled?: boolean | null;
@@ -2739,6 +3563,381 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_admin_users: {
+        parameters: {
+            query?: {
+                /** @description 用户名包含匹配（可选） */
+                username__contains?: string;
+                /** @description 每页条数（默认 20） */
+                limit?: number;
+                /** @description 偏移量（默认 0） */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 用户列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"][];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    create_admin_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminUserRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建成功，返回用户 ID */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 请求参数错误 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 用户名已存在 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    list_login_throttles: {
+        parameters: {
+            query?: {
+                /** @description 用户名精确匹配（可选） */
+                username?: string;
+                /** @description IP 精确匹配（可选） */
+                ip_address?: string;
+                /** @description 是否仅返回当前仍被锁定的记录（默认 true） */
+                locked_only?: boolean;
+                /** @description 每页条数（默认 20） */
+                limit?: number;
+                /** @description 偏移量（默认 0） */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 登录锁定列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginThrottleListResponse"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    unlock_login_throttle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnlockLoginThrottleRequest"];
+            };
+        };
+        responses: {
+            /** @description 解锁成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptySuccessResponse"];
+                };
+            };
+            /** @description 请求参数错误 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 服务器内部错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_admin_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 用户 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 用户详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 用户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    update_admin_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 用户 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminUserRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description 请求参数错误 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 用户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    delete_admin_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 用户 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptySuccessResponse"];
+                };
+            };
+            /** @description 不能删除自身 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 用户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    reset_admin_user_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 用户 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetAdminPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description 密码重置成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptySuccessResponse"];
+                };
+            };
+            /** @description 请求参数错误 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 用户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     list_agents: {
         parameters: {
             query?: {
@@ -3235,6 +4434,52 @@ export interface operations {
             };
         };
     };
+    agent_report_logs: {
+        parameters: {
+            query?: {
+                /** @description 每页条数（默认 20） */
+                limit?: number;
+                /** @description 偏移量（默认 0） */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Agent ID（agent.id） */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agent 上报日志列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentReportLogResponse"][];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Agent 不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     list_ai_accounts: {
         parameters: {
             query?: {
@@ -3380,6 +4625,43 @@ export interface operations {
             };
         };
     };
+    trigger_ai_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AI 账号 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description AI 报告触发成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerAIReportResponse"];
+                };
+            };
+            /** @description AI 账号未启用 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description AI 账号不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_ai_reports: {
         parameters: {
             query?: {
@@ -3411,7 +4693,10 @@ export interface operations {
     };
     get_ai_report: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 是否排除 html_content 和 raw_metrics_json 大字段（默认 false） */
+                exclude_content?: boolean;
+            };
             header?: never;
             path: {
                 /** @description 报告 ID */
@@ -3428,6 +4713,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AIReportRow"];
+                };
+            };
+            /** @description 报告不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_report_instances: {
+        parameters: {
+            query?: {
+                /** @description 按风险等级过滤：high / medium / low / normal（可选） */
+                risk_level?: string;
+                /** @description 每页记录数（默认 20，最大 1000） */
+                limit?: number;
+                /** @description 偏移量（默认 0） */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description 报告 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 实例列表（分页） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIReportInstanceItem"][];
                 };
             };
             /** @description 报告不存在 */
@@ -3949,6 +5271,149 @@ export interface operations {
             };
         };
     };
+    list_audit_logs: {
+        parameters: {
+            query?: {
+                /** @description 过滤用户 ID */
+                user_id?: string;
+                /** @description 用户名包含匹配（可选） */
+                username__contains?: string;
+                /** @description 过滤操作动作（如 LOGIN / LOGIN_FAILED / LOGOUT / CREATE / UPDATE / DELETE） */
+                action?: string;
+                /** @description 过滤资源类型 */
+                resource_type?: string;
+                /** @description 过滤客户端 IP（精确匹配） */
+                ip_address?: string;
+                /** @description 请求路径包含匹配（可选） */
+                path__contains?: string;
+                /** @description 过滤 HTTP 状态码（可选） */
+                status_code?: number;
+                /** @description 开始时间（ISO 8601，如 2026-01-01T00:00:00Z） */
+                start_time?: string;
+                /** @description 结束时间（ISO 8601） */
+                end_time?: string;
+                /** @description 每页条数（默认 20） */
+                limit?: number;
+                /** @description 偏移量（默认 0） */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 审计日志列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未授权 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_audit_security_summary: {
+        parameters: {
+            query?: {
+                /** @description 统计窗口小时数（默认 24） */
+                hours?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 登录安全审计概览 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditSecuritySummary"];
+                };
+            };
+            /** @description 未授权 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_audit_security_timeseries: {
+        parameters: {
+            query?: {
+                /** @description 统计窗口小时数（默认 24） */
+                hours?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 登录安全趋势 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditSecurityTimeseries"];
+                };
+            };
+            /** @description 未授权 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_audit_log: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 审计日志 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 审计日志详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未授权 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未找到 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -3980,7 +5445,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description 认证失败（用户名或密码错误） */
+            /** @description 认证失败（用户名或密码错误或用户被禁用） */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -3991,6 +5456,53 @@ export interface operations {
             };
             /** @description 缺少或无效的 ox-app-id */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 登录失败次数过多，已被临时锁定 */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginLockoutResponse"];
+                };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 登出成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptySuccessResponse"];
+                };
+            };
+            /** @description 未授权 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 服务器内部错误 */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4019,7 +5531,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiError"];
+                    "application/json": components["schemas"]["EmptySuccessResponse"];
                 };
             };
             /** @description 请求参数错误 */
@@ -5123,6 +6635,152 @@ export interface operations {
             };
         };
     };
+    trigger_all_cloud_instances_ai_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerCloudAICheckRequest"];
+            };
+        };
+        responses: {
+            /** @description AI 检测任务已提交，后台执行 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerCloudAICheckResponse"];
+                };
+            };
+            /** @description 无可用 AI 账号 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 同类型任务已在运行，请等待完成 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_ai_check_jobs: {
+        parameters: {
+            query?: {
+                /** @description 任务状态过滤（running / succeeded / failed） */
+                status?: string;
+                /** @description 任务类型过滤（cloud_all / cloud_instance:{id}） */
+                job_type?: string;
+                /** @description 每页数量，默认 20 */
+                limit?: number;
+                /** @description 偏移量，默认 0 */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 任务列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_ai_check_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 任务 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 任务详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AICheckJobResponse"];
+                };
+            };
+            /** @description 任务不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getCloudInstancesChart: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 按云供应商过滤（tencent / alibaba）
+                 * @example tencent
+                 */
+                provider?: string;
+                /**
+                 * @description 按地域过滤（如 ap-shanghai）
+                 * @example ap-shanghai
+                 */
+                region?: string;
+                /**
+                 * @description 按归一化状态过滤（running / stopped / pending / error / unknown）
+                 * @example running
+                 */
+                status?: string;
+                /**
+                 * @description 要返回的指标，逗号分隔，支持简名（`cpu` / `memory` / `disk`）或完整名。
+                 *     默认值：`cpu,memory,disk`
+                 * @example cpu,memory,disk
+                 */
+                metrics?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 所有实例最新指标并行数组（labels / instances / series 下标对应同一实例） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloudInstancesChartResponse"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     get_cloud_instance_detail: {
         parameters: {
             query?: never;
@@ -5142,6 +6800,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CloudInstanceDetailResponse"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    trigger_single_instance_ai_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 云实例数据库 ID（snowflake） */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerCloudAICheckRequest"];
+            };
+        };
+        responses: {
+            /** @description AI 检测报告触发成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerSingleInstanceAICheckResponse"];
+                };
+            };
+            /** @description 无可用 AI 账号 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 云实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 报告生成失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getCloudInstanceMetrics: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 查询开始时间（RFC3339/ISO8601）。
+                 *     默认为今天 00:00:00 UTC；最早不超过当前时间往前 7 天（与数据保留期一致）。
+                 * @example 2025-03-01T00:00:00Z
+                 */
+                from?: string;
+                /**
+                 * @description 查询结束时间（RFC3339/ISO8601）。
+                 *     默认为当前时间。
+                 * @example 2025-03-01T23:59:59Z
+                 */
+                to?: string;
+                /**
+                 * @description 要返回的指标，逗号分隔。
+                 *     支持简名（`cpu` / `memory` / `disk` / `network_in` / `network_out` / `iops_read` / `iops_write` / `connections`）
+                 *     或完整指标名（`cloud.cpu.usage` 等）。
+                 *     默认值：`cpu,memory,disk`
+                 * @example cpu,memory,disk
+                 */
+                metrics?: string;
+            };
+            header?: never;
+            path: {
+                /** @description 云实例系统雪花ID（cloud_instances 表主键，例如 1234567890123456789） */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 历史指标时间序列，series 中每个 key 对应一条折线 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloudInstanceMetricsResponse"];
                 };
             };
             /** @description 未认证 */

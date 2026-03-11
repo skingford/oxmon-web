@@ -753,7 +753,7 @@ export default function CloudInstancesPage() {
 
     try {
       const result = await api.triggerAllCloudInstancesAICheck({})
-      const jobId = result.job_id || result.report_id || "-"
+      const jobId = result.job_id || "-"
       setRecentlyTriggeredAICheckJobId(jobId === "-" ? null : jobId)
       setAICheckJobsPage(1)
 

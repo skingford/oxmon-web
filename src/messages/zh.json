@@ -1463,7 +1463,7 @@
         "detailToastFetchError": "加载云实例详情失败",
         "detailToastCopyApiCurlSuccess": "已复制 curl 命令",
         "detailToastCopyApiCurlError": "复制 curl 命令失败",
-        "detailToastTriggerAICheckSuccess": "已触发实例 AI 检测，任务 ID：{jobId}",
+        "detailToastTriggerAICheckSuccess": "已触发实例 AI 检测，报告 ID：{reportId}",
         "detailToastTriggerAICheckError": "触发实例 AI 检测失败",
         "detailToastFetchAICheckJobsError": "加载实例 AI 检测任务失败",
         "detailAICheckJobsTitle": "实例 AI 检测任务",

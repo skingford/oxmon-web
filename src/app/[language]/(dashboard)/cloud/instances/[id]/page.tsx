@@ -773,22 +773,20 @@ export default function CloudInstanceDetailPage() {
 
     try {
       const result = await api.triggerCloudInstanceAICheck(instanceId, {})
-      const jobId = result.job_id || result.report_id || "-"
-      setRecentlyTriggeredAICheckJobId(jobId === "-" ? null : jobId)
+      const reportId = result.report_id || "-"
+      setRecentlyTriggeredAICheckJobId(null)
 
-      if (jobId !== "-") {
-        if (clearTriggeredHighlightTimerRef.current !== null) {
-          window.clearTimeout(clearTriggeredHighlightTimerRef.current)
-        }
-
-        clearTriggeredHighlightTimerRef.current = window.setTimeout(() => {
-          setRecentlyTriggeredAICheckJobId(null)
-          clearTriggeredHighlightTimerRef.current = null
-        }, 3200)
+      if (clearTriggeredHighlightTimerRef.current !== null) {
+        window.clearTimeout(clearTriggeredHighlightTimerRef.current)
       }
 
+      clearTriggeredHighlightTimerRef.current = window.setTimeout(() => {
+        setRecentlyTriggeredAICheckJobId(null)
+        clearTriggeredHighlightTimerRef.current = null
+      }, 3200)
+
       toast.success(t("cloud.instances.detailToastTriggerAICheckSuccess", {
-        jobId,
+        reportId,
       }))
       await fetchAICheckJobs(true)
     } catch (error) {

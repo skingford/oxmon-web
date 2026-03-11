@@ -31,26 +31,16 @@ interface AgentApiModuleDeps {
   buildQueryString: (params: Record<string, unknown> | PaginationParams) => string
 }
 
-function resolveListItems<T>(payload: unknown): T[] {
-  if (Array.isArray(payload)) {
-    return payload as T[]
+function toListResponse<T>(
+  items: T[],
+  options: { fallbackLimit?: number; fallbackOffset?: number } = {},
+): ListResponse<T> {
+  return {
+    items,
+    total: items.length,
+    limit: options.fallbackLimit ?? items.length,
+    offset: options.fallbackOffset ?? 0,
   }
-
-  const record = payload as any
-
-  if (Array.isArray(record?.items)) {
-    return record.items as T[]
-  }
-
-  if (Array.isArray(record?.data?.items)) {
-    return record.data.items as T[]
-  }
-
-  if (Array.isArray(record?.data)) {
-    return record.data as T[]
-  }
-
-  return []
 }
 
 export interface AgentApiModule {
@@ -74,17 +64,12 @@ export interface AgentApiModule {
 
 export function createAgentApiModule({ request, buildQueryString }: AgentApiModuleDeps): AgentApiModule {
   const getAgents = (params: AgentListQueryParams = {}) =>
-    request<AgentResponse[]>(`/v1/agents${buildQueryString(params)}`).then((result) => {
-      const items = resolveListItems<AgentResponse>(result)
-      const fallbackLimit = params.limit ?? items.length
-      const fallbackOffset = params.offset ?? 0
-      return {
-        items,
-        total: (result as any).total ?? (result as any).data?.total ?? items.length,
-        limit: (result as any).limit ?? fallbackLimit,
-        offset: (result as any).offset ?? fallbackOffset,
-      }
-    })
+    request<AgentResponse[]>(`/v1/agents${buildQueryString(params)}`).then((items) =>
+      toListResponse(items, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+    )
 
   const getAgentById = (id: string, token?: string) =>
     request<AgentDetail>(`/v1/agents/${encodeURIComponent(id)}`, { token })
@@ -103,17 +88,12 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     })
 
   const getWhitelist = (params: AgentWhitelistQueryParams = {}) =>
-    request<AgentWhitelistDetail[]>(`/v1/agents/whitelist${buildQueryString(params)}`).then((result) => {
-      const items = resolveListItems<AgentWhitelistDetail>(result)
-      const fallbackLimit = params.limit ?? items.length
-      const fallbackOffset = params.offset ?? 0
-      return {
-        items,
-        total: (result as any).total ?? (result as any).data?.total ?? items.length,
-        limit: (result as any).limit ?? fallbackLimit,
-        offset: (result as any).offset ?? fallbackOffset,
-      }
-    })
+    request<AgentWhitelistDetail[]>(`/v1/agents/whitelist${buildQueryString(params)}`).then((items) =>
+      toListResponse(items, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+    )
 
   const getWhitelistById = (id: string, token?: string) =>
     request<AgentWhitelistDetail>(`/v1/agents/whitelist/${encodeURIComponent(id)}`, { token })
@@ -146,29 +126,21 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
 
   const getAgentLatestMetrics = (id: string, token?: string) =>
     request<LatestMetric[]>(`/v1/agents/${encodeURIComponent(id)}/latest`, { token })
-      .then((result) => resolveListItems<LatestMetric>(result))
 
   const getAgentReportLogs = (
     id: string,
     params: AgentReportLogQueryParams = {},
     token?: string
   ) =>
-    request<unknown>(
+    request<AgentReportLogItem[]>(
       `/v1/agents/${encodeURIComponent(id)}/report-logs${buildQueryString(params)}`,
       { token }
-    ).then((result) => {
-      const record = result as any
-      const normalizedItems = resolveListItems<AgentReportLogItem>(result)
-      const fallbackLimit = params.limit ?? normalizedItems.length
-      const fallbackOffset = params.offset ?? 0
-
-      return {
-        items: normalizedItems,
-        total: record?.total ?? record?.data?.total ?? normalizedItems.length,
-        limit: record?.limit ?? fallbackLimit,
-        offset: record?.offset ?? fallbackOffset,
-      }
-    })
+    ).then((items) =>
+      toListResponse(items, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      })
+    )
 
   return {
     getAgents,

@@ -178,6 +178,25 @@ export interface LoginResponse {
   expires_in: number;
 }
 
+export interface EmptySuccessResponse {
+  err_code: number;
+  err_msg: string;
+  trace_id: string;
+  data?: Record<string, never> | null;
+}
+
+export interface LoginLockoutInfo {
+  locked_until: string;
+  retry_after_seconds: number;
+}
+
+export interface LoginLockoutResponse {
+  err_code: number;
+  err_msg: string;
+  trace_id: string;
+  data: LoginLockoutInfo;
+}
+
 export interface PaginationParams {
   limit?: number;
   offset?: number;
@@ -262,6 +281,12 @@ export interface SystemConfigQueryParams extends PaginationParams {
 
 export interface AdminUserQueryParams extends PaginationParams {
   username__contains?: string;
+}
+
+export interface LoginThrottleQueryParams extends PaginationParams {
+  username?: string;
+  ip_address?: string;
+  locked_only?: boolean;
 }
 
 export interface AuditLogQueryParams extends PaginationParams {
@@ -639,6 +664,10 @@ export interface AdminUserResponse {
 export interface CreateAdminUserRequest {
   username: string;
   encrypted_password: string;
+  status?: string | null;
+  avatar?: string | null;
+  phone?: string | null;
+  email?: string | null;
 }
 
 export interface ResetAdminPasswordRequest {
@@ -664,6 +693,58 @@ export interface AuditLogItem {
   user_agent?: string | null;
   created_at: string;
   [key: string]: unknown;
+}
+
+export interface AuditSecurityTopItem {
+  key: string;
+  count: number;
+}
+
+export interface AuditSecuritySummary {
+  hours: number;
+  window_start: string;
+  login_success_count: number;
+  login_failed_count: number;
+  lock_triggered_count: number;
+  unique_failed_ips: number;
+  unique_failed_usernames: number;
+  top_failed_ips: AuditSecurityTopItem[];
+  top_failed_usernames: AuditSecurityTopItem[];
+}
+
+export interface AuditSecurityTimeseriesPoint {
+  hour: string;
+  login_success_count: number;
+  login_failed_count: number;
+  lock_triggered_count: number;
+}
+
+export interface AuditSecurityTimeseries {
+  hours: number;
+  window_start: string;
+  points: AuditSecurityTimeseriesPoint[];
+}
+
+export interface LoginThrottleItem {
+  id: string;
+  username: string;
+  ip_address: string;
+  failure_count: number;
+  last_failed_at: string;
+  locked_until?: string | null;
+  updated_at: string;
+}
+
+export interface LoginThrottleListResponse {
+  items: LoginThrottleItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface UnlockLoginThrottleRequest {
+  username: string;
+  ip_address?: string | null;
 }
 
 export interface SetRecipientsRequest {
@@ -797,8 +878,10 @@ export interface CloudInstanceResponse {
   public_ip?: string | null;
   private_ip?: string | null;
   os?: string | null;
-  normalized_status?: string | null;
+  normalized_status: string;
   status?: string | null;
+  status_synced_at: string;
+  status_sync_age_secs: number;
   last_seen_at: string;
   created_at: string;
   updated_at: string;
@@ -806,9 +889,28 @@ export interface CloudInstanceResponse {
   cpu_cores?: number | null;
   memory_gb?: number | null;
   disk_gb?: number | null;
-  security_group_ids?: string[] | null;
-  ipv6_addresses?: string[] | null;
-  tags?: Record<string, string> | null;
+  created_time?: number | null;
+  expired_time?: number | null;
+  charge_type?: string | null;
+  vpc_id?: string | null;
+  subnet_id?: string | null;
+  security_group_ids: string[];
+  zone?: string | null;
+  internet_max_bandwidth?: number | null;
+  ipv6_addresses: string[];
+  eip_allocation_id?: string | null;
+  internet_charge_type?: string | null;
+  image_id?: string | null;
+  hostname?: string | null;
+  description?: string | null;
+  gpu?: number | null;
+  io_optimized?: string | null;
+  latest_operation?: string | null;
+  latest_operation_state?: string | null;
+  tags: Record<string, string>;
+  project_id?: string | null;
+  resource_group_id?: string | null;
+  auto_renew_flag?: string | null;
 }
 
 export interface CloudInstanceChartMeta {
@@ -895,12 +997,15 @@ export interface TriggerCollectionResponse {
 
 export interface TriggerCloudAICheckRequest {
   ai_account_id?: string | null;
-  send_notification?: boolean | null;
 }
 
 export interface TriggerCloudAICheckResponse {
-  job_id?: string | null;
-  report_id?: string | null;
+  job_id: string;
+  message: string;
+}
+
+export interface TriggerSingleInstanceAICheckResponse {
+  report_id: string;
   message: string;
 }
 
@@ -980,6 +1085,32 @@ export interface AIReportListItem {
 export interface AIReportQueryParams extends PaginationParams {
   report_date?: string;
   risk_level?: string;
+}
+
+export interface AIReportInstanceQueryParams extends PaginationParams {
+  risk_level?: string;
+}
+
+export interface AIReportInstanceItem {
+  agent_id: string;
+  instance_name?: string | null;
+  agent_type: string;
+  cpu_usage?: number | null;
+  memory_usage?: number | null;
+  disk_usage?: number | null;
+  risk_level: string;
+  timestamp: number;
+}
+
+export interface TriggerAIReportResponse {
+  report_id: string;
+  message: string;
+}
+
+export interface CertDomainsBackfillResponse {
+  inserted_domains: number;
+  dry_run: boolean;
+  domains_preview: string[];
 }
 
 export interface AIReportRow extends AIReportListItem {
