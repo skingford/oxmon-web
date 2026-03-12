@@ -624,7 +624,10 @@ export default function CloudInstancesPage() {
     }
   }, [])
 
-  const optionSourceInstances = allInstancesSnapshot ?? instances
+  const optionSourceInstances = useMemo(
+    () => allInstancesSnapshot ?? instances,
+    [allInstancesSnapshot, instances]
+  )
 
   const discoveredProviders = useMemo(
     () => uniqueSortedWithLocale(optionSourceInstances.map((item) => normalizeCloudProvider(item.provider)), locale),

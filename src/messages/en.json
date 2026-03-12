@@ -1687,7 +1687,19 @@
       "detailFieldNotified": "Notified",
       "detailFieldCreatedAt": "Created At",
       "detailFieldUpdatedAt": "Updated At",
-      "detailToastFetchError": "Failed to load AI report details"
+      "detailToastFetchError": "Failed to load AI report details",
+      "detailSectionInstances": "Instance Details",
+      "detailSectionInstancesDescription": "Uses the latest instance detail API to show report coverage, risk, and key metrics.",
+      "detailInstancesStatTotal": "Instances",
+      "detailInstancesStatHigh": "High Risk",
+      "detailInstancesStatMedium": "Medium Risk",
+      "detailInstancesStatLowOrNormal": "Low / Normal",
+      "detailInstancesColAgentId": "Agent ID",
+      "detailInstancesColName": "Instance Name",
+      "detailInstancesColType": "Type",
+      "detailInstancesColRisk": "Risk Level",
+      "detailInstancesColTimestamp": "Timestamp",
+      "detailInstancesEmpty": "No instance detail data"
     }
   },
   "auth": {
@@ -2106,6 +2118,16 @@
     "dictionarySortKeyAsc": "Dictionary Key (A-Z)",
     "dictionarySortKeyDesc": "Dictionary Key (Z-A)",
     "dictionaryResetFilters": "Reset Filters",
-    "dictionaryEnabledOnlyShort": "Enabled"
+    "dictionaryEnabledOnlyShort": "Enabled",
+    "auditLogsSecurityTitle": "Login Security Overview",
+    "auditLogsSecurityDescription": "Uses the latest security summary API to show login and lock activity over the last 24 hours.",
+    "auditLogsSecurityStatLoginSuccess": "Login Success (24h)",
+    "auditLogsSecurityStatLoginFailed": "Login Failed (24h)",
+    "auditLogsSecurityStatLockTriggered": "Lock Triggered (24h)",
+    "auditLogsSecurityStatUniqueFailedIps": "Failed Source IPs (24h)",
+    "auditLogsSecurityToastFetchError": "Failed to load login security overview",
+    "auditLogsSecurityTrendTitle": "Login Security Trend",
+    "auditLogsSecurityTrendDescription": "Hourly login success, failure, and lock-trigger counts for the last 24 hours.",
+    "auditLogsSecurityTrendEmpty": "No security trend data"
   }
 }

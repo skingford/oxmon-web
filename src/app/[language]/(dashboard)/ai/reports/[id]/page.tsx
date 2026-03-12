@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
-import type { AIReportRow } from "@/types/api";
+import type { AIReportInstanceItem, AIReportRow } from "@/types/api";
 import { formatDateTimeByLocale } from "@/lib/date-time";
 import { notifiedBadgeClassName } from "@/lib/notified-status";
 import { toastApiError } from "@/lib/toast";
@@ -16,6 +16,7 @@ import {
 import { useAppTranslations } from "@/hooks/use-app-translations";
 import { useAppLocale } from "@/hooks/use-app-locale";
 import { withLocalePrefix } from "@/components/app-locale";
+import type { AppLocale } from "@/components/app-locale";
 import {
   Card,
   CardContent,
@@ -29,6 +30,14 @@ import { JsonTextarea } from "@/components/ui/json-textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Code2, Expand, Loader2, RefreshCw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -89,6 +98,12 @@ function formatJsonText(value?: string | null) {
   } catch {
     return value;
   }
+}
+
+
+function formatReportInstanceTimestamp(value: number, locale: AppLocale) {
+  const timestamp = value > 1_000_000_000_000 ? value : value * 1000
+  return formatDateTimeByLocale(new Date(timestamp).toISOString(), locale)
 }
 
 function buildHtmlPreviewDoc(value?: string | null) {
@@ -166,6 +181,7 @@ export default function AIReportDetailPage() {
   const params = useParams<{ id: string }>();
   const id = String(params?.id || "");
   const [report, setReport] = useState<AIReportRow | null>(null);
+  const [reportInstances, setReportInstances] = useState<AIReportInstanceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailTab, setDetailTab] = useState<"analysis" | "html">("analysis");
   const [htmlTab, setHtmlTab] = useState<"preview" | "source">("preview");
@@ -186,6 +202,24 @@ export default function AIReportDetailPage() {
     [report?.raw_metrics_json],
   );
   const isDev = process.env.NODE_ENV !== "production";
+  const reportInstanceRiskStats = useMemo(() => {
+    return reportInstances.reduce(
+      (acc, item) => {
+        const level = resolveRiskLevel(item.risk_level)
+        if (level === "critical") {
+          acc.high += 1
+        } else if (level === "alert") {
+          acc.medium += 1
+        } else if (level === "attention") {
+          acc.low += 1
+        } else {
+          acc.normal += 1
+        }
+        return acc
+      },
+      { high: 0, medium: 0, low: 0, normal: 0 },
+    )
+  }, [reportInstances]);
   const htmlRawContent = report?.html_content || "";
   const htmlSource = htmlRawContent.trim();
   const previewThresholdFactor = useMemo(resolvePreviewThresholdFactor, []);
@@ -295,9 +329,26 @@ export default function AIReportDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      setReport(await api.getAIReportById(id));
+      const [reportResult, instancesResult] = await Promise.allSettled([
+        api.getAIReportById(id),
+        api.listAIReportInstances(id),
+      ]);
+
+      if (reportResult.status === "rejected") {
+        throw reportResult.reason;
+      }
+
+      setReport(reportResult.value);
+
+      if (instancesResult.status === "fulfilled") {
+        setReportInstances(instancesResult.value);
+      } else {
+        setReportInstances([]);
+        console.error("Failed to load AI report instances", instancesResult.reason);
+      }
     } catch (error) {
       setReport(null);
+      setReportInstances([]);
       toastApiError(error, t("reports.detailToastFetchError"));
     } finally {
       setLoading(false);
@@ -428,6 +479,66 @@ export default function AIReportDetailPage() {
             label={t("reports.detailFieldUpdatedAt")}
             value={formatDateTimeByLocale(report.updated_at, locale)}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("reports.detailSectionInstances")}</CardTitle>
+          <CardDescription>{t("reports.detailSectionInstancesDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <MetaItem label={t("reports.detailInstancesStatTotal")} value={reportInstances.length} />
+            <MetaItem label={t("reports.detailInstancesStatHigh")} value={reportInstanceRiskStats.high} />
+            <MetaItem label={t("reports.detailInstancesStatMedium")} value={reportInstanceRiskStats.medium} />
+            <MetaItem label={t("reports.detailInstancesStatLowOrNormal")} value={reportInstanceRiskStats.low + reportInstanceRiskStats.normal} />
+          </div>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("reports.detailInstancesColAgentId")}</TableHead>
+                  <TableHead>{t("reports.detailInstancesColName")}</TableHead>
+                  <TableHead>{t("reports.detailInstancesColType")}</TableHead>
+                  <TableHead>{t("reports.detailInstancesColRisk")}</TableHead>
+                  <TableHead className="text-right">CPU</TableHead>
+                  <TableHead className="text-right">Memory</TableHead>
+                  <TableHead className="text-right">Disk</TableHead>
+                  <TableHead>{t("reports.detailInstancesColTimestamp")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reportInstances.length > 0 ? (
+                  reportInstances.map((item) => {
+                    const itemRiskLevel = resolveRiskLevel(item.risk_level)
+                    return (
+                      <TableRow key={`${item.agent_id}-${item.timestamp}`}>
+                        <TableCell className="font-mono text-xs">{item.agent_id}</TableCell>
+                        <TableCell>{item.instance_name || "-"}</TableCell>
+                        <TableCell>{item.agent_type}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={riskBadgeClassNameByLevel(itemRiskLevel)}>
+                            {riskLevelLabelZh(itemRiskLevel)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{item.cpu_usage ?? "-"}</TableCell>
+                        <TableCell className="text-right">{item.memory_usage ?? "-"}</TableCell>
+                        <TableCell className="text-right">{item.disk_usage ?? "-"}</TableCell>
+                        <TableCell>{formatReportInstanceTimestamp(item.timestamp, locale)}</TableCell>
+                      </TableRow>
+                    )
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center text-sm text-muted-foreground">
+                      {t("reports.detailInstancesEmpty")}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

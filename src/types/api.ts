@@ -621,10 +621,7 @@ export interface NotificationLogItem {
   api_error_code?: string | null;
 }
 
-export interface NotificationLogListResponse {
-  items: NotificationLogItem[];
-  total: number;
-}
+export interface NotificationLogListResponse extends ListResponse<NotificationLogItem> {}
 
 export interface NotificationLogSummaryResponse {
   total: number;
@@ -735,12 +732,7 @@ export interface LoginThrottleItem {
   updated_at: string;
 }
 
-export interface LoginThrottleListResponse {
-  items: LoginThrottleItem[];
-  total: number;
-  limit: number;
-  offset: number;
-}
+export interface LoginThrottleListResponse extends ListResponse<LoginThrottleItem> {}
 
 export interface UnlockLoginThrottleRequest {
   username: string;

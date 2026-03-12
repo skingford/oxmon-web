@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
-import { AlertEventResponse, AlertSummary } from "@/types/api"
+import { AlertEventResponse, AlertSummary, ListResponse } from "@/types/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import {
   useAppTranslations,
@@ -101,8 +101,7 @@ function TableRowSkeleton() {
 export default function ActiveAlertsPage() {
   const router = useRouter()
   const { t, locale } = useAppTranslations("alerts")
-  const [alerts, setAlerts] = useState<AlertEventResponse[]>([])
-  const [alertsTotal, setAlertsTotal] = useState(0)
+  const [alertsPage, setAlertsPage] = useState<ListResponse<AlertEventResponse>>({ items: [], total: 0, limit: 20, offset: 0 })
   const [summary, setSummary] = useState<AlertSummary | null>(null)
   const { loading, refreshing, runWithRefresh } = useRefreshState()
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
@@ -113,6 +112,8 @@ export default function ActiveAlertsPage() {
   )
   const [offset, setOffset] = useState(0)
   const limit = 20
+  const alerts = alertsPage.items
+  const alertsTotal = alertsPage.total
 
   // 搜索和筛选
   const [selectedSourceId, setSelectedSourceId] = useState("")
@@ -133,8 +134,7 @@ export default function ActiveAlertsPage() {
             api.getAlertSummary(),
           ])
 
-          setAlerts(alertsData.items)
-          setAlertsTotal(alertsData.total)
+          setAlertsPage(alertsData)
           setSummary(summaryData)
         }, t("active.toastFetchError"))
       }, { silent })
@@ -161,7 +161,7 @@ export default function ActiveAlertsPage() {
   const filteredAlerts = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
 
-    return alerts.filter((alert) => {
+    return alertsPage.items.filter((alert) => {
       if (selectedSourceId && alert.agent_id !== selectedSourceId) {
         return false
       }
@@ -178,7 +178,7 @@ export default function ActiveAlertsPage() {
         getMetricDisplayName(alert.metric_name, metricNameLabelMap).toLowerCase().includes(query)
       )
     })
-  }, [alerts, metricNameLabelMap, searchQuery, selectedSourceId, sourceDisplayNameMap])
+  }, [alertsPage.items, metricNameLabelMap, searchQuery, selectedSourceId, sourceDisplayNameMap])
 
   const runAlertAction = useCallback(
     async (
@@ -772,7 +772,7 @@ export default function ActiveAlertsPage() {
               {...buildTranslatedPaginationTextBundle({
                 t,
                 summaryKey: "active.paginationSummary",
-                total: alertsTotal,
+                total: alertsPage.total,
                 start: pagination.rangeStart,
                 end: pagination.rangeEnd,
                 shownKey: "active.paginationShown",

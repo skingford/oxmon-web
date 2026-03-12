@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { api } from "@/lib/api"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
-import type { AIReportListItem } from "@/types/api"
+import type { AIReportListItem, ListResponse } from "@/types/api"
 import { toastApiError } from "@/lib/toast"
 import { formatDateTimeByLocale } from "@/lib/date-time"
 import { notifiedBadgeClassName } from "@/lib/notified-status"
@@ -39,8 +39,7 @@ import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Loader2, RefreshCw } from "lucide-react"
 
 type ReportsState = {
-  items: AIReportListItem[]
-  total: number
+  reportsPage: ListResponse<AIReportListItem>
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -62,17 +61,21 @@ export default function AIReportsPage() {
     refreshing,
     execute,
   } = useRequestState<ReportsState>({
-    items: [],
-    total: 0,
+    reportsPage: {
+      items: [],
+      total: 0,
+      limit: pageSize,
+      offset: 0,
+    },
   })
 
   const sortedItems = useMemo(
     () =>
-      [...data.items].sort(
+      [...data.reportsPage.items].sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       ),
-    [data.items],
+    [data.reportsPage.items],
   )
 
   const fetchData = useCallback(async (silent = false) => {
@@ -84,8 +87,7 @@ export default function AIReportsPage() {
         })
 
         return {
-          items: page.items,
-          total: page.total,
+          reportsPage: page,
         }
       },
       {
@@ -105,7 +107,7 @@ export default function AIReportsPage() {
     offset,
     limit: pageSize,
     currentItemsCount: sortedItems.length,
-    totalItems: data.total,
+    totalItems: data.reportsPage.total,
   })
 
   const pageSizeOptionLabel = useCallback(
@@ -251,7 +253,7 @@ export default function AIReportsPage() {
             {...buildTranslatedPaginationTextBundle({
               t,
               summaryKey: "reports.paginationSummary",
-              total: data.total,
+              total: data.reportsPage.total,
               start: pagination.rangeStart,
               end: pagination.rangeEnd,
               pageKey: "reports.paginationPage",

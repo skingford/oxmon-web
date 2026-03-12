@@ -22,6 +22,7 @@ import { DomainToolbarSection } from "@/components/pages/certificates/domain-too
 import { toast, toastActionSuccess, toastApiError, toastCreated, toastDeleted, toastStatusError } from "@/lib/toast"
 
 const PAGE_LIMIT = 20
+const DOMAIN_LOOKUP_LIMIT = 200
 
 type DomainsQueryState = {
   domainsPage: ListResponse<CertDomain>
@@ -387,7 +388,7 @@ export default function DomainsPage() {
       if (error instanceof ApiRequestError && error.status === 409) {
         try {
           const maybeExisting = await api.listDomains({
-            limit: PAGE_LIMIT,
+            limit: DOMAIN_LOOKUP_LIMIT,
             offset: 0,
             domain__contains: domain,
           })

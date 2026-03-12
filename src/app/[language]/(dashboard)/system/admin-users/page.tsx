@@ -6,7 +6,7 @@ import { api } from "@/lib/api"
 import { formatDateTimeByLocale } from "@/lib/date-time"
 import { encryptPasswordWithPublicKey } from "@/lib/password-encryption"
 import { getAuthTokenPayload } from "@/lib/auth-token"
-import type { AdminUserResponse } from "@/types/api"
+import type { AdminUserResponse, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
@@ -42,8 +42,7 @@ import {
 const PAGE_LIMIT = 20
 
 type AdminUsersPageState = {
-  items: AdminUserResponse[]
-  total: number
+  usersPage: ListResponse<AdminUserResponse>
 }
 
 type CreateForm = {
@@ -78,7 +77,7 @@ export default function SystemAdminUsersPage() {
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [data, setData] = useState<AdminUsersPageState>({ items: [], total: 0 })
+  const [data, setData] = useState<AdminUsersPageState>({ usersPage: { items: [], total: 0, limit: PAGE_LIMIT, offset: 0 } })
   const [createOpen, setCreateOpen] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [createForm, setCreateForm] = useState<CreateForm>(getDefaultCreateForm)
@@ -104,8 +103,7 @@ export default function SystemAdminUsersPage() {
       })
 
       setData({
-        items: page.items,
-        total: page.total,
+        usersPage: page,
       })
     } catch (error) {
       toastApiError(error, t("adminUsersToastFetchError"))
@@ -122,16 +120,16 @@ export default function SystemAdminUsersPage() {
   const pagination = useServerOffsetPagination({
     offset,
     limit: PAGE_LIMIT,
-    currentItemsCount: data.items.length,
-    totalItems: data.total,
+    currentItemsCount: data.usersPage.items.length,
+    totalItems: data.usersPage.total,
   })
 
   const stats = useMemo(() => {
     return {
-      total: data.total,
-      currentPageCount: data.items.length,
+      total: data.usersPage.total,
+      currentPageCount: data.usersPage.items.length,
     }
-  }, [data.items.length, data.total])
+  }, [data.usersPage.items.length, data.usersPage.total])
 
   const applyFilters = () => {
     if (offset === 0) {
@@ -341,14 +339,14 @@ export default function SystemAdminUsersPage() {
                       {t("adminUsersTableLoading")}
                     </TableCell>
                   </TableRow>
-                ) : data.items.length === 0 ? (
+                ) : data.usersPage.items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       {t("adminUsersTableEmpty")}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.items.map((item) => (
+                  data.usersPage.items.map((item) => (
                     (() => {
                       const subject = String(authPayload?.sub || "")
                       const authUsername = String(authPayload?.username || "")
@@ -412,7 +410,7 @@ export default function SystemAdminUsersPage() {
             {...buildTranslatedPaginationTextBundle({
               t,
               summaryKey: "adminUsersPaginationSummary",
-              total: data.total,
+              total: data.usersPage.total,
               start: pagination.rangeStart,
               end: pagination.rangeEnd,
               pageKey: "adminUsersPaginationPage",

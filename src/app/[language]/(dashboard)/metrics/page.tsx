@@ -79,6 +79,7 @@ interface MetricQueryResultData {
   summary: MetricSummaryResponse | null;
 }
 
+
 function MetricsPageContent() {
   const { t } = useAppTranslations("pages");
   const router = useRouter();
@@ -642,13 +643,13 @@ function MetricsPageContent() {
 
   const filteredDataPoints = useMemo(() => {
     if (!labelFilter.trim()) {
-      return dataPoints;
+      return dataPoints
     }
 
     return dataPoints.filter((point) =>
       matchLabelFilter(point.labels || {}, labelFilter),
-    );
-  }, [dataPoints, labelFilter]);
+    )
+  }, [dataPoints, labelFilter])
 
   const chartData = useMemo(
     () =>

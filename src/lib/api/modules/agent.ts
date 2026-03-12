@@ -15,6 +15,10 @@ import {
   RegenerateTokenResponse,
   UpdateAgentRequest,
 } from "@/types/api"
+import {
+  normalizeListPayload,
+  toListResponse,
+} from "@/lib/api/list-response"
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE"
 
@@ -29,18 +33,6 @@ interface RequestConfig {
 interface AgentApiModuleDeps {
   request: <T>(endpoint: string, config?: RequestConfig) => Promise<T>
   buildQueryString: (params: Record<string, unknown> | PaginationParams) => string
-}
-
-function toListResponse<T>(
-  items: T[],
-  options: { fallbackLimit?: number; fallbackOffset?: number } = {},
-): ListResponse<T> {
-  return {
-    items,
-    total: items.length,
-    limit: options.fallbackLimit ?? items.length,
-    offset: options.fallbackOffset ?? 0,
-  }
 }
 
 export interface AgentApiModule {
@@ -64,8 +56,8 @@ export interface AgentApiModule {
 
 export function createAgentApiModule({ request, buildQueryString }: AgentApiModuleDeps): AgentApiModule {
   const getAgents = (params: AgentListQueryParams = {}) =>
-    request<AgentResponse[]>(`/v1/agents${buildQueryString(params)}`).then((items) =>
-      toListResponse(items, {
+    request<unknown>(`/v1/agents${buildQueryString(params)}`).then((payload) =>
+      toListResponse<AgentResponse>(payload, {
         fallbackLimit: params.limit ?? 0,
         fallbackOffset: params.offset ?? 0,
       })
@@ -88,8 +80,8 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     })
 
   const getWhitelist = (params: AgentWhitelistQueryParams = {}) =>
-    request<AgentWhitelistDetail[]>(`/v1/agents/whitelist${buildQueryString(params)}`).then((items) =>
-      toListResponse(items, {
+    request<unknown>(`/v1/agents/whitelist${buildQueryString(params)}`).then((payload) =>
+      toListResponse<AgentWhitelistDetail>(payload, {
         fallbackLimit: params.limit ?? 0,
         fallbackOffset: params.offset ?? 0,
       })
@@ -125,18 +117,20 @@ export function createAgentApiModule({ request, buildQueryString }: AgentApiModu
     })
 
   const getAgentLatestMetrics = (id: string, token?: string) =>
-    request<LatestMetric[]>(`/v1/agents/${encodeURIComponent(id)}/latest`, { token })
+    request<unknown>(`/v1/agents/${encodeURIComponent(id)}/latest`, { token }).then(
+      (payload) => normalizeListPayload<LatestMetric>(payload).items
+    )
 
   const getAgentReportLogs = (
     id: string,
     params: AgentReportLogQueryParams = {},
     token?: string
   ) =>
-    request<AgentReportLogItem[]>(
+    request<unknown>(
       `/v1/agents/${encodeURIComponent(id)}/report-logs${buildQueryString(params)}`,
       { token }
-    ).then((items) =>
-      toListResponse(items, {
+    ).then((payload) =>
+      toListResponse<AgentReportLogItem>(payload, {
         fallbackLimit: params.limit ?? 0,
         fallbackOffset: params.offset ?? 0,
       })

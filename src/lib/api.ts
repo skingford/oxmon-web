@@ -71,6 +71,7 @@ import {
   CreateAdminUserRequest,
   EmptySuccessResponse,
   LoginThrottleListResponse,
+  LoginThrottleItem,
   LoginThrottleQueryParams,
   ResetAdminPasswordRequest,
   UnlockLoginThrottleRequest,
@@ -143,6 +144,12 @@ import {
   withLocalePrefix,
 } from "@/components/app-locale";
 import { createAgentApiModule } from "@/lib/api/modules/agent";
+import {
+  extractListItemsPayload as extractListItemsPayloadBase,
+  normalizeListPayload as normalizeListPayloadBase,
+  type NormalizedListPayload,
+  toListResponse as toListResponseBase,
+} from "@/lib/api/list-response";
 
 function normalizeBaseUrl(value: string | undefined) {
   if (!value) {
@@ -229,7 +236,7 @@ function getRequiredAppId() {
 }
 
 async function requestAllPages<T>(
-  fetchPage: (params: Required<PaginationFetchConfig>) => Promise<T[]>,
+  fetchPage: (params: Required<PaginationFetchConfig>) => Promise<unknown>,
   options: PaginationFetchConfig = {},
 ) {
   const limit = Math.max(1, options.limit ?? 200);
@@ -237,7 +244,8 @@ async function requestAllPages<T>(
   const merged: T[] = [];
 
   while (true) {
-    const page = await fetchPage({ limit, offset });
+    const pagePayload = await fetchPage({ limit, offset });
+    const page = normalizeListPayload<T>(pagePayload).items
     merged.push(...page);
 
     if (page.length < limit) {
@@ -263,23 +271,42 @@ function toPageFetchConfig(
   };
 }
 
-function extractArrayPayload<T>(payload: unknown): T[] {
-  if (!Array.isArray(payload)) {
-    throw new ApiRequestError("Invalid API list response format")
-  }
+function createInvalidListResponseError(error: unknown) {
+  return new ApiRequestError(
+    error instanceof Error && error.message
+      ? error.message
+      : "Invalid API list response format",
+  )
+}
 
-  return payload as T[]
+function extractArrayPayload<T>(payload: unknown): T[] {
+  return extractListItemsPayload<T>(payload)
+}
+
+function normalizeListPayload<T>(payload: unknown): NormalizedListPayload<T> {
+  try {
+    return normalizeListPayloadBase<T>(payload)
+  } catch (error) {
+    throw createInvalidListResponseError(error)
+  }
+}
+
+function extractListItemsPayload<T>(payload: unknown): T[] {
+  try {
+    return extractListItemsPayloadBase<T>(payload)
+  } catch (error) {
+    throw createInvalidListResponseError(error)
+  }
 }
 
 function toListResponse<T>(
-  items: T[],
+  payloadOrItems: unknown,
   options: { fallbackLimit?: number; fallbackOffset?: number } = {},
 ): ListResponse<T> {
-  return {
-    items,
-    total: items.length,
-    limit: options.fallbackLimit ?? items.length,
-    offset: options.fallbackOffset ?? 0,
+  try {
+    return toListResponseBase<T>(payloadOrItems, options)
+  } catch (error) {
+    throw createInvalidListResponseError(error)
   }
 }
 
@@ -300,11 +327,10 @@ function getEnvelopePayload(payload: unknown): ApiResponseEnvelopeLike | null {
     return null;
   }
 
-  const keys = Object.keys(record);
-  const envelopeKeys = new Set(["data", "err_code", "err_msg", "trace_id"]);
-  const isEnvelopeShape = keys.every((key) => envelopeKeys.has(key));
+  const hasEnvelopeMetadata =
+    "err_code" in record || "err_msg" in record || "trace_id" in record;
 
-  if (!isEnvelopeShape) {
+  if (!hasEnvelopeMetadata) {
     return null;
   }
 
@@ -498,6 +524,25 @@ async function request<T>(
   return (requestPromise as Promise<T>).finally(finishProgress);
 }
 
+function requestListItems<T>(
+  endpoint: string,
+  config: RequestConfig = {},
+): Promise<T[]> {
+  return request<unknown>(endpoint, config).then((payload) =>
+    extractListItemsPayload<T>(payload),
+  )
+}
+
+function requestListResponse<T>(
+  endpoint: string,
+  options: { fallbackLimit?: number; fallbackOffset?: number } = {},
+  config: RequestConfig = {},
+): Promise<ListResponse<T>> {
+  return request<unknown>(endpoint, config).then((payload) =>
+    toListResponse<T>(payload, options),
+  )
+}
+
 const agentApi = createAgentApiModule({
   request,
   buildQueryString,
@@ -519,12 +564,12 @@ export const api = {
   ...agentApi,
 
   getActiveAlerts: (params: ActiveAlertQueryParams = {}) =>
-    request<AlertEventResponse[]>(`/v1/alerts/active${buildQueryString(params)}`).then(
-      (items) =>
-        toListResponse(items, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+    requestListResponse<AlertEventResponse>(
+      `/v1/alerts/active${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   getAlertHistory: (
@@ -535,12 +580,12 @@ export const api = {
       timestamp__lte?: string;
     } = {},
   ) =>
-    request<AlertEventResponse[]>(`/v1/alerts/history${buildQueryString(params)}`).then(
-      (items) =>
-        toListResponse(items, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+    requestListResponse<AlertEventResponse>(
+      `/v1/alerts/history${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   getAlertHistoryById: (id: string) =>
@@ -560,7 +605,7 @@ export const api = {
 
   getAlertRules: (params?: AlertRuleQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<AlertRuleResponse[]>(
+      return requestListItems<AlertRuleResponse>(
         `/v1/alerts/rules${buildQueryString(params || {})}`,
       )
     }
@@ -574,7 +619,7 @@ export const api = {
     }
 
     return requestAllPages<AlertRuleResponse>((page) =>
-      request<AlertRuleResponse[]>(
+      requestListItems<AlertRuleResponse>(
         `/v1/alerts/rules${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
@@ -596,12 +641,12 @@ export const api = {
       is_valid__eq?: boolean;
     } = {},
   ) =>
-    request<CertificateDetails[]>(`/v1/certificates${buildQueryString(params)}`).then(
-      (items) =>
-        toListResponse(items, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+    requestListResponse<CertificateDetails>(
+      `/v1/certificates${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   getCertificate: (id: string) =>
@@ -609,7 +654,7 @@ export const api = {
 
   listChannels: (params?: NotificationChannelQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<ChannelOverview[]>(
+      return requestListItems<ChannelOverview>(
         `/v1/notifications/channels${buildQueryString(params || {})}`,
       )
     }
@@ -622,20 +667,19 @@ export const api = {
     }
 
     return requestAllPages<ChannelOverview>((page) =>
-      request<ChannelOverview[]>(
+      requestListItems<ChannelOverview>(
         `/v1/notifications/channels${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
   },
 
   listChannelsPage: (params: NotificationChannelQueryParams = {}) =>
-    request<ChannelOverview[]>(
+    requestListResponse<ChannelOverview>(
       `/v1/notifications/channels${buildQueryString(params)}`,
-    ).then((items) =>
-      toListResponse(items, {
+      {
         fallbackLimit: params.limit ?? 0,
         fallbackOffset: params.offset ?? 0,
-      }),
+      },
     ),
 
   getChannelById: (id: string) =>
@@ -643,7 +687,7 @@ export const api = {
 
   listCloudAccounts: (params?: CloudAccountQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<CloudAccountResponse[]>(
+      return requestListItems<CloudAccountResponse>(
         `/v1/cloud/accounts${buildQueryString(params || {})}`,
       )
     }
@@ -654,7 +698,7 @@ export const api = {
     }
 
     return requestAllPages<CloudAccountResponse>((page) =>
-      request<CloudAccountResponse[]>(
+      requestListItems<CloudAccountResponse>(
         `/v1/cloud/accounts${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
@@ -699,7 +743,7 @@ export const api = {
 
   listCloudInstances: (params?: CloudInstanceQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<CloudInstanceResponse[]>(
+      return requestListItems<CloudInstanceResponse>(
         `/v1/cloud/instances${buildQueryString(params || {})}`,
       )
     }
@@ -712,19 +756,19 @@ export const api = {
     }
 
     return requestAllPages<CloudInstanceResponse>((page) =>
-      request<CloudInstanceResponse[]>(
+      requestListItems<CloudInstanceResponse>(
         `/v1/cloud/instances${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
   },
 
   listCloudInstancesPage: (params: CloudInstanceQueryParams = {}) =>
-    request<CloudInstanceResponse[]>(`/v1/cloud/instances${buildQueryString(params)}`).then(
-      (items) =>
-        toListResponse(items, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+    requestListResponse<CloudInstanceResponse>(
+      `/v1/cloud/instances${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   getCloudInstanceDetail: (id: string) =>
@@ -759,22 +803,21 @@ export const api = {
     }),
 
   listCloudAICheckJobsPage: (params: CloudAICheckJobQueryParams = {}) =>
-    request<unknown>(
+    requestListResponse<CloudAICheckJobResponse>(
       `/v1/cloud/instances/ai-check/jobs${buildQueryString(params)}`,
-    ).then((payload) =>
-      toListResponse(extractArrayPayload<CloudAICheckJobResponse>(payload), {
+      {
         fallbackLimit: params.limit ?? 0,
         fallbackOffset: params.offset ?? 0,
-      }),
+      },
     ),
 
   listCloudAICheckJobs: (
     params: CloudAICheckJobQueryParams = {},
   ) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<unknown>(
+      return requestListItems<CloudAICheckJobResponse>(
         `/v1/cloud/instances/ai-check/jobs${buildQueryString(params)}`,
-      ).then((payload) => extractArrayPayload<CloudAICheckJobResponse>(payload))
+      )
     }
 
     const queryParams = {
@@ -783,9 +826,9 @@ export const api = {
     }
 
     return requestAllPages<CloudAICheckJobResponse>((page) =>
-      request<unknown>(
+      requestListItems<CloudAICheckJobResponse>(
         `/v1/cloud/instances/ai-check/jobs${buildQueryString({ ...queryParams, ...page })}`,
-      ).then((payload) => extractArrayPayload<CloudAICheckJobResponse>(payload))
+      )
     )
   },
 
@@ -799,7 +842,7 @@ export const api = {
     } = {},
   ) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<AIAccountResponse[]>(
+      return requestListItems<AIAccountResponse>(
         `/v1/ai/accounts${buildQueryString(params || {})}`,
       )
     }
@@ -810,7 +853,7 @@ export const api = {
     }
 
     return requestAllPages<AIAccountResponse>((page) =>
-      request<AIAccountResponse[]>(
+      requestListItems<AIAccountResponse>(
         `/v1/ai/accounts${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
@@ -838,17 +881,19 @@ export const api = {
     }),
 
   listAIReportsPage: (params: AIReportQueryParams = {}) =>
-    request<AIReportListItem[]>(`/v1/ai/reports${buildQueryString(params)}`).then(
-      (items) =>
-        toListResponse(items, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+    requestListResponse<AIReportListItem>(
+      `/v1/ai/reports${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   listAIReports: (params: AIReportQueryParams = {}) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<AIReportListItem[]>(`/v1/ai/reports${buildQueryString(params)}`)
+      return requestListItems<AIReportListItem>(
+        `/v1/ai/reports${buildQueryString(params)}`,
+      )
     }
 
     const queryParams = {
@@ -857,7 +902,9 @@ export const api = {
     }
 
     return requestAllPages<AIReportListItem>((page) =>
-      request<AIReportListItem[]>(`/v1/ai/reports${buildQueryString({ ...queryParams, ...page })}`),
+      requestListItems<AIReportListItem>(
+        `/v1/ai/reports${buildQueryString({ ...queryParams, ...page })}`,
+      ),
     )
   },
 
@@ -877,13 +924,12 @@ export const api = {
     id: string,
     params: AIReportInstanceQueryParams = {},
   ) =>
-    request<AIReportInstanceItem[]>(
+    requestListResponse<AIReportInstanceItem>(
       `/v1/ai/reports/${id}/instances${buildQueryString(params)}`,
-    ).then((items) =>
-      toListResponse(items, {
+      {
         fallbackLimit: params.limit ?? 0,
         fallbackOffset: params.offset ?? 0,
-      }),
+      },
     ),
 
   listAIReportInstances: (
@@ -891,7 +937,7 @@ export const api = {
     params: AIReportInstanceQueryParams = {},
   ) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<AIReportInstanceItem[]>(
+      return requestListItems<AIReportInstanceItem>(
         `/v1/ai/reports/${id}/instances${buildQueryString(params)}`,
       )
     }
@@ -901,7 +947,7 @@ export const api = {
     }
 
     return requestAllPages<AIReportInstanceItem>((page) =>
-      request<AIReportInstanceItem[]>(
+      requestListItems<AIReportInstanceItem>(
         `/v1/ai/reports/${id}/instances${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
@@ -929,7 +975,7 @@ export const api = {
 
   listSystemConfigs: (params?: SystemConfigQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<SystemConfigResponse[]>(
+      return requestListItems<SystemConfigResponse>(
         `/v1/system/configs${buildQueryString(params || {})}`,
       )
     }
@@ -941,7 +987,7 @@ export const api = {
     }
 
     return requestAllPages<SystemConfigResponse>((page) =>
-      request<SystemConfigResponse[]>(
+      requestListItems<SystemConfigResponse>(
         `/v1/system/configs${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
@@ -963,17 +1009,17 @@ export const api = {
     request<IdResponse>(`/v1/system/configs/${id}`, { method: "DELETE" }),
 
   listAdminUsersPage: (params: AdminUserQueryParams = {}) =>
-    request<AdminUserResponse[]>(`/v1/admin/users${buildQueryString(params)}`).then(
-      (items) =>
-        toListResponse(items, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+    requestListResponse<AdminUserResponse>(
+      `/v1/admin/users${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   listAdminUsers: (params?: AdminUserQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<AdminUserResponse[]>(
+      return requestListItems<AdminUserResponse>(
         `/v1/admin/users${buildQueryString(params || {})}`,
       )
     }
@@ -983,7 +1029,7 @@ export const api = {
     }
 
     return requestAllPages<AdminUserResponse>((page) =>
-      request<AdminUserResponse[]>(
+      requestListItems<AdminUserResponse>(
         `/v1/admin/users${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
@@ -1018,9 +1064,14 @@ export const api = {
     }),
 
   listLoginThrottles: (params: LoginThrottleQueryParams = {}) =>
-    request<LoginThrottleListResponse>(
+    request<unknown>(
       `/v1/admin/users/login-throttles${buildQueryString(params)}`,
-    ).then((payload) => payload),
+    ).then((payload) =>
+      toListResponse<LoginThrottleItem>(payload, {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      }),
+    ),
 
   unlockLoginThrottle: (data: UnlockLoginThrottleRequest) =>
     request<EmptySuccessResponse>("/v1/admin/users/unlock-login-throttle", {
@@ -1051,7 +1102,7 @@ export const api = {
 
   listDictionaryTypes: (params?: DictionaryTypeQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
-      return request<DictionaryTypeSummary[]>(
+      return requestListItems<DictionaryTypeSummary>(
         `/v1/dictionaries/types${buildQueryString(params || {})}`,
       )
     }
@@ -1061,7 +1112,7 @@ export const api = {
     }
 
     return requestAllPages<DictionaryTypeSummary>((page) =>
-      request<DictionaryTypeSummary[]>(
+      requestListItems<DictionaryTypeSummary>(
         `/v1/dictionaries/types${buildQueryString({ ...queryParams, ...page })}`,
       ),
     )
@@ -1104,7 +1155,7 @@ export const api = {
     }
 
     const requestDictionaryPage = (page: Required<PaginationFetchConfig>) =>
-      request<DictionaryItem[]>(
+      requestListItems<DictionaryItem>(
         `/v1/dictionaries/types/all${buildQueryString({
           dict_type__in: normalizedDictTypes,
           enabled_only: enabledOnly,
@@ -1156,7 +1207,7 @@ export const api = {
     request<CertificateChainInfo>(`/v1/certificates/${id}/chain`),
 
   checkAllDomains: () =>
-    request<CertCheckResult[]>("/v1/certs/check", { method: "POST" }),
+    requestListItems<CertCheckResult>("/v1/certs/check", { method: "POST" }),
 
   listDomains: (
     params: PaginationParams & {
@@ -1164,12 +1215,12 @@ export const api = {
       domain__contains?: string;
     } = {},
   ) =>
-    request<CertDomain[]>(`/v1/certs/domains${buildQueryString(params)}`).then(
-      (items) =>
-        toListResponse(items, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+    requestListResponse<CertDomain>(
+      `/v1/certs/domains${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   getCertDomainsSummary: () =>
@@ -1179,7 +1230,7 @@ export const api = {
     request<IdResponse>("/v1/certs/domains", { method: "POST", body: data }),
 
   createDomainsBatch: (data: BatchCreateDomainsRequest) =>
-    request<IdResponse[]>("/v1/certs/domains/batch", {
+    requestListItems<IdResponse>("/v1/certs/domains/batch", {
       method: "POST",
       body: data,
     }),
@@ -1201,17 +1252,17 @@ export const api = {
     }),
 
   getCertCheckHistory: (id: string, params: PaginationParams = {}) =>
-    request<CertCheckResult[]>(
+    requestListItems<CertCheckResult>(
       `/v1/certs/domains/${id}/history${buildQueryString(params)}`,
     ),
 
   getCertStatusAll: (params: CertStatusQueryParams = {}) =>
-    request<CertCheckResult[]>(`/v1/certs/status${buildQueryString(params)}`).then(
-      (items) =>
-        toListResponse(items, {
-          fallbackLimit: params.limit ?? 0,
-          fallbackOffset: params.offset ?? 0,
-        }),
+    requestListResponse<CertCheckResult>(
+      `/v1/certs/status${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   getCertStatusSummary: (
@@ -1240,11 +1291,11 @@ export const api = {
       timestamp__lte?: string;
     } = {},
   ) =>
-    request<MetricDataPointResponse[]>(`/v1/metrics${buildQueryString(params)}`),
+    requestListItems<MetricDataPointResponse>(`/v1/metrics${buildQueryString(params)}`),
 
   getMetricAgents: (params?: MetricCatalogQueryParams) => {
     const requestMetricAgentPage = (page: Required<PaginationFetchConfig>) =>
-      request<string[]>(
+      requestListItems<string>(
         `/v1/metrics/agents${buildQueryString({
           timestamp__gte: params?.timestamp__gte,
           timestamp__lte: params?.timestamp__lte,
@@ -1263,7 +1314,7 @@ export const api = {
 
   getMetricSources: (params?: MetricSourceQueryParams) => {
     const requestMetricSourcePage = (page: Required<PaginationFetchConfig>) =>
-      request<MetricSourceItemResponse[]>(
+      requestListItems<MetricSourceItemResponse>(
         `/v1/metrics/sources${buildQueryString({
           timestamp__gte: params?.timestamp__gte,
           timestamp__lte: params?.timestamp__lte,
@@ -1295,7 +1346,7 @@ export const api = {
 
   getMetricNames: (params?: MetricCatalogQueryParams) => {
     const requestMetricNamePage = (page: Required<PaginationFetchConfig>) =>
-      request<string[]>(
+      requestListItems<string>(
         `/v1/metrics/names${buildQueryString({
           timestamp__gte: params?.timestamp__gte,
           timestamp__lte: params?.timestamp__lte,
@@ -1367,13 +1418,17 @@ export const api = {
     }),
 
   listSilenceWindows: (params: SilenceWindowQueryParams = {}) =>
-    request<SilenceWindow[]>(
+    requestListItems<SilenceWindow>(
       `/v1/notifications/silence-windows${buildQueryString(params)}`,
     ),
 
   getNotificationLogs: (params: NotificationLogQueryParams = {}) =>
-    request<NotificationLogListResponse>(
+    requestListResponse<NotificationLogItem>(
       `/v1/notifications/logs${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
     ),
 
   getNotificationLogById: (id: string) =>

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { api } from "@/lib/api"
 import {
   ChannelOverview,
+  ListResponse,
   NotificationChannelQueryParams,
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -46,8 +47,7 @@ const CHANNEL_SEVERITY_OPTIONS = ["info", "warning", "critical"] as const
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 
 type NotificationsQueryState = {
-  channels: ChannelOverview[]
-  total: number
+  channelsPage: ListResponse<ChannelOverview>
 }
 
 export default function NotificationsPage() {
@@ -61,12 +61,16 @@ export default function NotificationsPage() {
     refreshing,
     execute,
   } = useRequestState<NotificationsQueryState>({
-    channels: [],
-    total: 0,
+    channelsPage: {
+      items: [],
+      total: 0,
+      limit: PAGE_SIZE_OPTIONS[1],
+      offset: 0,
+    },
   })
 
-  const channels = data.channels
-  const total = data.total
+  const channels = data.channelsPage.items
+  const total = data.channelsPage.total
 
   const [searchKeyword, setSearchKeyword] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
@@ -176,7 +180,7 @@ export default function NotificationsPage() {
           statusFilter === "all"
             ? undefined
             : statusFilter === "enabled",
-        limit: pageSize,
+        limit: PAGE_SIZE_OPTIONS[1],
         offset,
       }
 
@@ -185,8 +189,7 @@ export default function NotificationsPage() {
           const page = await api.listChannelsPage(params)
 
           return {
-            channels: page.items,
-            total: page.total,
+            channelsPage: page,
           }
         },
         {
@@ -246,7 +249,7 @@ export default function NotificationsPage() {
 
   const pagination = useServerOffsetPagination({
     offset,
-    limit: pageSize,
+    limit: PAGE_SIZE_OPTIONS[1],
     currentItemsCount: channels.length,
     totalItems: total,
   })

@@ -1687,7 +1687,19 @@
       "detailFieldNotified": "已通知",
       "detailFieldCreatedAt": "创建时间",
       "detailFieldUpdatedAt": "更新时间",
-      "detailToastFetchError": "加载 AI 报告详情失败"
+      "detailToastFetchError": "加载 AI 报告详情失败",
+      "detailSectionInstances": "实例明细",
+      "detailSectionInstancesDescription": "基于最新实例明细接口展示本次报告覆盖的实例风险与关键指标。",
+      "detailInstancesStatTotal": "实例数",
+      "detailInstancesStatHigh": "高风险",
+      "detailInstancesStatMedium": "中风险",
+      "detailInstancesStatLowOrNormal": "低/正常",
+      "detailInstancesColAgentId": "Agent ID",
+      "detailInstancesColName": "实例名称",
+      "detailInstancesColType": "类型",
+      "detailInstancesColRisk": "风险等级",
+      "detailInstancesColTimestamp": "时间",
+      "detailInstancesEmpty": "暂无实例明细数据"
     }
   },
   "auth": {
@@ -2106,6 +2118,16 @@
     "dictionarySortKeyAsc": "按字典键（A-Z）",
     "dictionarySortKeyDesc": "按字典键（Z-A）",
     "dictionaryResetFilters": "重置筛选",
-    "dictionaryEnabledOnlyShort": "仅启用"
+    "dictionaryEnabledOnlyShort": "仅启用",
+    "auditLogsSecurityTitle": "登录安全概览",
+    "auditLogsSecurityDescription": "基于最新安全汇总接口，展示最近 24 小时登录与锁定情况。",
+    "auditLogsSecurityStatLoginSuccess": "登录成功（24 小时）",
+    "auditLogsSecurityStatLoginFailed": "登录失败（24 小时）",
+    "auditLogsSecurityStatLockTriggered": "触发锁定（24 小时）",
+    "auditLogsSecurityStatUniqueFailedIps": "失败来源 IP（24 小时）",
+    "auditLogsSecurityToastFetchError": "加载登录安全概览失败",
+    "auditLogsSecurityTrendTitle": "登录安全趋势",
+    "auditLogsSecurityTrendDescription": "最近 24 小时按小时聚合的登录成功、失败与触发锁定次数。",
+    "auditLogsSecurityTrendEmpty": "暂无安全趋势数据"
   }
 }

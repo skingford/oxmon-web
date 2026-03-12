@@ -5,7 +5,7 @@ import Link from "next/link"
 import { api } from "@/lib/api"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import {
-  NotificationLogItem,
+  NotificationLogListResponse,
   NotificationLogSummaryQueryParams,
 } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -37,8 +37,7 @@ import { Loader2, RefreshCw } from "lucide-react"
 import { toast, toastApiError } from "@/lib/toast"
 
 type LogsQueryState = {
-  items: NotificationLogItem[]
-  total: number
+  logsPage: NotificationLogListResponse
   summary: {
     total: number
     success: number
@@ -94,8 +93,12 @@ export default function NotificationLogsPage() {
     refreshing,
     execute,
   } = useRequestState<LogsQueryState>({
-    items: [],
-    total: 0,
+    logsPage: {
+      items: [],
+      total: 0,
+      limit: PAGE_LIMIT,
+      offset: 0,
+    },
     summary: {
       total: 0,
       success: 0,
@@ -139,8 +142,7 @@ export default function NotificationLogsPage() {
           ])
 
           return {
-            items: logs.items,
-            total: logs.total,
+            logsPage: logs,
             summary,
           }
         },
@@ -162,8 +164,8 @@ export default function NotificationLogsPage() {
   const pagination = useServerOffsetPagination({
     offset,
     limit: PAGE_LIMIT,
-    currentItemsCount: data.items.length,
-    totalItems: data.total,
+    currentItemsCount: data.logsPage.items.length,
+    totalItems: data.logsPage.total,
   })
 
   const formatDateTime = (value: string) => {
@@ -260,7 +262,7 @@ export default function NotificationLogsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("notifications.logsStatPageCount")}</CardDescription>
-            <CardTitle className="text-2xl">{data.items.length}</CardTitle>
+            <CardTitle className="text-2xl">{data.logsPage.items.length}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -379,14 +381,14 @@ export default function NotificationLogsPage() {
                       {t("notifications.logsTableLoading")}
                     </TableCell>
                   </TableRow>
-                ) : data.items.length === 0 ? (
+                ) : data.logsPage.items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       {hasActiveFilters ? t("notifications.logsTableEmptyFiltered") : t("notifications.logsTableEmpty")}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.items.map((item) => (
+                  data.logsPage.items.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{formatDateTime(item.created_at)}</TableCell>
                       <TableCell>
@@ -434,7 +436,7 @@ export default function NotificationLogsPage() {
             {...buildTranslatedPaginationTextBundle({
               t,
               summaryKey: "notifications.logsPaginationSummary",
-              total: data.total,
+              total: data.logsPage.total,
               start: pagination.rangeStart,
               end: pagination.rangeEnd,
               pageKey: "notifications.logsPaginationPage",

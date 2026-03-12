@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Loader2, RefreshCw } from "lucide-react"
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { api } from "@/lib/api"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { formatDateTimeByLocale } from "@/lib/date-time"
-import type { AdminUserResponse, AuditLogItem } from "@/types/api"
+import type { AdminUserResponse, AuditLogItem, AuditSecuritySummary, AuditSecurityTimeseries, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
@@ -35,8 +36,7 @@ import { PaginationControls } from "@/components/ui/pagination-controls"
 import { toastApiError } from "@/lib/toast"
 
 type AuditLogsState = {
-  items: AuditLogItem[]
-  total: number
+  auditLogsPage: ListResponse<AuditLogItem>
 }
 
 type AuditFilters = {
@@ -92,20 +92,41 @@ function resolveAuditActionBadgeVariant(action: string) {
   return "secondary" as const
 }
 
+
+function formatSecurityHourLabel(value: string, locale: string) {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return parsed.toLocaleTimeString(locale === "zh" ? "zh-CN" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+}
+
 export default function SystemAuditLogsPage() {
   const { t, locale } = useAppTranslations("system")
   const [draftFilters, setDraftFilters] = useState<AuditFilters>(getDefaultFilters)
   const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(getDefaultFilters)
   const [offset, setOffset] = useState(0)
   const [users, setUsers] = useState<AdminUserResponse[]>([])
+  const [securitySummary, setSecuritySummary] = useState<AuditSecuritySummary | null>(null)
+  const [securityTimeseries, setSecurityTimeseries] = useState<AuditSecurityTimeseries | null>(null)
+  const [securitySummaryLoading, setSecuritySummaryLoading] = useState(false)
   const {
     data,
     loading,
     refreshing,
     execute,
   } = useRequestState<AuditLogsState>({
-    items: [],
-    total: 0,
+    auditLogsPage: {
+      items: [],
+      total: 0,
+      limit: PAGE_LIMIT,
+      offset: 0,
+    },
   })
 
   const fetchAdminUsers = useCallback(async () => {
@@ -116,6 +137,28 @@ export default function SystemAuditLogsPage() {
       setUsers([])
     }
   }, [])
+
+
+  const fetchSecuritySummary = useCallback(async (silent = false) => {
+    if (!silent) {
+      setSecuritySummaryLoading(true)
+    }
+
+    try {
+      const [summary, timeseries] = await Promise.all([
+        api.getAuditSecuritySummary({ hours: 24 }),
+        api.getAuditSecurityTimeseries({ hours: 24 }),
+      ])
+      setSecuritySummary(summary)
+      setSecurityTimeseries(timeseries)
+    } catch (error) {
+      if (!silent) {
+        toastApiError(error, t("auditLogsSecurityToastFetchError"))
+      }
+    } finally {
+      setSecuritySummaryLoading(false)
+    }
+  }, [t])
 
   const fetchAuditLogs = useCallback(async (silent = false) => {
     await execute(
@@ -131,8 +174,7 @@ export default function SystemAuditLogsPage() {
         })
 
         return {
-          items: page.items,
-          total: page.total,
+          auditLogsPage: page,
         }
       },
       {
@@ -146,7 +188,8 @@ export default function SystemAuditLogsPage() {
 
   useEffect(() => {
     fetchAuditLogs()
-  }, [fetchAuditLogs])
+    fetchSecuritySummary()
+  }, [fetchAuditLogs, fetchSecuritySummary])
 
   useEffect(() => {
     fetchAdminUsers()
@@ -155,12 +198,22 @@ export default function SystemAuditLogsPage() {
   const pagination = useServerOffsetPagination({
     offset,
     limit: PAGE_LIMIT,
-    currentItemsCount: data.items.length,
-    totalItems: data.total,
+    currentItemsCount: data.auditLogsPage.items.length,
+    totalItems: data.auditLogsPage.total,
   })
 
+  const securityTrendData = useMemo(() => {
+    return (securityTimeseries?.points || []).map((point) => ({
+      hour: point.hour,
+      hourLabel: formatSecurityHourLabel(point.hour, locale),
+      loginSuccess: point.login_success_count,
+      loginFailed: point.login_failed_count,
+      lockTriggered: point.lock_triggered_count,
+    }))
+  }, [locale, securityTimeseries?.points])
+
   const actionStats = useMemo(() => {
-    return data.items.reduce(
+    return data.auditLogsPage.items.reduce(
       (acc, item) => {
         const action = normalizeAuditAction(item.action)
         if (action === "CREATE") {
@@ -174,7 +227,7 @@ export default function SystemAuditLogsPage() {
       },
       { create: 0, update: 0, delete: 0 }
     )
-  }, [data.items])
+  }, [data.auditLogsPage.items])
 
   const hasActiveFilters = Boolean(
     appliedFilters.userId !== "all" ||
@@ -206,17 +259,90 @@ export default function SystemAuditLogsPage() {
           <h2 className="text-2xl font-bold tracking-tight">{t("auditLogsTitle")}</h2>
           <p className="text-sm text-muted-foreground">{t("auditLogsDescription")}</p>
         </div>
-        <Button type="button" variant="outline" onClick={() => fetchAuditLogs(true)} disabled={refreshing}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            void Promise.all([fetchAuditLogs(true), fetchSecuritySummary(true)])
+          }}
+          disabled={refreshing || securitySummaryLoading}
+        >
           {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
           {t("auditLogsRefreshButton")}
         </Button>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-medium">{t("auditLogsSecurityTitle")}</h3>
+            <p className="text-sm text-muted-foreground">{t("auditLogsSecurityDescription")}</p>
+          </div>
+          {securitySummaryLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("auditLogsSecurityStatLoginSuccess")}</CardDescription>
+              <CardTitle className="text-2xl text-emerald-600">{securitySummary?.login_success_count ?? "-"}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("auditLogsSecurityStatLoginFailed")}</CardDescription>
+              <CardTitle className="text-2xl text-amber-600">{securitySummary?.login_failed_count ?? "-"}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("auditLogsSecurityStatLockTriggered")}</CardDescription>
+              <CardTitle className="text-2xl text-red-600">{securitySummary?.lock_triggered_count ?? "-"}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("auditLogsSecurityStatUniqueFailedIps")}</CardDescription>
+              <CardTitle className="text-2xl">{securitySummary?.unique_failed_ips ?? "-"}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("auditLogsSecurityTrendTitle")}</CardTitle>
+            <CardDescription>{t("auditLogsSecurityTrendDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {securityTrendData.length > 0 ? (
+              <div className="h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={securityTrendData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="hourLabel" tickLine={false} axisLine={false} minTickGap={24} />
+                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={36} />
+                    <Tooltip
+                      labelFormatter={(_, payload) => payload?.[0]?.payload?.hour ? formatDateTimeByLocale(payload[0].payload.hour, locale) : "-"}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="loginSuccess" stroke="#16a34a" strokeWidth={2} dot={false} name={t("auditLogsSecurityStatLoginSuccess")} />
+                    <Line type="monotone" dataKey="loginFailed" stroke="#d97706" strokeWidth={2} dot={false} name={t("auditLogsSecurityStatLoginFailed")} />
+                    <Line type="monotone" dataKey="lockTriggered" stroke="#dc2626" strokeWidth={2} dot={false} name={t("auditLogsSecurityStatLockTriggered")} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex h-48 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+                {t("auditLogsSecurityTrendEmpty")}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("auditLogsStatTotal")}</CardDescription>
-            <CardTitle className="text-2xl">{data.total}</CardTitle>
+            <CardTitle className="text-2xl">{data.auditLogsPage.total}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
@@ -341,14 +467,14 @@ export default function SystemAuditLogsPage() {
                       {t("auditLogsTableLoading")}
                     </TableCell>
                   </TableRow>
-                ) : data.items.length === 0 ? (
+                ) : data.auditLogsPage.items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       {hasActiveFilters ? t("auditLogsTableEmptyFiltered") : t("auditLogsTableEmpty")}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.items.map((item) => {
+                  data.auditLogsPage.items.map((item) => {
                     const action = normalizeAuditAction(item.action)
 
                     return (
@@ -382,7 +508,7 @@ export default function SystemAuditLogsPage() {
             {...buildTranslatedPaginationTextBundle({
               t,
               summaryKey: "auditLogsPaginationSummary",
-              total: data.total,
+              total: data.auditLogsPage.total,
               start: pagination.rangeStart,
               end: pagination.rangeEnd,
               pageKey: "auditLogsPaginationPage",

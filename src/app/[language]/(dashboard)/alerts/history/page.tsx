@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { api } from "@/lib/api"
-import { AlertEventResponse } from "@/types/api"
+import { AlertEventResponse, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRefreshState } from "@/hooks/use-refresh-state"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
@@ -83,8 +83,7 @@ function TableRowSkeleton() {
 
 export default function AlertHistoryPage() {
   const { t, locale } = useAppTranslations("alerts")
-  const [alerts, setAlerts] = useState<AlertEventResponse[]>([])
-  const [alertsTotal, setAlertsTotal] = useState(0)
+  const [alertsPage, setAlertsPage] = useState<ListResponse<AlertEventResponse>>({ items: [], total: 0, limit: 20, offset: 0 })
   const { loading, refreshing, runWithRefresh } = useRefreshState()
   const [metadataRefreshKey, setMetadataRefreshKey] = useState(0)
   const { sourceDisplayNameMap, metricNameLabelMap, sourceOptions } = useAlertDisplayMetadata(
@@ -100,6 +99,8 @@ export default function AlertHistoryPage() {
 
   const [offset, setOffset] = useState(0)
   const limit = 20
+  const alerts = alertsPage.items
+  const alertsTotal = alertsPage.total
 
   const fetchHistory = useCallback(async (options?: { silent?: boolean }) => {
     await runWithRefresh(async () => {
@@ -123,8 +124,7 @@ export default function AlertHistoryPage() {
         }
 
         const data = await api.getAlertHistory(params)
-        setAlerts(data.items)
-        setAlertsTotal(data.total)
+        setAlertsPage(data)
       }, t("history.toastFetchError"))
     }, options)
   }, [filterSeverity, filterSourceId, filterTimeFrom, filterTimeTo, limit, offset, runWithRefresh, t])
@@ -136,10 +136,10 @@ export default function AlertHistoryPage() {
   // 客户端状态筛选（因为 API 不支持状态筛选参数）
   // 状态: 1=未处理, 2=已确认, 3=已处理
   const filteredAlerts = useMemo(() => {
-    if (!filterStatus || filterStatus === "all") return alerts
+    if (!filterStatus || filterStatus === "all") return alertsPage.items
 
-    return alerts.filter((alert) => matchesAlertHistoryStatusFilter(filterStatus, alert.status))
-  }, [alerts, filterStatus])
+    return alertsPage.items.filter((alert) => matchesAlertHistoryStatusFilter(filterStatus, alert.status))
+  }, [alertsPage.items, filterStatus])
 
   const handleApplyFilters = () => {
     setOffset(0)
@@ -167,8 +167,8 @@ export default function AlertHistoryPage() {
   const pagination = useServerOffsetPagination({
     offset,
     limit,
-    currentItemsCount: alerts.length,
-    totalItems: alertsTotal,
+    currentItemsCount: alertsPage.items.length,
+    totalItems: alertsPage.total,
   })
 
   return (
@@ -322,7 +322,7 @@ export default function AlertHistoryPage() {
               {...buildTranslatedPaginationTextBundle({
                 t,
                 summaryKey: "history.paginationSummary",
-                total: alertsTotal,
+                total: alertsPage.total,
                 start: pagination.rangeStart,
                 end: pagination.rangeEnd,
                 shownKey: "history.paginationShown",
