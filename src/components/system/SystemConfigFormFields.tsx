@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 export type SystemConfigFormState = {
   configKey: string
   configType: string
+  provider: string
   displayName: string
   description: string
   configJson: string
@@ -69,29 +70,47 @@ export function SystemConfigFormFields({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-config-type`}>{t("systemConfigFieldConfigType")}</Label>
-        <Select
-          value={form.configType}
-          onValueChange={(value) =>
-            setForm((previous) => ({
-              ...previous,
-              configType: value,
-            }))
-          }
-          disabled={isEditing}
-        >
-          <SelectTrigger id={`${idPrefix}-config-type`} className="h-10 w-full bg-background">
-            <SelectValue placeholder={t("systemConfigFieldConfigTypePlaceholder")} />
-          </SelectTrigger>
-          <SelectContent>
-            {configTypeOptions.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-config-type`}>{t("systemConfigFieldConfigType")}</Label>
+          <Select
+            value={form.configType}
+            onValueChange={(value) =>
+              setForm((previous) => ({
+                ...previous,
+                configType: value,
+              }))
+            }
+            disabled={isEditing}
+          >
+            <SelectTrigger id={`${idPrefix}-config-type`} className="h-10 w-full bg-background">
+              <SelectValue placeholder={t("systemConfigFieldConfigTypePlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {configTypeOptions.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-provider`}>{t("systemConfigFieldProvider")}</Label>
+          <Input
+            id={`${idPrefix}-provider`}
+            value={form.provider}
+            onChange={(event) =>
+              setForm((previous) => ({
+                ...previous,
+                provider: event.target.value,
+              }))
+            }
+            placeholder={t("systemConfigFieldProviderPlaceholder")}
+            disabled={isEditing}
+          />
+        </div>
       </div>
 
       {isEditing ? (

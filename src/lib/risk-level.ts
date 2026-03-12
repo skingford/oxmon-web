@@ -16,6 +16,26 @@ export function riskLevelLabelZh(level: RiskLevel) {
   return "严重告警"
 }
 
+export function riskLevelLabel(level: RiskLevel, locale: "zh" | "en" = "zh") {
+  if (locale === "en") {
+    if (level === "normal") {
+      return "Normal"
+    }
+
+    if (level === "attention") {
+      return "Attention"
+    }
+
+    if (level === "alert") {
+      return "Alert"
+    }
+
+    return "Critical"
+  }
+
+  return riskLevelLabelZh(level)
+}
+
 export function resolveRiskLevelByScore(score: number): RiskLevel {
   if (score > 85) {
     return "critical"

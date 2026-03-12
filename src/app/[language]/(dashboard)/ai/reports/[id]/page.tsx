@@ -10,7 +10,7 @@ import { notifiedBadgeClassName } from "@/lib/notified-status";
 import { toastApiError } from "@/lib/toast";
 import {
   resolveRiskLevel,
-  riskLevelLabelZh,
+  riskLevelLabel,
   riskBadgeClassNameByLevel,
 } from "@/lib/risk-level";
 import { useAppTranslations } from "@/hooks/use-app-translations";
@@ -196,7 +196,7 @@ export default function AIReportDetailPage() {
     () => resolveRiskLevel(report?.risk_level || ""),
     [report?.risk_level],
   );
-  const riskLevelLabel = riskLevelLabelZh(riskLevel);
+  const riskLevelText = riskLevelLabel(riskLevel, locale);
   const formattedRawMetricsJson = useMemo(
     () => formatJsonText(report?.raw_metrics_json),
     [report?.raw_metrics_json],
@@ -448,7 +448,7 @@ export default function AIReportDetailPage() {
             </div>
             <div className="text-sm">
               <Badge variant="outline" className={riskBadgeClassNameByLevel(riskLevel)}>
-                {riskLevelLabel}
+                {riskLevelText}
               </Badge>
             </div>
           </div>
@@ -519,7 +519,7 @@ export default function AIReportDetailPage() {
                         <TableCell>{item.agent_type}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={riskBadgeClassNameByLevel(itemRiskLevel)}>
-                            {riskLevelLabelZh(itemRiskLevel)}
+                            {riskLevelLabel(itemRiskLevel, locale)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">{item.cpu_usage ?? "-"}</TableCell>

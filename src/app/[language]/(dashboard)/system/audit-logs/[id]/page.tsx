@@ -159,6 +159,10 @@ export default function SystemAuditLogDetailPage() {
             <p className="text-sm">{item.username || item.user_id || t("auditLogsUnknownValue")}</p>
           </div>
           <div>
+            <p className="text-xs text-muted-foreground">{t("auditLogsDetailFieldUserId")}</p>
+            <p className="font-mono text-sm break-all">{item.user_id || t("auditLogsUnknownValue")}</p>
+          </div>
+          <div>
             <p className="text-xs text-muted-foreground">{t("auditLogsTableColAction")}</p>
             <Badge variant={resolveActionVariant(action)}>{action || t("auditLogsUnknownValue")}</Badge>
           </div>

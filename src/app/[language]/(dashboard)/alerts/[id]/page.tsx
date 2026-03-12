@@ -28,6 +28,18 @@ import {
   useAlertDisplayMetadata,
 } from "@/hooks/use-alert-display-metadata"
 
+function getAlertStatusLabel(status: number, t: ReturnType<typeof useAppTranslations>["t"]) {
+  if (status === 3) {
+    return t("history.statusResolved")
+  }
+
+  if (status === 2) {
+    return t("history.statusAcknowledged")
+  }
+
+  return t("history.statusOpen")
+}
+
 async function findAlertById(id: string) {
   try {
     const historyById = await api.getAlertHistoryById(id)
@@ -283,6 +295,28 @@ export default function AlertDetailPage() {
               {metricDisplayName !== alertDetail.metric_name ? (
                 <p className="font-mono text-xs text-muted-foreground">{alertDetail.metric_name}</p>
               ) : null}
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">{t("active.detailStatusLabel")}</p>
+              <Badge variant="outline">{getAlertStatusLabel(alertDetail.status, t)}</Badge>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">{t("active.detailPredictedBreachLabel")}</p>
+              <p className="text-sm">
+                {formatDateTimeByLocale(
+                  alertDetail.predicted_breach,
+                  locale,
+                  alertDetail.predicted_breach || "-",
+                  {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  }
+                )}
+              </p>
             </div>
           </div>
 

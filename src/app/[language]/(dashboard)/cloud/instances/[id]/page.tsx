@@ -124,6 +124,40 @@ function formatNumber(value: number | null | undefined, digits = 2) {
   })
 }
 
+function formatUnixSecondsDateTime(
+  value: number | null | undefined,
+  locale: "zh" | "en"
+) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return "-"
+  }
+
+  return formatDateTimeByLocale(new Date(value * 1000).toISOString(), locale, "-", {
+    hour12: false,
+  })
+}
+
+function formatStringList(value: string[] | null | undefined) {
+  if (!Array.isArray(value) || value.length === 0) {
+    return "-"
+  }
+
+  return value.filter(Boolean).join(", ")
+}
+
+function formatTags(value: Record<string, string> | null | undefined) {
+  if (!value || typeof value !== "object") {
+    return "-"
+  }
+
+  const entries = Object.entries(value).filter(([key, item]) => key && item)
+  if (entries.length === 0) {
+    return "-"
+  }
+
+  return entries.map(([key, item]) => `${key}: ${item}`).join(", ")
+}
+
 function resolveHistoryRangeStart(range: (typeof HISTORY_RANGE_OPTIONS)[number]) {
   const now = Date.now()
 
@@ -1001,6 +1035,56 @@ export default function CloudInstanceDetailPage() {
           <FieldItem label={t("cloud.instances.detailFieldCpuCores")} value={formatNumber(instance.cpu_cores, 0)} />
           <FieldItem label={t("cloud.instances.detailFieldMemoryGb")} value={formatNumber(instance.memory_gb)} />
           <FieldItem label={t("cloud.instances.detailFieldDiskGb")} value={formatNumber(instance.disk_gb)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("cloud.instances.detailSectionNetwork")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FieldItem label={t("cloud.instances.detailFieldZone")} value={instance.zone || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldVpcId")} value={instance.vpc_id || "-"} mono />
+          <FieldItem label={t("cloud.instances.detailFieldSubnetId")} value={instance.subnet_id || "-"} mono />
+          <FieldItem label={t("cloud.instances.detailFieldEipAllocationId")} value={instance.eip_allocation_id || "-"} mono />
+          <FieldItem label={t("cloud.instances.detailFieldBandwidth")} value={formatNumber(instance.internet_max_bandwidth, 0)} />
+          <FieldItem label={t("cloud.instances.detailFieldInternetChargeType")} value={instance.internet_charge_type || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldIpv6Addresses")} value={formatStringList(instance.ipv6_addresses)} />
+          <FieldItem label={t("cloud.instances.detailFieldSecurityGroups")} value={formatStringList(instance.security_group_ids)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("cloud.instances.detailSectionLifecycle")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FieldItem label={t("cloud.instances.detailFieldStatusRaw")} value={instance.status || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldStatusSyncedAt")} value={formatDateTimeByLocale(instance.status_synced_at, locale, instance.status_synced_at || "-", {
+            hour12: false,
+          })} />
+          <FieldItem label={t("cloud.instances.detailFieldStatusSyncAgeSecs")} value={formatNumber(instance.status_sync_age_secs, 0)} />
+          <FieldItem label={t("cloud.instances.detailFieldCreatedTime")} value={formatUnixSecondsDateTime(instance.created_time, locale)} />
+          <FieldItem label={t("cloud.instances.detailFieldExpiredTime")} value={formatUnixSecondsDateTime(instance.expired_time, locale)} />
+          <FieldItem label={t("cloud.instances.detailFieldChargeType")} value={instance.charge_type || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldAutoRenewFlag")} value={instance.auto_renew_flag || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldLatestOperation")} value={instance.latest_operation || "-"} hint={instance.latest_operation_state || "-"} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("cloud.instances.detailSectionMetadata")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FieldItem label={t("cloud.instances.detailFieldHostname")} value={instance.hostname || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldImageId")} value={instance.image_id || "-"} mono />
+          <FieldItem label={t("cloud.instances.detailFieldProjectId")} value={instance.project_id || "-"} mono />
+          <FieldItem label={t("cloud.instances.detailFieldResourceGroupId")} value={instance.resource_group_id || "-"} mono />
+          <FieldItem label={t("cloud.instances.detailFieldGpu")} value={formatNumber(instance.gpu, 0)} />
+          <FieldItem label={t("cloud.instances.detailFieldIoOptimized")} value={instance.io_optimized || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldDescription")} value={instance.description || "-"} />
+          <FieldItem label={t("cloud.instances.detailFieldTags")} value={formatTags(instance.tags)} />
         </CardContent>
       </Card>
 

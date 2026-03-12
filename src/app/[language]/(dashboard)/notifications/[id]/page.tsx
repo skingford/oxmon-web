@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { api } from "@/lib/api"
+import type { ChannelOverview } from "@/types/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -54,17 +55,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, Loader2, MoreHorizontal, Pencil, Sen
 import { toast, toastActionSuccess, toastApiError, toastDeleted, toastSaved, toastStatusError } from "@/lib/toast"
 
 type ChannelDetailState = {
-  channel: {
-    id: string
-    name: string
-    channel_type: string
-    min_severity: string
-    enabled: boolean
-    description: string | null
-    recipients: string[]
-    created_at: string
-    updated_at: string
-  } | null
+  channel: ChannelOverview | null
   configJson: string
 }
 
@@ -411,6 +402,14 @@ export default function NotificationChannelDetailPage() {
             <Badge variant={channel.enabled ? "secondary" : "outline"}>
               {channel.enabled ? t("notifications.statusEnabled") : t("notifications.statusDisabled")}
             </Badge>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t("notifications.detailFieldRecipientType")}</p>
+            <p className="text-sm">{channel.recipient_type || "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t("notifications.detailFieldRecipientsCount")}</p>
+            <p className="text-sm">{channel.recipients.length}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{t("notifications.detailFieldCreatedAt")}</p>

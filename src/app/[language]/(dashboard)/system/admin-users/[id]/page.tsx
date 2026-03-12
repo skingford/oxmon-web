@@ -185,6 +185,30 @@ export default function AdminUserDetailPage() {
             <p className="text-xs text-muted-foreground">{t("adminUsersTableColUpdatedAt")}</p>
             <p className="text-sm">{formatDateTimeByLocale(item.updated_at, locale, item.updated_at || "-", { hour12: false })}</p>
           </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t("adminUsersDetailFieldEmail")}</p>
+            <p className="text-sm break-all">{item.email || "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t("adminUsersDetailFieldPhone")}</p>
+            <p className="text-sm">{item.phone || "-"}</p>
+          </div>
+          <div className="md:col-span-2">
+            <p className="text-xs text-muted-foreground">{t("adminUsersDetailFieldAvatar")}</p>
+            {item.avatar ? (
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.avatar}
+                  alt={item.username}
+                  className="h-12 w-12 rounded-full border object-cover"
+                />
+                <p className="text-sm break-all text-muted-foreground">{item.avatar}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">-</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

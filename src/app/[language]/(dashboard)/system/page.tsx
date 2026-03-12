@@ -302,6 +302,7 @@ export default function SystemPage() {
           item.display_name,
           item.config_key,
           item.config_type,
+          item.provider || "",
           item.description || "",
         ]
           .join(" ")
@@ -366,6 +367,7 @@ export default function SystemPage() {
     const displayName = systemConfigForm.displayName.trim();
     const configKey = systemConfigForm.configKey.trim();
     const configType = systemConfigForm.configType.trim().toLowerCase();
+    const provider = systemConfigForm.provider.trim();
     const description = systemConfigForm.description.trim();
     const configJsonInput = systemConfigForm.configJson.trim();
 
@@ -415,6 +417,7 @@ export default function SystemPage() {
         const payload: CreateSystemConfigRequest = {
           config_key: configKey,
           config_type: configType,
+          provider: provider || null,
           display_name: displayName,
           description: description || null,
           config_json: normalizedConfigJson,
@@ -628,6 +631,7 @@ export default function SystemPage() {
                     <TableRow>
                       <TableHead>{t("systemConfigColDisplayName")}</TableHead>
                       <TableHead>{t("systemConfigColKeyType")}</TableHead>
+                      <TableHead>{t("systemConfigColProvider")}</TableHead>
                       <TableHead>{t("systemConfigColConfigJson")}</TableHead>
                       <TableHead>{t("systemConfigColStatus")}</TableHead>
                       <TableHead>{t("systemConfigColUpdatedAt")}</TableHead>
@@ -640,7 +644,7 @@ export default function SystemPage() {
                     {filteredSystemConfigs.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={7}
                           className="h-24 text-center text-muted-foreground"
                         >
                           {t("systemConfigEmpty")}
@@ -676,6 +680,11 @@ export default function SystemPage() {
                                   {item.config_type}
                                 </p>
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-xs text-muted-foreground">
+                                {item.provider || "-"}
+                              </p>
                             </TableCell>
                             <TableCell className="max-w-[260px]">
                               <p

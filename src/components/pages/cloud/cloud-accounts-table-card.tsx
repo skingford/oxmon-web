@@ -42,6 +42,8 @@ type CloudAccountsTableCardProps = {
     colName: string
     colConfigKey: string
     colProvider: string
+    colRegions: string
+    colInterval: string
     colStatus: string
     colUpdatedAt: string
     colActions: string
@@ -96,25 +98,27 @@ export function CloudAccountsTableCard({
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>{texts.colName}</TableHead>
-                <TableHead>{texts.colConfigKey}</TableHead>
-                <TableHead>{texts.colProvider}</TableHead>
-                <TableHead>{texts.colStatus}</TableHead>
-                <TableHead>{texts.colUpdatedAt}</TableHead>
-                <TableHead className="text-right">{texts.colActions}</TableHead>
-              </TableRow>
+                <TableRow>
+                  <TableHead>{texts.colName}</TableHead>
+                  <TableHead>{texts.colConfigKey}</TableHead>
+                  <TableHead>{texts.colProvider}</TableHead>
+                  <TableHead>{texts.colRegions}</TableHead>
+                  <TableHead>{texts.colInterval}</TableHead>
+                  <TableHead>{texts.colStatus}</TableHead>
+                  <TableHead>{texts.colUpdatedAt}</TableHead>
+                  <TableHead className="text-right">{texts.colActions}</TableHead>
+                </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-28 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-28 text-center text-muted-foreground">
                     {texts.tableLoading}
                   </TableCell>
                 </TableRow>
               ) : accounts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-28 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-28 text-center text-muted-foreground">
                     {texts.tableEmpty}
                   </TableCell>
                 </TableRow>
@@ -143,6 +147,12 @@ export function CloudAccountsTableCard({
                     <TableCell>
                       <Badge variant="secondary">{getProviderLabel(account.provider)}</Badge>
                     </TableCell>
+                    <TableCell className="max-w-[220px]">
+                      <div className="truncate text-sm" title={account.regions.join(", ") || undefined}>
+                        {account.regions.length > 0 ? account.regions.join(", ") : "-"}
+                      </div>
+                    </TableCell>
+                    <TableCell>{account.collection_interval_secs || "-"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Switch

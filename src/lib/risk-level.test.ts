@@ -6,6 +6,7 @@ import {
   resolveRiskLevelByScore,
   riskBadgeClassNameByLevel,
   riskBadgeClassName,
+  riskLevelLabel,
   riskLevelLabelZh,
   riskLevelColorHex,
 } from "./risk-level"
@@ -49,5 +50,13 @@ describe("risk-level", () => {
     expect(riskLevelLabelZh("attention")).toBe("关注")
     expect(riskLevelLabelZh("alert")).toBe("告警")
     expect(riskLevelLabelZh("critical")).toBe("严重告警")
+  })
+
+  it("返回多语言风险等级文案", () => {
+    expect(riskLevelLabel("normal", "en")).toBe("Normal")
+    expect(riskLevelLabel("attention", "en")).toBe("Attention")
+    expect(riskLevelLabel("alert", "en")).toBe("Alert")
+    expect(riskLevelLabel("critical", "en")).toBe("Critical")
+    expect(riskLevelLabel("critical", "zh")).toBe("严重告警")
   })
 })

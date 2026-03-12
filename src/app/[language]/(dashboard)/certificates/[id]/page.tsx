@@ -86,6 +86,14 @@ function getCertificateStatusMeta(
   }
 }
 
+function formatOptionalList(value: string[] | null | undefined) {
+  if (!Array.isArray(value) || value.length === 0) {
+    return []
+  }
+
+  return value.filter(Boolean)
+}
+
 export default function CertificateDetailPage() {
   const { t, locale } = useAppTranslations("pages")
   const params = useParams()
@@ -393,6 +401,119 @@ export default function CertificateDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("certificates.detail.technicalTitle")}</CardTitle>
+          <CardDescription>{t("certificates.detail.technicalDescription")}</CardDescription>
+        </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldIssuerOu")}</p>
+            <p className="text-sm break-all">{certificate.issuer_ou || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldIssuerCountry")}</p>
+            <p className="text-sm">{certificate.issuer_c || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldSubjectCn")}</p>
+            <p className="text-sm break-all">{certificate.subject_cn || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldSubjectOrg")}</p>
+            <p className="text-sm break-all">{certificate.subject_o || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldSerialNumber")}</p>
+            <p className="text-sm font-mono break-all">{certificate.serial_number || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldFingerprintSha256")}</p>
+            <p className="text-sm font-mono break-all">{certificate.fingerprint_sha256 || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldSignatureAlgorithm")}</p>
+            <p className="text-sm">{certificate.signature_algorithm || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldPublicKeyAlgorithm")}</p>
+            <p className="text-sm">{certificate.public_key_algorithm || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldPublicKeyBits")}</p>
+            <p className="text-sm">{certificate.public_key_bits ?? "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldVersion")}</p>
+            <p className="text-sm">{certificate.version ?? "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldChainDepth")}</p>
+            <p className="text-sm">{certificate.chain_depth ?? "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldTlsVersion")}</p>
+            <p className="text-sm">{certificate.tls_version || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldCipherSuite")}</p>
+            <p className="text-sm break-all">{certificate.cipher_suite || "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldSctCount")}</p>
+            <p className="text-sm">{certificate.sct_count ?? "-"}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldIsWildcard")}</p>
+            <p className="text-sm">{certificate.is_wildcard === null ? "-" : certificate.is_wildcard ? t("certificates.domains.statusEnabled") : t("certificates.detail.monitoringStatusDisabled")}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldIsCa")}</p>
+            <p className="text-sm">{certificate.is_ca === null ? "-" : certificate.is_ca ? t("certificates.domains.statusEnabled") : t("certificates.detail.monitoringStatusDisabled")}</p>
+          </div>
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldKeyUsage")}</p>
+            <div className="flex flex-wrap gap-1">
+              {formatOptionalList(certificate.key_usage).length > 0 ? formatOptionalList(certificate.key_usage).map((item) => (
+                <Badge key={item} variant="secondary" className="text-xs">{item}</Badge>
+              )) : <p className="text-sm text-muted-foreground">-</p>}
+            </div>
+          </div>
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldExtendedKeyUsage")}</p>
+            <div className="flex flex-wrap gap-1">
+              {formatOptionalList(certificate.extended_key_usage).length > 0 ? formatOptionalList(certificate.extended_key_usage).map((item) => (
+                <Badge key={item} variant="secondary" className="text-xs">{item}</Badge>
+              )) : <p className="text-sm text-muted-foreground">-</p>}
+            </div>
+          </div>
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldOcspUrls")}</p>
+            <div className="space-y-1">
+              {formatOptionalList(certificate.ocsp_urls).length > 0 ? formatOptionalList(certificate.ocsp_urls).map((item) => (
+                <p key={item} className="text-sm break-all">{item}</p>
+              )) : <p className="text-sm text-muted-foreground">-</p>}
+            </div>
+          </div>
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldCrlUrls")}</p>
+            <div className="space-y-1">
+              {formatOptionalList(certificate.crl_urls).length > 0 ? formatOptionalList(certificate.crl_urls).map((item) => (
+                <p key={item} className="text-sm break-all">{item}</p>
+              )) : <p className="text-sm text-muted-foreground">-</p>}
+            </div>
+          </div>
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
+            <p className="text-sm font-medium text-muted-foreground">{t("certificates.detail.fieldCaIssuerUrls")}</p>
+            <div className="space-y-1">
+              {formatOptionalList(certificate.ca_issuer_urls).length > 0 ? formatOptionalList(certificate.ca_issuer_urls).map((item) => (
+                <p key={item} className="text-sm break-all">{item}</p>
+              )) : <p className="text-sm text-muted-foreground">-</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

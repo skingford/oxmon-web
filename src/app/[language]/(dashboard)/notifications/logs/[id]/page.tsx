@@ -150,6 +150,10 @@ export default function NotificationLogDetailPage() {
             <p className="text-xs text-muted-foreground">{item.channel_id}</p>
           </div>
           <div>
+            <p className="text-xs text-muted-foreground">{t("notifications.logsDetailFieldChannelType")}</p>
+            <p className="text-sm">{item.channel_type || t("notifications.logsUnknownValue")}</p>
+          </div>
+          <div>
             <p className="text-xs text-muted-foreground">{t("notifications.logsTableColRule")}</p>
             <p className="text-sm">{item.rule_name || t("notifications.logsUnknownValue")}</p>
             <p className="text-xs text-muted-foreground">{item.rule_id}</p>
@@ -157,6 +161,10 @@ export default function NotificationLogDetailPage() {
           <div>
             <p className="text-xs text-muted-foreground">{t("notifications.logsTableColAgent")}</p>
             <p className="text-sm">{item.agent_id || t("notifications.logsUnknownValue")}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t("notifications.logsDetailFieldAlertEventId")}</p>
+            <p className="font-mono text-sm break-all">{item.alert_event_id || t("notifications.logsUnknownValue")}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{t("notifications.logsTableColDuration")}</p>

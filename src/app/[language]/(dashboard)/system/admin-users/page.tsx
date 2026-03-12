@@ -326,6 +326,8 @@ export default function SystemAdminUsersPage() {
                 <TableRow>
                   <TableHead>{t("adminUsersTableColUsername")}</TableHead>
                   <TableHead>{t("adminUsersTableColStatus")}</TableHead>
+                  <TableHead>{t("adminUsersDetailFieldEmail")}</TableHead>
+                  <TableHead>{t("adminUsersDetailFieldPhone")}</TableHead>
                   <TableHead>{t("adminUsersTableColId")}</TableHead>
                   <TableHead>{t("adminUsersTableColCreatedAt")}</TableHead>
                   <TableHead>{t("adminUsersTableColUpdatedAt")}</TableHead>
@@ -335,13 +337,13 @@ export default function SystemAdminUsersPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                       {t("adminUsersTableLoading")}
                     </TableCell>
                   </TableRow>
                 ) : data.usersPage.items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                       {t("adminUsersTableEmpty")}
                     </TableCell>
                   </TableRow>
@@ -366,6 +368,10 @@ export default function SystemAdminUsersPage() {
                               {item.status === "disabled" ? t("adminUsersStatusDisabled") : t("adminUsersStatusActive")}
                             </Badge>
                           </TableCell>
+                          <TableCell className="max-w-[220px] truncate" title={item.email || undefined}>
+                            {item.email || "-"}
+                          </TableCell>
+                          <TableCell>{item.phone || "-"}</TableCell>
                           <TableCell className="font-mono text-xs">{item.id}</TableCell>
                           <TableCell>{formatDateTimeByLocale(item.created_at, locale, item.created_at || "-", { hour12: false })}</TableCell>
                           <TableCell>{formatDateTimeByLocale(item.updated_at, locale, item.updated_at || "-", { hour12: false })}</TableCell>

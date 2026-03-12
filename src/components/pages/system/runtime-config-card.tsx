@@ -110,9 +110,15 @@ export function RuntimeConfigCard({ config }: RuntimeConfigCardProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">{t("fieldNotificationChannelsCount")}</Label>
-            <Input readOnly value={config?.notification_channels_count ?? 0} className="bg-muted font-mono" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t("fieldNotificationChannelsCount")}</Label>
+              <Input readOnly value={config?.notification_channels_count ?? 0} className="bg-muted font-mono" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t("fieldLanguage")}</Label>
+              <Input readOnly value={config?.language || "N/A"} className="bg-muted font-mono" />
+            </div>
           </div>
         </CardContent>
       </Card>

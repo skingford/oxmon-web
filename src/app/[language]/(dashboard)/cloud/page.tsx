@@ -757,6 +757,8 @@ export default function CloudAccountsPage() {
           colName: t("cloud.accounts.tableColName"),
           colConfigKey: t("cloud.accounts.tableColConfigKey"),
           colProvider: t("cloud.accounts.tableColProvider"),
+          colRegions: t("cloud.accounts.tableColRegions"),
+          colInterval: t("cloud.accounts.tableColInterval"),
           colStatus: t("cloud.accounts.tableColStatus"),
           colUpdatedAt: t("cloud.accounts.tableColUpdatedAt"),
           colActions: t("cloud.accounts.tableColActions"),

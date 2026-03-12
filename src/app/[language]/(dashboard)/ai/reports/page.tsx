@@ -10,7 +10,7 @@ import { formatDateTimeByLocale } from "@/lib/date-time"
 import { notifiedBadgeClassName } from "@/lib/notified-status"
 import {
   resolveRiskLevel,
-  riskLevelLabelZh,
+  riskLevelLabel,
   riskBadgeClassNameByLevel,
 } from "@/lib/risk-level"
 import { useAppTranslations } from "@/hooks/use-app-translations"
@@ -194,7 +194,7 @@ export default function AIReportsPage() {
                 ) : (
                   sortedItems.map((item) => {
                     const level = resolveRiskLevel(item.risk_level)
-                    const riskLabel = riskLevelLabelZh(level)
+                    const riskLabel = riskLevelLabel(level, locale)
 
                     return (
                       <TableRow key={item.id}>

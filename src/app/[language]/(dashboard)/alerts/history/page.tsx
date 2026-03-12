@@ -1,8 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { api } from "@/lib/api"
 import { AlertEventResponse, ListResponse } from "@/types/api"
+import { withLocalePrefix } from "@/components/app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRefreshState } from "@/hooks/use-refresh-state"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
@@ -231,6 +233,7 @@ export default function AlertHistoryPage() {
                   <TableHead>{t("active.colValue")}</TableHead>
                   <TableHead>{t("active.colTime")}</TableHead>
                   <TableHead>{t("history.colStatus")}</TableHead>
+                  <TableHead className="text-right">{t("active.viewDetails")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -243,7 +246,7 @@ export default function AlertHistoryPage() {
                   </>
                 ) : filteredAlerts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-40 text-center">
+                    <TableCell colSpan={8} className="h-40 text-center">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <AlertCircle className="h-10 w-10" />
                         <p className="font-semibold">{t("history.emptyTitle")}</p>
@@ -306,6 +309,13 @@ export default function AlertHistoryPage() {
                           })}
                         </TableCell>
                         <TableCell><AlertStatusBadge status={alert.status} t={t} /></TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild type="button" size="sm" variant="outline">
+                            <Link href={withLocalePrefix(`/alerts/${alert.id}`, locale)}>
+                              {t("active.viewDetails")}
+                            </Link>
+                          </Button>
+                        </TableCell>
                       </motion.tr>
                     )
                   })
