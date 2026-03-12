@@ -12,6 +12,7 @@ import { toastApiError } from "@/lib/toast";
 import {
   parseRiskScore,
   resolveRiskLevel,
+  resolveRiskLevelByScore,
   riskLevelLabel,
   riskBadgeClassNameByLevel,
 } from "@/lib/risk-level";
@@ -30,7 +31,11 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { JsonTextarea } from "@/components/ui/json-textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -43,7 +48,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PaginationControls } from "@/components/ui/pagination-controls";
-import { Code2, Expand, Loader2, RefreshCw } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Code2, Expand, Loader2, RefreshCw, Search } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -112,6 +117,10 @@ function formatReportInstanceTimestamp(value: number, locale: AppLocale) {
 }
 
 const INSTANCE_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
+type InstanceRiskFilter = "all" | "critical" | "alert" | "attention" | "normal"
+type InstanceSortField = "risk" | "cpu" | "memory" | "disk" | "timestamp"
+type InstanceSortDirection = "asc" | "desc"
+const ANOMALY_INCOMPATIBLE_RISK_FILTERS: InstanceRiskFilter[] = ["attention", "normal"]
 
 function riskLevelPriority(level: ReturnType<typeof resolveRiskLevel>) {
   if (level === "critical") {
@@ -129,20 +138,43 @@ function riskLevelPriority(level: ReturnType<typeof resolveRiskLevel>) {
   return 0
 }
 
+function maxRiskLevel(
+  left: ReturnType<typeof resolveRiskLevel>,
+  right: ReturnType<typeof resolveRiskLevel>,
+) {
+  return riskLevelPriority(left) >= riskLevelPriority(right) ? left : right
+}
+
 function riskRowClassNameByLevel(level: ReturnType<typeof resolveRiskLevel>) {
   if (level === "critical") {
-    return "border-l-4 border-l-red-500 bg-red-50/60"
+    return "bg-red-50/60"
   }
 
   if (level === "alert") {
-    return "border-l-4 border-l-amber-500 bg-amber-50/60"
+    return "bg-amber-50/60"
   }
 
   if (level === "attention") {
-    return "border-l-4 border-l-blue-500 bg-blue-50/60"
+    return "bg-blue-50/60"
   }
 
-  return "border-l-4 border-l-emerald-500 bg-emerald-50/60"
+  return "bg-emerald-50/60"
+}
+
+function riskAccentCellClassNameByLevel(level: ReturnType<typeof resolveRiskLevel>) {
+  if (level === "critical") {
+    return "border-l-4 border-l-red-500"
+  }
+
+  if (level === "alert") {
+    return "border-l-4 border-l-amber-500"
+  }
+
+  if (level === "attention") {
+    return "border-l-4 border-l-blue-500"
+  }
+
+  return "border-l-4 border-l-emerald-500"
 }
 
 function riskDotClassNameByLevel(level: ReturnType<typeof resolveRiskLevel>) {
@@ -159,6 +191,102 @@ function riskDotClassNameByLevel(level: ReturnType<typeof resolveRiskLevel>) {
   }
 
   return "bg-emerald-500"
+}
+
+function normalizeUsagePercent(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null
+  }
+
+  return value
+}
+
+function formatUsagePercent(value?: number | null) {
+  const normalized = normalizeUsagePercent(value)
+
+  if (normalized === null) {
+    return "-"
+  }
+
+  return `${normalized.toFixed(1)}%`
+}
+
+function usageRiskLevel(value?: number | null) {
+  const normalized = normalizeUsagePercent(value)
+
+  if (normalized === null) {
+    return null
+  }
+
+  return resolveRiskLevelByScore(normalized)
+}
+
+function resolveInstanceDisplayRiskLevel(item: AIReportInstanceItem) {
+  const apiRiskLevel = resolveRiskLevel(item.risk_level)
+  const metricsRiskLevel = [item.cpu_usage, item.memory_usage, item.disk_usage].reduce<
+    ReturnType<typeof resolveRiskLevel>
+  >((highestLevel, value) => {
+    const currentLevel = usageRiskLevel(value)
+    if (!currentLevel) {
+      return highestLevel
+    }
+
+    return maxRiskLevel(highestLevel, currentLevel)
+  }, "normal")
+
+  return maxRiskLevel(apiRiskLevel, metricsRiskLevel)
+}
+
+function usageTextClassName(value?: number | null) {
+  const level = usageRiskLevel(value)
+
+  if (level === "critical") {
+    return "text-red-600"
+  }
+
+  if (level === "alert") {
+    return "text-amber-600"
+  }
+
+  if (level === "attention") {
+    return "text-blue-600"
+  }
+
+  if (level === "normal") {
+    return "text-emerald-600"
+  }
+
+  return "text-muted-foreground"
+}
+
+function UsageMetricCell({ value }: { value?: number | null }) {
+  const percentText = formatUsagePercent(value)
+
+  return (
+    <div className="inline-flex min-w-[72px] items-center justify-end">
+      <span className={cn("font-medium tabular-nums", usageTextClassName(value))}>
+        {percentText}
+      </span>
+    </div>
+  )
+}
+
+function SortIndicator({
+  active,
+  direction,
+}: {
+  active: boolean
+  direction: InstanceSortDirection
+}) {
+  if (!active) {
+    return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+  }
+
+  if (direction === "asc") {
+    return <ArrowUp className="h-3.5 w-3.5" />
+  }
+
+  return <ArrowDown className="h-3.5 w-3.5" />
 }
 
 function buildHtmlPreviewDoc(value?: string | null) {
@@ -244,10 +372,19 @@ export default function AIReportDetailPage() {
   const [htmlPreviewUrl, setHtmlPreviewUrl] = useState("");
   const [htmlPreviewRequested, setHtmlPreviewRequested] = useState(false);
   const [instancesPageSize, setInstancesPageSize] = useState<number>(INSTANCE_PAGE_SIZE_OPTIONS[0]);
+  const [instanceRiskFilter, setInstanceRiskFilter] = useState<InstanceRiskFilter>("all");
+  const [instanceSortField, setInstanceSortField] = useState<InstanceSortField>("risk");
+  const [instanceSortDirection, setInstanceSortDirection] = useState<InstanceSortDirection>("desc");
+  const [instanceSearchKeyword, setInstanceSearchKeyword] = useState("");
+  const [showAnomalyOnly, setShowAnomalyOnly] = useState(false);
   const htmlPreviewCacheRef = useRef<{
     raw: string;
     url: string;
   } | null>(null);
+  const normalizedInstanceSearchKeyword = useMemo(
+    () => instanceSearchKeyword.trim().toLowerCase(),
+    [instanceSearchKeyword],
+  );
   const riskLevel = useMemo(
     () => resolveRiskLevel(report?.risk_level || ""),
     [report?.risk_level],
@@ -261,7 +398,7 @@ export default function AIReportDetailPage() {
   const reportInstanceRiskStats = useMemo(() => {
     return reportInstances.reduce(
       (acc, item) => {
-        const level = resolveRiskLevel(item.risk_level)
+        const level = resolveInstanceDisplayRiskLevel(item)
         if (level === "critical") {
           acc.high += 1
         } else if (level === "alert") {
@@ -276,31 +413,98 @@ export default function AIReportDetailPage() {
       { high: 0, medium: 0, low: 0, normal: 0 },
     )
   }, [reportInstances]);
-  const sortedReportInstances = useMemo(() => {
-    return [...reportInstances].sort((left, right) => {
-      const leftLevel = resolveRiskLevel(left.risk_level)
-      const rightLevel = resolveRiskLevel(right.risk_level)
-      const levelDiff = riskLevelPriority(rightLevel) - riskLevelPriority(leftLevel)
+  const filteredReportInstances = useMemo(() => {
+    return reportInstances.filter((item) => {
+      const resolvedRiskLevel = resolveInstanceDisplayRiskLevel(item)
+      const matchesRisk = instanceRiskFilter === "all"
+        ? true
+        : resolvedRiskLevel === instanceRiskFilter
 
-      if (levelDiff !== 0) {
+      if (!matchesRisk) {
+        return false
+      }
+
+      const matchesSearch = !normalizedInstanceSearchKeyword
+        ? true
+        : [
+            item.agent_id,
+            item.instance_name || "",
+            item.agent_type,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedInstanceSearchKeyword)
+
+      if (!matchesSearch) {
+        return false
+      }
+
+      if (!showAnomalyOnly) {
+        return true
+      }
+
+      return riskLevelPriority(resolvedRiskLevel) >= riskLevelPriority("alert")
+    })
+  }, [instanceRiskFilter, normalizedInstanceSearchKeyword, reportInstances, showAnomalyOnly]);
+  const sortedReportInstances = useMemo(() => {
+    return [...filteredReportInstances].sort((left, right) => {
+      const leftLevel = resolveInstanceDisplayRiskLevel(left)
+      const rightLevel = resolveInstanceDisplayRiskLevel(right)
+      const baseLevelDiff = riskLevelPriority(rightLevel) - riskLevelPriority(leftLevel)
+      const levelDiff = instanceSortDirection === "asc" ? -baseLevelDiff : baseLevelDiff
+
+      const compareUsage = (leftValue?: number | null, rightValue?: number | null) => {
+        const leftUsage = normalizeUsagePercent(leftValue) ?? -1
+        const rightUsage = normalizeUsagePercent(rightValue) ?? -1
+        return instanceSortDirection === "asc" ? leftUsage - rightUsage : rightUsage - leftUsage
+      }
+
+      if (instanceSortField === "cpu") {
+        const diff = compareUsage(left.cpu_usage, right.cpu_usage)
+        if (diff !== 0) {
+          return diff
+        }
+      } else if (instanceSortField === "memory") {
+        const diff = compareUsage(left.memory_usage, right.memory_usage)
+        if (diff !== 0) {
+          return diff
+        }
+      } else if (instanceSortField === "disk") {
+        const diff = compareUsage(left.disk_usage, right.disk_usage)
+        if (diff !== 0) {
+          return diff
+        }
+      } else if (instanceSortField === "timestamp") {
+        const diff = instanceSortDirection === "asc"
+          ? left.timestamp - right.timestamp
+          : right.timestamp - left.timestamp
+
+        if (diff !== 0) {
+          return diff
+        }
+      } else if (levelDiff !== 0) {
         return levelDiff
       }
 
       const leftScore = parseRiskScore(left.risk_level) ?? -1
       const rightScore = parseRiskScore(right.risk_level) ?? -1
-      const scoreDiff = rightScore - leftScore
+      const scoreDiff = instanceSortDirection === "asc"
+        ? leftScore - rightScore
+        : rightScore - leftScore
 
       if (scoreDiff !== 0) {
         return scoreDiff
       }
 
-      return right.timestamp - left.timestamp
+      return instanceSortDirection === "asc"
+        ? left.timestamp - right.timestamp
+        : right.timestamp - left.timestamp
     })
-  }, [reportInstances]);
+  }, [filteredReportInstances, instanceSortDirection, instanceSortField]);
   const reportInstancesPagination = useClientPagination({
     items: sortedReportInstances,
     pageSize: instancesPageSize,
-    resetKey: `${id}|${instancesPageSize}|${sortedReportInstances.length}`,
+    resetKey: `${id}|${instanceRiskFilter}|${normalizedInstanceSearchKeyword}|${showAnomalyOnly}|${instanceSortField}|${instanceSortDirection}|${instancesPageSize}|${sortedReportInstances.length}`,
   });
   const htmlRawContent = report?.html_content || "";
   const htmlSource = htmlRawContent.trim();
@@ -441,6 +645,24 @@ export default function AIReportDetailPage() {
     void fetchDetail();
   }, [fetchDetail]);
 
+  useEffect(() => {
+    if (showAnomalyOnly && ANOMALY_INCOMPATIBLE_RISK_FILTERS.includes(instanceRiskFilter)) {
+      setInstanceRiskFilter("all")
+    }
+  }, [instanceRiskFilter, showAnomalyOnly]);
+
+  const handleInstanceSort = useCallback((field: InstanceSortField) => {
+    setInstanceSortField((currentField) => {
+      if (currentField === field) {
+        setInstanceSortDirection((currentDirection) => currentDirection === "desc" ? "asc" : "desc")
+        return currentField
+      }
+
+      setInstanceSortDirection(field === "timestamp" ? "desc" : "desc")
+      return field
+    })
+  }, []);
+
   if (loading && !report) {
     return (
       <div className="flex h-[calc(100vh-4rem)] items-center justify-center gap-2 text-muted-foreground">
@@ -576,6 +798,51 @@ export default function AIReportDetailPage() {
             <MetaItem label={t("reports.detailInstancesStatMedium")} value={reportInstanceRiskStats.medium} />
             <MetaItem label={t("reports.detailInstancesStatLowOrNormal")} value={reportInstanceRiskStats.low + reportInstanceRiskStats.normal} />
           </div>
+          <div className="flex flex-col gap-3 rounded-md border p-3">
+            <div className="text-sm text-muted-foreground">
+              {t("reports.detailInstancesToolbarDescription", {
+                count: filteredReportInstances.length,
+                total: reportInstances.length,
+              })}
+            </div>
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={instanceSearchKeyword}
+                  onChange={(event) => setInstanceSearchKeyword(event.target.value)}
+                  placeholder={t("reports.detailInstancesSearchPlaceholder")}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={instanceRiskFilter} onValueChange={(value) => setInstanceRiskFilter(value as InstanceRiskFilter)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={t("reports.detailInstancesRiskFilterPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("reports.detailInstancesRiskFilter_all")}</SelectItem>
+                  <SelectItem value="critical">{t("reports.detailInstancesRiskFilter_critical")}</SelectItem>
+                  <SelectItem value="alert">{t("reports.detailInstancesRiskFilter_alert")}</SelectItem>
+                  <SelectItem
+                    value="attention"
+                    disabled={showAnomalyOnly}
+                  >
+                    {t("reports.detailInstancesRiskFilter_attention")}
+                  </SelectItem>
+                  <SelectItem
+                    value="normal"
+                    disabled={showAnomalyOnly}
+                  >
+                    {t("reports.detailInstancesRiskFilter_normal")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Label className="flex items-center gap-3 rounded-md border px-3 py-2">
+                <Switch checked={showAnomalyOnly} onCheckedChange={setShowAnomalyOnly} />
+                <span>{t("reports.detailInstancesAnomalyOnly")}</span>
+              </Label>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-3 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
             {(["normal", "attention", "alert", "critical"] as const).map((level) => (
               <div key={level} className="flex items-center gap-2">
@@ -593,23 +860,85 @@ export default function AIReportDetailPage() {
                   <TableHead>{t("reports.detailInstancesColAgentId")}</TableHead>
                   <TableHead>{t("reports.detailInstancesColName")}</TableHead>
                   <TableHead>{t("reports.detailInstancesColType")}</TableHead>
-                  <TableHead>{t("reports.detailInstancesColRisk")}</TableHead>
-                  <TableHead className="text-right">CPU</TableHead>
-                  <TableHead className="text-right">Memory</TableHead>
-                  <TableHead className="text-right">Disk</TableHead>
-                  <TableHead>{t("reports.detailInstancesColTimestamp")}</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1"
+                      onClick={() => handleInstanceSort("risk")}
+                    >
+                      {t("reports.detailInstancesColRisk")}
+                      <SortIndicator
+                        active={instanceSortField === "risk"}
+                        direction={instanceSortDirection}
+                      />
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-end gap-1"
+                      onClick={() => handleInstanceSort("cpu")}
+                    >
+                      {t("reports.detailInstancesColCpuUsage")}
+                      <SortIndicator
+                        active={instanceSortField === "cpu"}
+                        direction={instanceSortDirection}
+                      />
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-end gap-1"
+                      onClick={() => handleInstanceSort("memory")}
+                    >
+                      {t("reports.detailInstancesColMemoryUsage")}
+                      <SortIndicator
+                        active={instanceSortField === "memory"}
+                        direction={instanceSortDirection}
+                      />
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-end gap-1"
+                      onClick={() => handleInstanceSort("disk")}
+                    >
+                      {t("reports.detailInstancesColDiskUsage")}
+                      <SortIndicator
+                        active={instanceSortField === "disk"}
+                        direction={instanceSortDirection}
+                      />
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1"
+                      onClick={() => handleInstanceSort("timestamp")}
+                    >
+                      {t("reports.detailInstancesColTimestamp")}
+                      <SortIndicator
+                        active={instanceSortField === "timestamp"}
+                        direction={instanceSortDirection}
+                      />
+                    </button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedReportInstances.length > 0 ? (
                   reportInstancesPagination.paginatedItems.map((item) => {
-                    const itemRiskLevel = resolveRiskLevel(item.risk_level)
+                    const itemRiskLevel = resolveInstanceDisplayRiskLevel(item)
                     return (
                       <TableRow
                         key={`${item.agent_id}-${item.timestamp}`}
                         className={riskRowClassNameByLevel(itemRiskLevel)}
                       >
-                        <TableCell className="font-mono text-xs">{item.agent_id}</TableCell>
+                        <TableCell className={cn("font-mono text-xs", riskAccentCellClassNameByLevel(itemRiskLevel))}>
+                          {item.agent_id}
+                        </TableCell>
                         <TableCell>{item.instance_name || "-"}</TableCell>
                         <TableCell>{item.agent_type}</TableCell>
                         <TableCell>
@@ -620,9 +949,15 @@ export default function AIReportDetailPage() {
                             </Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">{item.cpu_usage ?? "-"}</TableCell>
-                        <TableCell className="text-right">{item.memory_usage ?? "-"}</TableCell>
-                        <TableCell className="text-right">{item.disk_usage ?? "-"}</TableCell>
+                        <TableCell className="text-right">
+                          <UsageMetricCell value={item.cpu_usage} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <UsageMetricCell value={item.memory_usage} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <UsageMetricCell value={item.disk_usage} />
+                        </TableCell>
                         <TableCell>{formatReportInstanceTimestamp(item.timestamp, locale)}</TableCell>
                       </TableRow>
                     )

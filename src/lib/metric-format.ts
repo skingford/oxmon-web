@@ -60,9 +60,13 @@ export function formatBinaryBytes(value: number, suffix = "") {
   const abs = Math.abs(value)
   if (abs === 0) return `0 B${suffix}`
   const units = ["B", "KB", "MB", "GB", "TB", "PB"]
-  const exponent = Math.min(
-    Math.floor(Math.log(abs) / Math.log(1024)),
-    units.length - 1,
+  // Clamp sub-byte values to B to avoid negative exponents like units[-1].
+  const exponent = Math.max(
+    0,
+    Math.min(
+      Math.floor(Math.log(abs) / Math.log(1024)),
+      units.length - 1,
+    ),
   )
   const scaled = value / 1024 ** exponent
   const digits = Math.abs(scaled) >= 100 ? 0 : Math.abs(scaled) >= 10 ? 1 : 2
