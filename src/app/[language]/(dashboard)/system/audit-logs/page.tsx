@@ -179,6 +179,18 @@ function resolveAuditActionDotClassName(action: string) {
   return "bg-muted-foreground"
 }
 
+function resolveAuditActionRowClassName(action: string) {
+  if (action === "LOGIN_FAILED") {
+    return "bg-rose-50/70 hover:bg-rose-100/70"
+  }
+
+  if (action === "LOGIN") {
+    return "bg-sky-50/45 hover:bg-sky-100/55"
+  }
+
+  return ""
+}
+
 
 function formatSecurityHourLabel(value: string, locale: string) {
   const parsed = new Date(value)
@@ -431,49 +443,37 @@ export default function SystemAuditLogsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsStatTotal")}</CardDescription>
-            <CardTitle className="text-2xl">{data.auditLogsPage.total}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsActionLogin")}</CardDescription>
-            <CardTitle className="text-2xl text-sky-600">{actionStats.login}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsActionLoginFailed")}</CardDescription>
-            <CardTitle className="text-2xl text-rose-600">{actionStats.loginFailed}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsActionLogout")}</CardDescription>
-            <CardTitle className="text-2xl text-slate-600">{actionStats.logout}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsActionCreate")}</CardDescription>
-            <CardTitle className="text-2xl text-emerald-600">{actionStats.create}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsActionUpdate")}</CardDescription>
-            <CardTitle className="text-2xl text-amber-600">{actionStats.update}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsActionDelete")}</CardDescription>
-            <CardTitle className="text-2xl text-red-600">{actionStats.delete}</CardTitle>
-          </CardHeader>
-        </Card>
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-sm font-medium">{t("auditLogsEventsChangeTitle")}</h3>
+          <p className="text-sm text-muted-foreground">{t("auditLogsEventsChangeDescription")}</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("auditLogsStatTotal")}</CardDescription>
+              <CardTitle className="text-2xl">{data.auditLogsPage.total}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("auditLogsActionCreate")}</CardDescription>
+              <CardTitle className="text-2xl text-emerald-600">{actionStats.create}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("auditLogsActionUpdate")}</CardDescription>
+              <CardTitle className="text-2xl text-amber-600">{actionStats.update}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>{t("auditLogsActionDelete")}</CardDescription>
+              <CardTitle className="text-2xl text-red-600">{actionStats.delete}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
       </div>
 
       <Card>
@@ -599,7 +599,10 @@ export default function SystemAuditLogsPage() {
                     const action = normalizeAuditAction(item.action)
 
                     return (
-                      <TableRow key={item.id}>
+                      <TableRow
+                        key={item.id}
+                        className={resolveAuditActionRowClassName(action)}
+                      >
                         <TableCell>{formatDateTimeByLocale(item.created_at, locale, item.created_at || "-", { hour12: false })}</TableCell>
                         <TableCell>{item.username || item.user_id || t("auditLogsUnknownValue")}</TableCell>
                         <TableCell>
