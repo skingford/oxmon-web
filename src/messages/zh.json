@@ -1757,7 +1757,13 @@
       "detailInstancesColType": "类型",
       "detailInstancesColRisk": "风险等级",
       "detailInstancesColTimestamp": "时间",
-      "detailInstancesEmpty": "暂无实例明细数据"
+      "detailInstancesEmpty": "暂无实例明细数据",
+      "detailInstancesLegend_normal": "< 60% 正常",
+      "detailInstancesLegend_attention": "60% - 80% 关注",
+      "detailInstancesLegend_alert": "> 80% 告警",
+      "detailInstancesLegend_critical": "> 85% 严重告警",
+      "detailInstancesPageSize": "每页条数",
+      "detailInstancesPageSizeOption": "{value} 条 / 页"
     }
   },
   "auth": {

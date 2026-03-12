@@ -1757,7 +1757,13 @@
       "detailInstancesColType": "Type",
       "detailInstancesColRisk": "Risk Level",
       "detailInstancesColTimestamp": "Timestamp",
-      "detailInstancesEmpty": "No instance detail data"
+      "detailInstancesEmpty": "No instance detail data",
+      "detailInstancesLegend_normal": "< 60% Normal",
+      "detailInstancesLegend_attention": "60% - 80% Attention",
+      "detailInstancesLegend_alert": "> 80% Alert",
+      "detailInstancesLegend_critical": "> 85% Critical",
+      "detailInstancesPageSize": "Rows per page",
+      "detailInstancesPageSizeOption": "{value} / page"
     }
   },
   "auth": {
