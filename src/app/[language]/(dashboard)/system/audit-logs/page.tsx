@@ -7,6 +7,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { api } from "@/lib/api"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { formatDateTimeByLocale } from "@/lib/date-time"
+import { cn } from "@/lib/utils"
 import type { AdminUserResponse, AuditLogItem, AuditSecuritySummary, AuditSecurityTimeseries, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useRequestState } from "@/hooks/use-request-state"
@@ -76,20 +77,106 @@ function normalizeAuditAction(value: string | null | undefined) {
   return (value || "").trim().toUpperCase()
 }
 
+const AUDIT_ACTION_OPTIONS = [
+  "LOGIN",
+  "LOGIN_FAILED",
+  "LOGOUT",
+  "CREATE",
+  "UPDATE",
+  "DELETE",
+] as const
+
+function resolveAuditActionLabel(
+  action: string,
+  t: ReturnType<typeof useAppTranslations>["t"]
+) {
+  const normalized = normalizeAuditAction(action)
+
+  if (normalized === "LOGIN") {
+    return t("auditLogsActionLogin")
+  }
+
+  if (normalized === "LOGIN_FAILED") {
+    return t("auditLogsActionLoginFailed")
+  }
+
+  if (normalized === "LOGOUT") {
+    return t("auditLogsActionLogout")
+  }
+
+  if (normalized === "CREATE") {
+    return t("auditLogsActionCreate")
+  }
+
+  if (normalized === "UPDATE") {
+    return t("auditLogsActionUpdate")
+  }
+
+  if (normalized === "DELETE") {
+    return t("auditLogsActionDelete")
+  }
+
+  return normalized || t("auditLogsUnknownValue")
+}
+
 function resolveAuditActionBadgeVariant(action: string) {
+  return "outline" as const
+}
+
+function resolveAuditActionBadgeClassName(action: string) {
+  if (action === "LOGIN") {
+    return "border-sky-200 bg-sky-50 text-sky-700"
+  }
+
+  if (action === "LOGIN_FAILED") {
+    return "border-rose-200 bg-rose-50 text-rose-700"
+  }
+
+  if (action === "LOGOUT") {
+    return "border-slate-200 bg-slate-50 text-slate-700"
+  }
+
   if (action === "CREATE") {
-    return "success" as const
+    return "border-emerald-200 bg-emerald-50 text-emerald-700"
   }
 
   if (action === "UPDATE") {
-    return "warning" as const
+    return "border-amber-200 bg-amber-50 text-amber-700"
   }
 
   if (action === "DELETE") {
-    return "destructive" as const
+    return "border-red-200 bg-red-50 text-red-700"
   }
 
-  return "secondary" as const
+  return "border-border bg-background text-foreground"
+}
+
+function resolveAuditActionDotClassName(action: string) {
+  if (action === "LOGIN") {
+    return "bg-sky-500"
+  }
+
+  if (action === "LOGIN_FAILED") {
+    return "bg-rose-500"
+  }
+
+  if (action === "LOGOUT") {
+    return "bg-slate-500"
+  }
+
+  if (action === "CREATE") {
+    return "bg-emerald-500"
+  }
+
+  if (action === "UPDATE") {
+    return "bg-amber-500"
+  }
+
+  if (action === "DELETE") {
+    return "bg-red-500"
+  }
+
+  return "bg-muted-foreground"
 }
 
 
@@ -216,7 +303,13 @@ export default function SystemAuditLogsPage() {
     return data.auditLogsPage.items.reduce(
       (acc, item) => {
         const action = normalizeAuditAction(item.action)
-        if (action === "CREATE") {
+        if (action === "LOGIN") {
+          acc.login += 1
+        } else if (action === "LOGIN_FAILED") {
+          acc.loginFailed += 1
+        } else if (action === "LOGOUT") {
+          acc.logout += 1
+        } else if (action === "CREATE") {
           acc.create += 1
         } else if (action === "UPDATE") {
           acc.update += 1
@@ -225,7 +318,7 @@ export default function SystemAuditLogsPage() {
         }
         return acc
       },
-      { create: 0, update: 0, delete: 0 }
+      { login: 0, loginFailed: 0, logout: 0, create: 0, update: 0, delete: 0 }
     )
   }, [data.auditLogsPage.items])
 
@@ -338,7 +431,7 @@ export default function SystemAuditLogsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("auditLogsStatTotal")}</CardDescription>
@@ -347,19 +440,37 @@ export default function SystemAuditLogsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsStatCreate")}</CardDescription>
+            <CardDescription>{t("auditLogsActionLogin")}</CardDescription>
+            <CardTitle className="text-2xl text-sky-600">{actionStats.login}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("auditLogsActionLoginFailed")}</CardDescription>
+            <CardTitle className="text-2xl text-rose-600">{actionStats.loginFailed}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("auditLogsActionLogout")}</CardDescription>
+            <CardTitle className="text-2xl text-slate-600">{actionStats.logout}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{t("auditLogsActionCreate")}</CardDescription>
             <CardTitle className="text-2xl text-emerald-600">{actionStats.create}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsStatUpdate")}</CardDescription>
+            <CardDescription>{t("auditLogsActionUpdate")}</CardDescription>
             <CardTitle className="text-2xl text-amber-600">{actionStats.update}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>{t("auditLogsStatDelete")}</CardDescription>
+            <CardDescription>{t("auditLogsActionDelete")}</CardDescription>
             <CardTitle className="text-2xl text-red-600">{actionStats.delete}</CardTitle>
           </CardHeader>
         </Card>
@@ -396,9 +507,19 @@ export default function SystemAuditLogsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("auditLogsFilterActionAll")}</SelectItem>
-                  <SelectItem value="CREATE">CREATE</SelectItem>
-                  <SelectItem value="UPDATE">UPDATE</SelectItem>
-                  <SelectItem value="DELETE">DELETE</SelectItem>
+                  {AUDIT_ACTION_OPTIONS.map((action) => (
+                    <SelectItem key={action} value={action}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-block h-2 w-2 rounded-full",
+                            resolveAuditActionDotClassName(action),
+                          )}
+                        />
+                        <span>{resolveAuditActionLabel(action, t)}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -482,7 +603,12 @@ export default function SystemAuditLogsPage() {
                         <TableCell>{formatDateTimeByLocale(item.created_at, locale, item.created_at || "-", { hour12: false })}</TableCell>
                         <TableCell>{item.username || item.user_id || t("auditLogsUnknownValue")}</TableCell>
                         <TableCell>
-                          <Badge variant={resolveAuditActionBadgeVariant(action)}>{action || t("auditLogsUnknownValue")}</Badge>
+                          <Badge
+                            variant={resolveAuditActionBadgeVariant(action)}
+                            className={cn(resolveAuditActionBadgeClassName(action))}
+                          >
+                            {resolveAuditActionLabel(action, t)}
+                          </Badge>
                         </TableCell>
                         <TableCell>{item.resource_type || t("auditLogsUnknownValue")}</TableCell>
                         <TableCell className="font-mono text-xs">{item.resource_id || t("auditLogsUnknownValue")}</TableCell>

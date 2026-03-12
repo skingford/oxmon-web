@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { formatDateTimeByLocale } from "@/lib/date-time"
+import { cn } from "@/lib/utils"
 import type { AuditLogItem } from "@/types/api"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
@@ -25,20 +26,69 @@ function normalizeAction(value: string | null | undefined) {
   return (value || "").trim().toUpperCase()
 }
 
+function resolveActionLabel(
+  action: string,
+  t: ReturnType<typeof useAppTranslations>["t"]
+) {
+  const normalized = normalizeAction(action)
+
+  if (normalized === "LOGIN") {
+    return t("auditLogsActionLogin")
+  }
+
+  if (normalized === "LOGIN_FAILED") {
+    return t("auditLogsActionLoginFailed")
+  }
+
+  if (normalized === "LOGOUT") {
+    return t("auditLogsActionLogout")
+  }
+
+  if (normalized === "CREATE") {
+    return t("auditLogsActionCreate")
+  }
+
+  if (normalized === "UPDATE") {
+    return t("auditLogsActionUpdate")
+  }
+
+  if (normalized === "DELETE") {
+    return t("auditLogsActionDelete")
+  }
+
+  return normalized || t("auditLogsUnknownValue")
+}
+
 function resolveActionVariant(action: string) {
+  return "outline" as const
+}
+
+function resolveActionClassName(action: string) {
+  if (action === "LOGIN") {
+    return "border-sky-200 bg-sky-50 text-sky-700"
+  }
+
+  if (action === "LOGIN_FAILED") {
+    return "border-rose-200 bg-rose-50 text-rose-700"
+  }
+
+  if (action === "LOGOUT") {
+    return "border-slate-200 bg-slate-50 text-slate-700"
+  }
+
   if (action === "CREATE") {
-    return "success" as const
+    return "border-emerald-200 bg-emerald-50 text-emerald-700"
   }
 
   if (action === "UPDATE") {
-    return "warning" as const
+    return "border-amber-200 bg-amber-50 text-amber-700"
   }
 
   if (action === "DELETE") {
-    return "destructive" as const
+    return "border-red-200 bg-red-50 text-red-700"
   }
 
-  return "secondary" as const
+  return "border-border bg-background text-foreground"
 }
 
 function asPrettyJsonString(value: unknown) {
@@ -164,7 +214,12 @@ export default function SystemAuditLogDetailPage() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{t("auditLogsTableColAction")}</p>
-            <Badge variant={resolveActionVariant(action)}>{action || t("auditLogsUnknownValue")}</Badge>
+            <Badge
+              variant={resolveActionVariant(action)}
+              className={cn(resolveActionClassName(action))}
+            >
+              {resolveActionLabel(action, t)}
+            </Badge>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{t("auditLogsTableColResourceType")}</p>
