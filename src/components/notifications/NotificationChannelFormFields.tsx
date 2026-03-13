@@ -4,6 +4,7 @@ import { Dispatch, SetStateAction } from "react"
 import type { AppNamespaceTranslator } from "@/hooks/use-app-translations"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SensitiveInput } from "@/components/ui/sensitive-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -257,6 +258,7 @@ function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldIn
   const inputId = `${idPrefix}-config-${field.key}`
   const shouldTakeFullRow = field.key === "webhook_url" || field.key === "secret"
   const fieldContainerClassName = shouldTakeFullRow ? "min-w-0 space-y-2 sm:col-span-2" : "min-w-0 space-y-2"
+  const fieldLabel = t(field.labelKey)
 
   if (field.type === "boolean") {
     return (
@@ -297,13 +299,17 @@ function ConfigFieldInput({ field, idPrefix, value, t, onChange }: ConfigFieldIn
   if (field.type === "password") {
     return (
       <div className={fieldContainerClassName}>
-        <Label htmlFor={inputId}>{t(field.labelKey)}</Label>
-        <Input
+        <Label htmlFor={inputId}>{fieldLabel}</Label>
+        <SensitiveInput
           id={inputId}
-          type="text"
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(field.key, event.target.value)}
           placeholder={t(field.placeholderKey)}
+          showLabel={`显示${fieldLabel}`}
+          hideLabel={`隐藏${fieldLabel}`}
+          copyLabel={`复制${fieldLabel}`}
+          copiedMessage={`已复制${fieldLabel}`}
+          enableCopy
         />
       </div>
     )

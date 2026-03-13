@@ -32,6 +32,10 @@ export function useSilenceWindowsPageState({ windows }: UseSilenceWindowsPageSta
   const [statusFilter, setStatusFilter] = useState<SilenceStatusFilter>("all")
   const [originModeFilter, setOriginModeFilter] = useState<WindowOriginModeFilter>("all")
   const [onlyOriginMarked, setOnlyOriginMarked] = useState(false)
+  const [searchKeywordDraft, setSearchKeywordDraft] = useState("")
+  const [statusFilterDraft, setStatusFilterDraft] = useState<SilenceStatusFilter>("all")
+  const [originModeFilterDraft, setOriginModeFilterDraft] = useState<WindowOriginModeFilter>("all")
+  const [onlyOriginMarkedDraft, setOnlyOriginMarkedDraft] = useState(false)
   const [tablePageSize, setTablePageSize] = useState<number>(20)
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -190,6 +194,12 @@ export function useSilenceWindowsPageState({ windows }: UseSilenceWindowsPageSta
     originModeFilter !== "all" ||
     onlyOriginMarked
 
+  const hasPendingFilterChanges =
+    searchKeywordDraft.trim() !== searchKeyword.trim() ||
+    statusFilterDraft !== statusFilter ||
+    originModeFilterDraft !== originModeFilter ||
+    onlyOriginMarkedDraft !== onlyOriginMarked
+
   const originMarksCount = Object.keys(windowOrigins).length
 
   const originModeCounts = useMemo(() => {
@@ -216,11 +226,22 @@ export function useSilenceWindowsPageState({ windows }: UseSilenceWindowsPageSta
     resetKey: paginationResetKey,
   })
 
+  const applyFilters = () => {
+    setSearchKeyword(searchKeywordDraft)
+    setStatusFilter(statusFilterDraft)
+    setOriginModeFilter(originModeFilterDraft)
+    setOnlyOriginMarked(onlyOriginMarkedDraft)
+  }
+
   const resetFilters = () => {
     setSearchKeyword("")
     setStatusFilter("all")
     setOriginModeFilter("all")
     setOnlyOriginMarked(false)
+    setSearchKeywordDraft("")
+    setStatusFilterDraft("all")
+    setOriginModeFilterDraft("all")
+    setOnlyOriginMarkedDraft(false)
   }
 
   return {
@@ -232,6 +253,14 @@ export function useSilenceWindowsPageState({ windows }: UseSilenceWindowsPageSta
     setOriginModeFilter,
     onlyOriginMarked,
     setOnlyOriginMarked,
+    searchKeywordDraft,
+    setSearchKeywordDraft,
+    statusFilterDraft,
+    setStatusFilterDraft,
+    originModeFilterDraft,
+    setOriginModeFilterDraft,
+    onlyOriginMarkedDraft,
+    setOnlyOriginMarkedDraft,
     tablePageSize,
     setTablePageSize,
     tablePageSizeOptions: TABLE_PAGE_SIZE_OPTIONS,
@@ -266,9 +295,11 @@ export function useSilenceWindowsPageState({ windows }: UseSilenceWindowsPageSta
     setDeletingId,
     stats,
     hasActiveFilters,
+    hasPendingFilterChanges,
     originMarksCount,
     originModeCounts,
     hasWindowOrigins,
+    applyFilters,
     resetFilters,
   }
 }

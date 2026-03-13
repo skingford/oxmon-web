@@ -101,6 +101,9 @@ export default function CloudAccountsPage() {
   const [searchKeyword, setSearchKeyword] = useState("")
   const [enabledFilter, setEnabledFilter] = useState<"all" | "enabled" | "disabled">("all")
   const [providerFilter, setProviderFilter] = useState("all")
+  const [searchKeywordDraft, setSearchKeywordDraft] = useState("")
+  const [enabledFilterDraft, setEnabledFilterDraft] = useState<"all" | "enabled" | "disabled">("all")
+  const [providerFilterDraft, setProviderFilterDraft] = useState("all")
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<CloudAccountResponse | null>(null)
@@ -242,6 +245,16 @@ export default function CloudAccountsPage() {
     })
   }, [accounts, enabledFilter, getProviderLabel, providerFilter, searchKeyword])
 
+  const hasActiveFilters =
+    Boolean(searchKeyword.trim()) ||
+    enabledFilter !== "all" ||
+    providerFilter !== "all"
+
+  const hasPendingFilterChanges =
+    searchKeywordDraft.trim() !== searchKeyword.trim() ||
+    enabledFilterDraft !== enabledFilter ||
+    providerFilterDraft !== providerFilter
+
   const stats = useMemo(() => {
     const enabledCount = accounts.filter((item) => item.enabled).length
     return {
@@ -259,6 +272,57 @@ export default function CloudAccountsPage() {
     })
     setEditingAccount(null)
   }, [providerOptions])
+
+  useEffect(() => {
+    setSearchKeywordDraft((prev) => (prev === searchKeyword ? prev : searchKeyword))
+  }, [searchKeyword])
+
+  useEffect(() => {
+    setEnabledFilterDraft((prev) => (prev === enabledFilter ? prev : enabledFilter))
+  }, [enabledFilter])
+
+  useEffect(() => {
+    setProviderFilterDraft((prev) => (prev === providerFilter ? prev : providerFilter))
+  }, [providerFilter])
+
+  useEffect(() => {
+    if (providerFilter === "all") {
+      return
+    }
+
+    if (providerOptions.some((item) => item.value === providerFilter)) {
+      return
+    }
+
+    setProviderFilter("all")
+  }, [providerFilter, providerOptions])
+
+  useEffect(() => {
+    if (providerFilterDraft === "all") {
+      return
+    }
+
+    if (providerOptions.some((item) => item.value === providerFilterDraft)) {
+      return
+    }
+
+    setProviderFilterDraft("all")
+  }, [providerFilterDraft, providerOptions])
+
+  const handleApplyFilters = useCallback(() => {
+    setSearchKeyword(searchKeywordDraft)
+    setEnabledFilter(enabledFilterDraft)
+    setProviderFilter(providerFilterDraft)
+  }, [enabledFilterDraft, providerFilterDraft, searchKeywordDraft])
+
+  const handleResetFilters = useCallback(() => {
+    setSearchKeyword("")
+    setEnabledFilter("all")
+    setProviderFilter("all")
+    setSearchKeywordDraft("")
+    setEnabledFilterDraft("all")
+    setProviderFilterDraft("all")
+  }, [])
 
   const resetBatchForm = useCallback(() => {
     setBatchProvider(providerOptions[0]?.value || DEFAULT_FORM_STATE.provider)
@@ -710,13 +774,17 @@ export default function CloudAccountsPage() {
       />
 
       <CloudAccountsFiltersCard
-        searchKeyword={searchKeyword}
-        providerFilter={providerFilter}
-        enabledFilter={enabledFilter}
+        searchKeyword={searchKeywordDraft}
+        providerFilter={providerFilterDraft}
+        enabledFilter={enabledFilterDraft}
+        hasPendingChanges={hasPendingFilterChanges}
+        hasActiveFilters={hasActiveFilters}
         providerOptions={providerOptions}
-        onSearchKeywordChange={setSearchKeyword}
-        onProviderFilterChange={setProviderFilter}
-        onEnabledFilterChange={(value) => setEnabledFilter(value as "all" | "enabled" | "disabled")}
+        onSearchKeywordChange={setSearchKeywordDraft}
+        onProviderFilterChange={setProviderFilterDraft}
+        onEnabledFilterChange={(value) => setEnabledFilterDraft(value as "all" | "enabled" | "disabled")}
+        onApplyFilters={handleApplyFilters}
+        onResetFilters={handleResetFilters}
         texts={{
           title: t("cloud.accounts.filtersTitle"),
           description: t("cloud.accounts.filtersDescription"),
@@ -728,6 +796,9 @@ export default function CloudAccountsPage() {
           filterStatusAll: t("cloud.accounts.filterStatusAll"),
           filterStatusEnabled: t("cloud.accounts.filterStatusEnabled"),
           filterStatusDisabled: t("cloud.accounts.filterStatusDisabled"),
+          applyFilters: t("cloud.accounts.applyFilters"),
+          clearFilters: t("cloud.accounts.clearFilters"),
+          pendingFilterChanges: t("cloud.accounts.pendingFilterChanges"),
         }}
       />
 

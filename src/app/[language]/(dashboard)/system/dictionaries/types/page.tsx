@@ -15,6 +15,7 @@ import {
 } from "@/components/system/DictionaryTypeFormFields"
 
 import { normalizeNullableText, parseOptionalSortOrder } from "@/lib/dictionary-utils"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
@@ -37,7 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Loader2, Pencil, Plus, RefreshCw } from "lucide-react"
+import { FilterX, Loader2, Pencil, Plus, RefreshCw } from "lucide-react"
 import { toast, toastApiError, toastCreated, toastSaved, toastStatusError } from "@/lib/toast"
 
 type DictionaryTypeSortMode =
@@ -67,6 +68,8 @@ export default function SystemDictionaryTypesPage() {
 
   const [typeKeyword, setTypeKeyword] = useState("")
   const [typeSortMode, setTypeSortMode] = useState<DictionaryTypeSortMode>(DEFAULT_TYPE_SORT_MODE)
+  const [typeKeywordDraft, setTypeKeywordDraft] = useState("")
+  const [typeSortModeDraft, setTypeSortModeDraft] = useState<DictionaryTypeSortMode>(DEFAULT_TYPE_SORT_MODE)
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
@@ -132,6 +135,26 @@ export default function SystemDictionaryTypesPage() {
       return left.dict_type.localeCompare(right.dict_type)
     })
   }, [typeKeyword, typeSortMode, typeSummaries])
+
+  const hasActiveFilters =
+    Boolean(typeKeyword.trim()) ||
+    typeSortMode !== DEFAULT_TYPE_SORT_MODE
+
+  const hasPendingFilterChanges =
+    typeKeywordDraft.trim() !== typeKeyword.trim() ||
+    typeSortModeDraft !== typeSortMode
+
+  const handleApplyFilters = () => {
+    setTypeKeyword(typeKeywordDraft)
+    setTypeSortMode(typeSortModeDraft)
+  }
+
+  const handleResetFilters = () => {
+    setTypeKeyword("")
+    setTypeKeywordDraft("")
+    setTypeSortMode(DEFAULT_TYPE_SORT_MODE)
+    setTypeSortModeDraft(DEFAULT_TYPE_SORT_MODE)
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -297,8 +320,8 @@ export default function SystemDictionaryTypesPage() {
           <FilterToolbar
             className="gap-4 xl:grid-cols-3"
             search={{
-              value: typeKeyword,
-              onValueChange: setTypeKeyword,
+              value: typeKeywordDraft,
+              onValueChange: setTypeKeywordDraft,
               placeholder: t("dictionaryTypeSearchPlaceholder"),
               label: t("dictionaryTypeSearchPlaceholder"),
               inputClassName: "h-10",
@@ -307,8 +330,8 @@ export default function SystemDictionaryTypesPage() {
             <div className="space-y-2">
               <Label>{t("dictionaryTypeSortLabel")}</Label>
               <Select
-                value={typeSortMode}
-                onValueChange={(value) => setTypeSortMode(value as DictionaryTypeSortMode)}
+                value={typeSortModeDraft}
+                onValueChange={(value) => setTypeSortModeDraft(value as DictionaryTypeSortMode)}
               >
                 <SelectTrigger className="h-10 w-full bg-background">
                   <SelectValue placeholder={t("dictionaryTypeSortLabel")} />
@@ -323,17 +346,43 @@ export default function SystemDictionaryTypesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="invisible">{t("dictionaryTypeTableStats", { visible: 0, total: 0 })}</Label>
-              <div className="flex h-10 w-full items-center rounded-md border bg-background px-3">
-                <p className="text-sm text-muted-foreground">
-                  {t("dictionaryTypeTableStats", {
-                    visible: filteredTypeSummaries.length,
-                    total: typeSummaries.length,
-                  })}
-                </p>
+              <Label className="invisible">{t("dictionaryTypeApplyFilters")}</Label>
+              <div className="flex min-h-10 w-full flex-wrap items-center justify-end gap-2">
+                {hasPendingFilterChanges ? (
+                  <Badge variant="outline" className="h-9 rounded-md px-3 text-xs">
+                    {t("dictionaryTypePendingFilterChanges")}
+                  </Badge>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetFilters}
+                  disabled={!hasActiveFilters && !hasPendingFilterChanges}
+                  className="h-10 min-w-[112px]"
+                >
+                  <FilterX className="mr-2 h-4 w-4" />
+                  {t("dictionaryResetFilters")}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleApplyFilters}
+                  disabled={!hasPendingFilterChanges}
+                  className="h-10 min-w-[112px]"
+                >
+                  {t("dictionaryTypeApplyFilters")}
+                </Button>
               </div>
             </div>
           </FilterToolbar>
+
+          <div className="rounded-md border bg-background px-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              {t("dictionaryTypeTableStats", {
+                visible: filteredTypeSummaries.length,
+                total: typeSummaries.length,
+              })}
+            </p>
+          </div>
 
           <Table>
             <TableHeader>

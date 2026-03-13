@@ -1,7 +1,7 @@
 "use client"
 
-import { memo, useCallback, useState, type FormEvent } from "react"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { memo, useCallback, type FormEvent } from "react"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SensitiveInput } from "@/components/ui/sensitive-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -69,8 +70,6 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
   getProviderLabel,
   t,
 }: CloudAccountDialogProps) {
-  const [showSecretKey, setShowSecretKey] = useState(false)
-
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     onOpenChange(nextOpen)
   }, [onOpenChange])
@@ -252,49 +251,35 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
                   <Label htmlFor="cloud-secret-key">
                     {locale === "zh" ? "SecretKey / AccessKey Secret" : "SecretKey / AccessKey Secret"}
                   </Label>
-                  <div className="relative">
-                    <Input
-                      id="cloud-secret-key"
-                      type={showSecretKey ? "text" : "password"}
-                      value={form.secretKey}
-                      onChange={(event) => setForm((prev) => ({ ...prev, secretKey: event.target.value }))}
-                      placeholder={locale === "zh" ? "请输入密钥 Secret" : "Enter key secret"}
-                      className="pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
-                      onClick={() => setShowSecretKey((prev) => !prev)}
-                      aria-label={showSecretKey
-                        ? (locale === "zh" ? "隐藏密钥" : "Hide secret key")
-                        : (locale === "zh" ? "显示密钥" : "Show secret key")}
-                    >
-                      {showSecretKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="cloud-endpoint">
-                    {t("cloud.accounts.fieldEndpoint")}
-                  </Label>
-                  <Input
-                    id="cloud-endpoint"
-                    value={form.endpoint}
-                    onChange={(event) => setForm((prev) => ({ ...prev, endpoint: event.target.value }))}
-                    placeholder={t("cloud.accounts.fieldEndpointPlaceholder")}
+                  <SensitiveInput
+                    id="cloud-secret-key"
+                    value={form.secretKey}
+                    onChange={(event) => setForm((prev) => ({ ...prev, secretKey: event.target.value }))}
+                    placeholder={locale === "zh" ? "请输入密钥 Secret" : "Enter key secret"}
+                    showLabel={locale === "zh" ? "显示 SecretKey / AccessKey Secret" : "Show SecretKey / AccessKey Secret"}
+                    hideLabel={locale === "zh" ? "隐藏 SecretKey / AccessKey Secret" : "Hide SecretKey / AccessKey Secret"}
+                    copyLabel={locale === "zh" ? "复制 SecretKey / AccessKey Secret" : "Copy SecretKey / AccessKey Secret"}
+                    copiedMessage={locale === "zh" ? "已复制 SecretKey / AccessKey Secret" : "Copied SecretKey / AccessKey Secret"}
+                    enableCopy
+                    resetKey={open}
                   />
-                  {isSangfor ? (
+                </div>
+                {isSangfor ? (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="cloud-endpoint">
+                      {t("cloud.accounts.fieldEndpoint")}
+                    </Label>
+                    <Input
+                      id="cloud-endpoint"
+                      value={form.endpoint}
+                      onChange={(event) => setForm((prev) => ({ ...prev, endpoint: event.target.value }))}
+                      placeholder={t("cloud.accounts.fieldEndpointPlaceholder")}
+                    />
                     <p className="text-xs text-amber-600">
                       {t("cloud.accounts.fieldEndpointSangforRequiredHint")}
                     </p>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="cloud-regions">
                     {locale === "zh" ? "地域列表" : "Regions"}

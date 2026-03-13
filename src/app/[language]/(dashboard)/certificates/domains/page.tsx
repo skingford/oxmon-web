@@ -40,10 +40,15 @@ export default function DomainsPage() {
   const {
     domainKeyword,
     statusFilter,
+    domainKeywordDraft,
+    statusFilterDraft,
+    hasPendingFilterChanges,
+    hasActiveFilters,
     offset,
     setOffset,
-    handleDomainKeywordChange,
-    handleStatusFilterChange,
+    setDomainKeywordDraft,
+    setStatusFilterDraft,
+    handleApplyFilters,
     handleResetFilters,
   } = useCertificateDomainsQueryState({
     pathname,
@@ -600,10 +605,13 @@ export default function DomainsPage() {
         locale={locale}
         stats={stats}
         filters={{
-          domainKeyword,
-          statusFilter,
-          onDomainKeywordChange: handleDomainKeywordChange,
-          onStatusFilterChange: handleStatusFilterChange,
+          domainKeyword: domainKeywordDraft,
+          statusFilter: statusFilterDraft,
+          hasPendingFilterChanges,
+          hasActiveFilters,
+          onDomainKeywordChange: setDomainKeywordDraft,
+          onStatusFilterChange: setStatusFilterDraft,
+          onApplyFilters: handleApplyFilters,
           onResetFilters: handleResetFilters,
         }}
         table={{

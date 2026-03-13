@@ -34,6 +34,10 @@ export function useCertificateDomainsQueryState({
   const [statusFilter, setStatusFilter] = useState<CertificateDomainsStatusFilter>(() =>
     parseStatusFilter(searchParams.get("status"))
   )
+  const [domainKeywordDraft, setDomainKeywordDraft] = useState(() => searchParams.get("domain") || "")
+  const [statusFilterDraft, setStatusFilterDraft] = useState<CertificateDomainsStatusFilter>(() =>
+    parseStatusFilter(searchParams.get("status"))
+  )
   const [offset, setOffset] = useState(() => parseOffset(searchParams.get("offset")))
 
   useEffect(() => {
@@ -43,6 +47,8 @@ export function useCertificateDomainsQueryState({
 
     setDomainKeyword((previous) => (previous === nextDomain ? previous : nextDomain))
     setStatusFilter((previous) => (previous === nextStatus ? previous : nextStatus))
+    setDomainKeywordDraft((previous) => (previous === nextDomain ? previous : nextDomain))
+    setStatusFilterDraft((previous) => (previous === nextStatus ? previous : nextStatus))
     setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
   }, [searchParams])
 
@@ -77,29 +83,38 @@ export function useCertificateDomainsQueryState({
     replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
   }, [domainKeyword, offset, pathname, replace, searchParams, statusFilter])
 
-  const handleDomainKeywordChange = (value: string) => {
-    setDomainKeyword(value)
-    setOffset((previous) => (previous === 0 ? previous : 0))
-  }
+  const hasPendingFilterChanges =
+    domainKeywordDraft.trim() !== domainKeyword.trim() ||
+    statusFilterDraft !== statusFilter
 
-  const handleStatusFilterChange = (value: CertificateDomainsStatusFilter) => {
-    setStatusFilter(value)
+  const hasActiveFilters = Boolean(domainKeyword.trim()) || statusFilter !== "all"
+
+  const handleApplyFilters = () => {
+    setDomainKeyword(domainKeywordDraft)
+    setStatusFilter(statusFilterDraft)
     setOffset((previous) => (previous === 0 ? previous : 0))
   }
 
   const handleResetFilters = () => {
     setDomainKeyword("")
     setStatusFilter("all")
+    setDomainKeywordDraft("")
+    setStatusFilterDraft("all")
     setOffset(0)
   }
 
   return {
     domainKeyword,
     statusFilter,
+    domainKeywordDraft,
+    statusFilterDraft,
+    hasPendingFilterChanges,
+    hasActiveFilters,
     offset,
     setOffset,
-    handleDomainKeywordChange,
-    handleStatusFilterChange,
+    setDomainKeywordDraft,
+    setStatusFilterDraft,
+    handleApplyFilters,
     handleResetFilters,
   }
 }

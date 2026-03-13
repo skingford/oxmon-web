@@ -174,7 +174,10 @@
       "detailLoading": "Loading alert details...",
       "detailNotFoundTitle": "Alert Not Found",
       "detailNotFoundDescription": "No alert found for ID {id}. It may have expired or been cleaned up.",
-      "detailFetchError": "Failed to load alert details"
+      "detailFetchError": "Failed to load alert details",
+      "applyFilters": "Apply Filters",
+      "resetFilters": "Reset Filters",
+      "pendingFilterChanges": "Pending filter changes"
     },
     "history": {
       "title": "Alert History",
@@ -319,7 +322,11 @@
       "paginationPage": "Page {current} / {total}",
       "paginationPrev": "Previous",
       "paginationNext": "Next",
-      "toastFetchError": "Failed to load agent list"
+      "toastFetchError": "Failed to load agent list",
+      "searchLabel": "Keyword",
+      "applyFilters": "Apply Filters",
+      "resetFilters": "Reset Filters",
+      "pendingFilterChanges": "Pending filter changes"
     },
     "agentDetail": {
       "backToList": "Back to Agent List",
@@ -480,7 +487,11 @@
       "regenerateDialogTitle": "Confirm Token Regeneration",
       "regenerateDialogDescription": "A new token will be generated for \"{agentId}\" and the old token will be invalidated immediately.",
       "deleteDialogTitle": "Confirm Removing Agent",
-      "deleteDialogDescription": "After removal, \"{agentId}\" can no longer connect. Continue?"
+      "deleteDialogDescription": "After removal, \"{agentId}\" can no longer connect. Continue?",
+      "searchLabel": "Keyword",
+      "applyFilters": "Apply Filters",
+      "resetFilters": "Reset Filters",
+      "pendingFilterChanges": "Pending filter changes"
     },
     "certificates": {
       "overview": {
@@ -688,7 +699,11 @@
         "tableEmptyHint": "Add a single domain or use batch import to onboard quickly.",
         "toastAutoCreateSuccess": "Domain {domain} created. Starting check",
         "toastAutoCreateConflict": "Domain {domain} already exists. Starting check",
-        "toastAutoCreateError": "Failed to auto-create domain"
+        "toastAutoCreateError": "Failed to auto-create domain",
+        "filterDomainLabel": "Domain",
+        "filterStatusLabel": "Enabled Status",
+        "applyFilters": "Apply Filters",
+        "pendingFilterChanges": "Pending filter changes"
       },
       "status": {
         "title": "Check Status",
@@ -1279,7 +1294,13 @@
       "silenceClearFiltersShort": "Clear",
       "silenceClearOriginsShort": "Clear Marks",
       "silenceImportOriginsShort": "Import",
-      "silenceExportOriginsShort": "Export"
+      "silenceExportOriginsShort": "Export",
+      "filtersDescription": "Filter notification channels by keyword, channel type, minimum severity, and status.",
+      "searchLabel": "Keyword",
+      "applyFilters": "Apply Filters",
+      "pendingFilterChanges": "Pending filter changes",
+      "silenceApplyFilters": "Apply Filters",
+      "silencePendingFilterChanges": "Pending filter changes"
     },
     "cloud": {
       "layoutTitle": "Cloud Resource Management",
@@ -1413,7 +1434,10 @@
         "toastBatchPartial": "Batch import partially succeeded: created {created}, skipped {skipped}, errors {errors}",
         "toastBatchError": "Failed to batch import cloud accounts",
         "testResultInstanceCount": "{count} instance(s) discovered",
-        "collectResultCount": "{count} instance(s) collected"
+        "collectResultCount": "{count} instance(s) collected",
+        "applyFilters": "Apply Filters",
+        "clearFilters": "Reset Filters",
+        "pendingFilterChanges": "Pending filter changes"
       },
       "instances": {
         "title": "Cloud Instances",
@@ -1596,7 +1620,10 @@
         "toastRefreshAICheckJobSuccess": "Job status refreshed",
         "toastRefreshAICheckJobError": "Failed to refresh job status",
         "toastAICheckJobsCompletedSuccess": "All AI check jobs have completed",
-        "toastAICheckJobsCompletedWithFailure": "AI check jobs finished with {failed} failures"
+        "toastAICheckJobsCompletedWithFailure": "AI check jobs finished with {failed} failures",
+        "applyFilters": "Apply Filters",
+        "clearFilters": "Reset Filters",
+        "pendingFilterChanges": "Pending filter changes"
       },
       "instancesRanking": {
         "title": "Latest Instance Metric Ranking",
@@ -2217,6 +2244,10 @@
     "auditLogsSecurityToastFetchError": "Failed to load login security overview",
     "auditLogsSecurityTrendTitle": "Login Security Trend",
     "auditLogsSecurityTrendDescription": "Hourly login success, failure, and lock-trigger counts for the last 24 hours.",
-    "auditLogsSecurityTrendEmpty": "No security trend data"
+    "auditLogsSecurityTrendEmpty": "No security trend data",
+    "dictionaryApplyFilters": "Apply Filters",
+    "dictionaryPendingFilterChanges": "Pending filter changes",
+    "dictionaryTypeApplyFilters": "Apply Filters",
+    "dictionaryTypePendingFilterChanges": "Pending filter changes"
   }
 }

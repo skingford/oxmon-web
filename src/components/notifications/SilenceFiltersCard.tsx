@@ -20,6 +20,7 @@ type SilenceFiltersCardProps = {
   originModeFilter: WindowOriginModeFilter
   windowOriginTtlDays: number
   onlyOriginMarked: boolean
+  hasPendingFilterChanges: boolean
   hasActiveFilters: boolean
   hasWindowOrigins: boolean
   importingOrigins: boolean
@@ -35,6 +36,7 @@ type SilenceFiltersCardProps = {
   onWindowOriginTtlDaysChange: (value: string) => void
   onOnlyOriginMarkedChange: (value: boolean) => void
   onImportWindowOrigins: ChangeEventHandler<HTMLInputElement>
+  onApplyFilters: () => void
   onResetFilters: () => void
   onClearWindowOrigins: () => void
   onTriggerImportOrigins: () => void
@@ -47,6 +49,7 @@ export function SilenceFiltersCard({
   originModeFilter,
   windowOriginTtlDays,
   onlyOriginMarked,
+  hasPendingFilterChanges,
   hasActiveFilters,
   hasWindowOrigins,
   importingOrigins,
@@ -59,6 +62,7 @@ export function SilenceFiltersCard({
   onWindowOriginTtlDaysChange,
   onOnlyOriginMarkedChange,
   onImportWindowOrigins,
+  onApplyFilters,
   onResetFilters,
   onClearWindowOrigins,
   onTriggerImportOrigins,
@@ -144,28 +148,43 @@ export function SilenceFiltersCard({
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="sm:col-span-2 xl:col-span-12 flex flex-wrap items-center justify-end gap-2 pt-1">
+                {hasPendingFilterChanges ? (
+                  <Badge variant="outline" className="h-9 rounded-md px-3 text-xs">
+                    {t("notifications.silencePendingFilterChanges")}
+                  </Badge>
+                ) : null}
+                <Button
+                  type="button"
+                  onClick={onApplyFilters}
+                  disabled={!hasPendingFilterChanges}
+                  className="h-10 min-w-[112px]"
+                >
+                  {t("notifications.silenceApplyFilters")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onResetFilters}
+                  disabled={!hasActiveFilters && !hasPendingFilterChanges}
+                  title={t("notifications.silenceClearFilters")}
+                  aria-label={t("notifications.silenceClearFilters")}
+                  className="h-10 min-w-[112px]"
+                >
+                  <FilterX className="mr-1 h-4 w-4 shrink-0" />
+                  {t("notifications.silenceClearFiltersShort")}
+                </Button>
+              </div>
             </FilterToolbar>
           </div>
 
           <div className="rounded-lg border p-3 sm:p-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="flex h-10 items-center justify-between rounded-md border bg-background px-3">
                 <p className="truncate text-sm">{t("notifications.silenceFilterOriginOnlyLabel")}</p>
                 <Switch checked={onlyOriginMarked} onCheckedChange={onOnlyOriginMarkedChange} />
               </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onResetFilters}
-                disabled={!hasActiveFilters}
-                title={t("notifications.silenceClearFilters")}
-                aria-label={t("notifications.silenceClearFilters")}
-                className="h-10 w-full justify-center gap-1.5 px-2 text-sm"
-              >
-                <FilterX className="h-4 w-4 shrink-0" />
-                {t("notifications.silenceClearFiltersShort")}
-              </Button>
 
               <Button
                 type="button"

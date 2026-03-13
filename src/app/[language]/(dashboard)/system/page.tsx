@@ -50,6 +50,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { SensitiveInput } from "@/components/ui/sensitive-input";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import {
   Select,
@@ -889,9 +890,8 @@ export default function SystemPage() {
               >
                 {t("fieldOldPassword")}
               </Label>
-              <Input
+              <SensitiveInput
                 id="old-password"
-                type="password"
                 value={passwordForm.current_password}
                 onChange={(e) =>
                   setPasswordForm({
@@ -900,6 +900,9 @@ export default function SystemPage() {
                   })
                 }
                 className="bg-white border-gray-300 text-gray-900"
+                showLabel={t("fieldOldPassword")}
+                hideLabel={t("fieldOldPassword")}
+                resetKey={isPasswordDialogOpen}
               />
             </div>
 
@@ -910,9 +913,8 @@ export default function SystemPage() {
               >
                 {t("fieldNewPassword")}
               </Label>
-              <Input
+              <SensitiveInput
                 id="new-password"
-                type="password"
                 value={passwordForm.new_password}
                 onChange={(e) =>
                   setPasswordForm({
@@ -921,6 +923,9 @@ export default function SystemPage() {
                   })
                 }
                 className="bg-white border-gray-300 text-gray-900"
+                showLabel={t("fieldNewPassword")}
+                hideLabel={t("fieldNewPassword")}
+                resetKey={isPasswordDialogOpen}
               />
             </div>
           </div>

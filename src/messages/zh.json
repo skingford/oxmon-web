@@ -174,7 +174,10 @@
       "detailLoading": "加载告警详情中...",
       "detailNotFoundTitle": "未找到该告警",
       "detailNotFoundDescription": "未找到 ID 为 {id} 的告警，可能已过期或被清理。",
-      "detailFetchError": "加载告警详情失败"
+      "detailFetchError": "加载告警详情失败",
+      "applyFilters": "应用筛选",
+      "resetFilters": "重置筛选",
+      "pendingFilterChanges": "有未应用的筛选变更"
     },
     "history": {
       "title": "告警历史",
@@ -319,7 +322,11 @@
       "paginationPage": "第 {current} / {total} 页",
       "paginationPrev": "上一页",
       "paginationNext": "下一页",
-      "toastFetchError": "加载 Agent 列表失败"
+      "toastFetchError": "加载 Agent 列表失败",
+      "searchLabel": "关键字",
+      "applyFilters": "应用筛选",
+      "resetFilters": "重置筛选",
+      "pendingFilterChanges": "有未应用的筛选变更"
     },
     "agentDetail": {
       "backToList": "返回 Agent 列表",
@@ -480,7 +487,11 @@
       "regenerateDialogTitle": "确认重新生成 Token",
       "regenerateDialogDescription": "将为 Agent「{agentId}」生成新 token，旧 token 会立即失效。",
       "deleteDialogTitle": "确认移除白名单 Agent",
-      "deleteDialogDescription": "移除后 Agent「{agentId}」将无法继续接入，是否继续？"
+      "deleteDialogDescription": "移除后 Agent「{agentId}」将无法继续接入，是否继续？",
+      "searchLabel": "关键字",
+      "applyFilters": "应用筛选",
+      "resetFilters": "重置筛选",
+      "pendingFilterChanges": "有未应用的筛选变更"
     },
     "certificates": {
       "overview": {
@@ -688,7 +699,11 @@
         "tableEmptyHint": "可以新增单个域名或使用批量导入快速接入。",
         "toastAutoCreateSuccess": "已创建域名 {domain}，正在触发检查",
         "toastAutoCreateConflict": "域名 {domain} 已存在，正在触发检查",
-        "toastAutoCreateError": "自动创建域名失败"
+        "toastAutoCreateError": "自动创建域名失败",
+        "filterDomainLabel": "域名",
+        "filterStatusLabel": "启用状态",
+        "applyFilters": "应用筛选",
+        "pendingFilterChanges": "有未应用的筛选变更"
       },
       "status": {
         "title": "检查状态",
@@ -1279,7 +1294,13 @@
       "silenceClearFiltersShort": "清空筛选",
       "silenceClearOriginsShort": "清空标记",
       "silenceImportOriginsShort": "导入标记",
-      "silenceExportOriginsShort": "导出标记"
+      "silenceExportOriginsShort": "导出标记",
+      "filtersDescription": "按关键字、渠道类型、最小告警级别和状态筛选通知渠道。",
+      "searchLabel": "关键字",
+      "applyFilters": "应用筛选",
+      "pendingFilterChanges": "有未应用的筛选变更",
+      "silenceApplyFilters": "应用筛选",
+      "silencePendingFilterChanges": "有未应用的筛选变更"
     },
     "cloud": {
       "layoutTitle": "云资源管理",
@@ -1413,7 +1434,10 @@
         "toastBatchPartial": "批量导入部分成功：新增 {created}，跳过 {skipped}，错误 {errors}",
         "toastBatchError": "批量导入云账户失败",
         "testResultInstanceCount": "发现 {count} 个实例",
-        "collectResultCount": "采集 {count} 个实例"
+        "collectResultCount": "采集 {count} 个实例",
+        "applyFilters": "应用筛选",
+        "clearFilters": "重置筛选",
+        "pendingFilterChanges": "有未应用的筛选变更"
       },
       "instances": {
         "title": "云实例",
@@ -1596,7 +1620,10 @@
         "toastRefreshAICheckJobSuccess": "任务状态已刷新",
         "toastRefreshAICheckJobError": "刷新任务状态失败",
         "toastAICheckJobsCompletedSuccess": "AI 检测任务已全部完成",
-        "toastAICheckJobsCompletedWithFailure": "AI 检测任务已结束，失败 {failed} 条"
+        "toastAICheckJobsCompletedWithFailure": "AI 检测任务已结束，失败 {failed} 条",
+        "applyFilters": "应用筛选",
+        "clearFilters": "重置筛选",
+        "pendingFilterChanges": "有未应用的筛选变更"
       },
       "instancesRanking": {
         "title": "实例最新指标排行",
@@ -2217,6 +2244,10 @@
     "auditLogsSecurityToastFetchError": "加载登录安全概览失败",
     "auditLogsSecurityTrendTitle": "登录安全趋势",
     "auditLogsSecurityTrendDescription": "最近 24 小时按小时聚合的登录成功、失败与触发锁定次数。",
-    "auditLogsSecurityTrendEmpty": "暂无安全趋势数据"
+    "auditLogsSecurityTrendEmpty": "暂无安全趋势数据",
+    "dictionaryApplyFilters": "应用筛选",
+    "dictionaryPendingFilterChanges": "有未应用的筛选变更",
+    "dictionaryTypeApplyFilters": "应用筛选",
+    "dictionaryTypePendingFilterChanges": "有未应用的筛选变更"
   }
 }

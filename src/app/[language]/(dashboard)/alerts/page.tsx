@@ -118,6 +118,8 @@ export default function ActiveAlertsPage() {
   // 搜索和筛选
   const [selectedSourceId, setSelectedSourceId] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedSourceIdDraft, setSelectedSourceIdDraft] = useState("")
+  const [searchQueryDraft, setSearchQueryDraft] = useState("")
 
   // 自动刷新
   const [autoRefresh, setAutoRefresh] = useState(false)
@@ -179,6 +181,23 @@ export default function ActiveAlertsPage() {
       )
     })
   }, [alertsPage.items, metricNameLabelMap, searchQuery, selectedSourceId, sourceDisplayNameMap])
+
+  const hasActiveFilters = Boolean(selectedSourceId || searchQuery.trim())
+  const hasPendingFilterChanges =
+    selectedSourceIdDraft !== selectedSourceId ||
+    searchQueryDraft.trim() !== searchQuery.trim()
+
+  const handleApplyFilters = () => {
+    setSelectedSourceId(selectedSourceIdDraft)
+    setSearchQuery(searchQueryDraft)
+  }
+
+  const handleResetFilters = () => {
+    setSelectedSourceId("")
+    setSearchQuery("")
+    setSelectedSourceIdDraft("")
+    setSearchQueryDraft("")
+  }
 
   const runAlertAction = useCallback(
     async (
@@ -285,8 +304,6 @@ export default function ActiveAlertsPage() {
       setSelectedAlerts(new Set(filteredAlerts.map((alert) => alert.id)))
     }
   }
-
-  const hasActiveFilters = Boolean(selectedSourceId || searchQuery.trim())
 
   const handleViewDetails = (alert: AlertEventResponse) => {
     router.push(withLocalePrefix(`/alerts/${alert.id}`, locale))
@@ -506,11 +523,15 @@ export default function ActiveAlertsPage() {
 
       <Card className="glass-card">
         <ActiveAlertsListHeader
-          sourceId={selectedSourceId}
+          sourceId={selectedSourceIdDraft}
           sourceOptions={sourceOptions}
-          searchQuery={searchQuery}
-          onSourceIdChange={setSelectedSourceId}
-          onSearchQueryChange={setSearchQuery}
+          searchQuery={searchQueryDraft}
+          hasPendingFilterChanges={hasPendingFilterChanges}
+          hasActiveFilters={hasActiveFilters}
+          onSourceIdChange={setSelectedSourceIdDraft}
+          onSearchQueryChange={setSearchQueryDraft}
+          onApplyFilters={handleApplyFilters}
+          onResetFilters={handleResetFilters}
         />
         <CardContent>
           {hasActiveFilters ? (
@@ -519,10 +540,7 @@ export default function ActiveAlertsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setSelectedSourceId("")
-                  setSearchQuery("")
-                }}
+                onClick={handleResetFilters}
               >
                 <X className="mr-2 h-4 w-4" />
                 {t("active.clearFilters")}

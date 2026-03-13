@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SensitiveInput } from "@/components/ui/sensitive-input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import {
@@ -456,13 +457,15 @@ export default function SystemAdminUsersPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="admin-create-password">{t("adminUsersFieldPassword")}</Label>
-              <Input
+              <SensitiveInput
                 id="admin-create-password"
-                type="password"
                 value={createForm.password}
                 onChange={(event) => setCreateForm((prev) => ({ ...prev, password: event.target.value }))}
                 placeholder={t("adminUsersFieldPasswordPlaceholder")}
                 disabled={createSubmitting}
+                showLabel={t("adminUsersFieldPassword")}
+                hideLabel={t("adminUsersFieldPassword")}
+                resetKey={createOpen}
               />
             </div>
             <DialogFooter>
@@ -492,13 +495,15 @@ export default function SystemAdminUsersPage() {
           <form className="space-y-4" onSubmit={handleResetPassword}>
             <div className="space-y-2">
               <Label htmlFor="admin-reset-password">{t("adminUsersFieldNewPassword")}</Label>
-              <Input
+              <SensitiveInput
                 id="admin-reset-password"
-                type="password"
                 value={resetForm.password}
                 onChange={(event) => setResetForm({ password: event.target.value })}
                 placeholder={t("adminUsersFieldPasswordPlaceholder")}
                 disabled={resetSubmitting}
+                showLabel={t("adminUsersFieldNewPassword")}
+                hideLabel={t("adminUsersFieldNewPassword")}
+                resetKey={Boolean(resetTarget)}
               />
             </div>
             <DialogFooter>

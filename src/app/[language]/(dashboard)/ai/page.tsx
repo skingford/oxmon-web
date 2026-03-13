@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { SensitiveInput } from "@/components/ui/sensitive-input";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -52,7 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Eye, EyeOff, Loader2, Plus, RefreshCw } from "lucide-react";
+import { Loader2, Plus, RefreshCw } from "lucide-react";
 
 type FormState = {
   config_key: string;
@@ -130,7 +131,6 @@ export default function AIAccountsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
   const [editing, setEditing] = useState<AIAccountResponse | null>(null);
   const [editingLoadingId, setEditingLoadingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AIAccountResponse | null>(
@@ -169,7 +169,6 @@ export default function AIAccountsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setShowApiKey(false);
     setForm(EMPTY_FORM);
     setDialogOpen(true);
   };
@@ -179,7 +178,6 @@ export default function AIAccountsPage() {
     try {
       const detail = await api.getAIAccountById(item.id);
       setEditing(detail);
-      setShowApiKey(false);
       setForm({
         config_key: detail.config_key,
         provider: detail.provider,
@@ -493,9 +491,6 @@ export default function AIAccountsPage() {
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
-          if (!open) {
-            setShowApiKey(false);
-          }
         }}
       >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
@@ -590,32 +585,18 @@ export default function AIAccountsPage() {
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>{t("accounts.fieldApiKey")}</Label>
-                  <div className="relative">
-                    <Input
-                      type={showApiKey ? "text" : "password"}
-                      value={form.api_key}
-                      className="pr-10"
-                      onChange={(e) =>
-                        setForm((s) => ({ ...s, api_key: e.target.value }))
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-0 top-0 inline-flex h-9 w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => setShowApiKey((prev) => !prev)}
-                      aria-label={
-                        showApiKey
-                          ? t("accounts.hideApiKey")
-                          : t("accounts.showApiKey")
-                      }
-                    >
-                      {showApiKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
+                  <SensitiveInput
+                    value={form.api_key}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, api_key: e.target.value }))
+                    }
+                    showLabel={t("accounts.showApiKey")}
+                    hideLabel={t("accounts.hideApiKey")}
+                    copyLabel={locale === "zh" ? "复制 API Key" : "Copy API Key"}
+                    copiedMessage={locale === "zh" ? "已复制 API Key" : "Copied API Key"}
+                    enableCopy
+                    resetKey={dialogOpen}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("accounts.fieldModel")}</Label>

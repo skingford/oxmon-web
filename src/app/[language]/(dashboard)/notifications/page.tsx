@@ -76,6 +76,10 @@ export default function NotificationsPage() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [severityFilter, setSeverityFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<NotificationStatusFilter>("all")
+  const [searchKeywordDraft, setSearchKeywordDraft] = useState("")
+  const [typeFilterDraft, setTypeFilterDraft] = useState("all")
+  const [severityFilterDraft, setSeverityFilterDraft] = useState("all")
+  const [statusFilterDraft, setStatusFilterDraft] = useState<NotificationStatusFilter>("all")
   const [offset, setOffset] = useState(0)
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(PAGE_SIZE_OPTIONS[1])
   const [allChannelsSnapshot, setAllChannelsSnapshot] = useState<ChannelOverview[] | null>(null)
@@ -106,6 +110,10 @@ export default function NotificationsPage() {
     setTypeFilter((prev) => (prev === nextTypeFilter ? prev : nextTypeFilter))
     setSeverityFilter((prev) => (prev === nextSeverityFilter ? prev : nextSeverityFilter))
     setStatusFilter((prev) => (prev === nextStatusFilter ? prev : nextStatusFilter))
+    setSearchKeywordDraft((prev) => (prev === nextSearchKeyword ? prev : nextSearchKeyword))
+    setTypeFilterDraft((prev) => (prev === nextTypeFilter ? prev : nextTypeFilter))
+    setSeverityFilterDraft((prev) => (prev === nextSeverityFilter ? prev : nextSeverityFilter))
+    setStatusFilterDraft((prev) => (prev === nextStatusFilter ? prev : nextStatusFilter))
     setPageSize((prev) => (prev === nextPageSize ? prev : nextPageSize))
     setOffset((prev) => (prev === nextOffset ? prev : nextOffset))
   }, [searchParams])
@@ -261,17 +269,34 @@ export default function NotificationsPage() {
 
   const isBusy = loading || refreshing
   const severityOptions = CHANNEL_SEVERITY_OPTIONS
+  const hasPendingFilterChanges =
+    searchKeywordDraft.trim() !== searchKeyword.trim() ||
+    typeFilterDraft !== typeFilter ||
+    severityFilterDraft !== severityFilter ||
+    statusFilterDraft !== statusFilter
 
   const getSeverityLabelForForm = useCallback(
     (severity: string) => getSeverityLabel(severity, t),
     [t]
   )
 
+  const handleApplyFilters = () => {
+    setSearchKeyword(searchKeywordDraft)
+    setTypeFilter(typeFilterDraft)
+    setSeverityFilter(severityFilterDraft)
+    setStatusFilter(statusFilterDraft)
+    setOffset(0)
+  }
+
   const resetFilters = () => {
     setSearchKeyword("")
     setTypeFilter("all")
     setSeverityFilter("all")
     setStatusFilter("all")
+    setSearchKeywordDraft("")
+    setTypeFilterDraft("all")
+    setSeverityFilterDraft("all")
+    setStatusFilterDraft("all")
     setOffset(0)
   }
 
@@ -344,29 +369,19 @@ export default function NotificationsPage() {
       <NotificationsStatsCards stats={stats} t={t} />
 
       <NotificationsFiltersCard
-        searchKeyword={searchKeyword}
-        typeFilter={typeFilter}
-        severityFilter={severityFilter}
-        statusFilter={statusFilter}
+        searchKeyword={searchKeywordDraft}
+        typeFilter={typeFilterDraft}
+        severityFilter={severityFilterDraft}
+        statusFilter={statusFilterDraft}
+        hasPendingFilterChanges={hasPendingFilterChanges}
         hasActiveFilters={hasActiveFilters}
         typeOptions={filterTypeOptions}
         severityOptions={filterSeverityOptions}
-        onSearchKeywordChange={(value) => {
-          setSearchKeyword(value)
-          setOffset(0)
-        }}
-        onTypeFilterChange={(value) => {
-          setTypeFilter(value)
-          setOffset(0)
-        }}
-        onSeverityFilterChange={(value) => {
-          setSeverityFilter(value)
-          setOffset(0)
-        }}
-        onStatusFilterChange={(value) => {
-          setStatusFilter(value)
-          setOffset(0)
-        }}
+        onSearchKeywordChange={setSearchKeywordDraft}
+        onTypeFilterChange={setTypeFilterDraft}
+        onSeverityFilterChange={setSeverityFilterDraft}
+        onStatusFilterChange={(value) => setStatusFilterDraft(value)}
+        onApplyFilters={handleApplyFilters}
         onResetFilters={resetFilters}
       />
 

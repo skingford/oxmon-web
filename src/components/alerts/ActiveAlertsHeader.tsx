@@ -1,8 +1,9 @@
 "use client"
 
-import { RefreshCw, X } from "lucide-react"
+import { RefreshCw } from "lucide-react"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { ALERTS_ALL_SOURCE_VALUE } from "@/components/alerts/constants"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilterToolbar } from "@/components/ui/filter-toolbar"
@@ -22,8 +23,12 @@ type ActiveAlertsListHeaderProps = {
   sourceId: string
   sourceOptions: SearchableComboboxOption[]
   searchQuery: string
+  hasPendingFilterChanges: boolean
+  hasActiveFilters: boolean
   onSourceIdChange: (value: string) => void
   onSearchQueryChange: (value: string) => void
+  onApplyFilters: () => void
+  onResetFilters: () => void
 }
 
 export function ActiveAlertsTopControls({
@@ -71,8 +76,12 @@ export function ActiveAlertsListHeader({
   sourceId,
   sourceOptions,
   searchQuery,
+  hasPendingFilterChanges,
+  hasActiveFilters,
   onSourceIdChange,
   onSearchQueryChange,
+  onApplyFilters,
+  onResetFilters,
 }: ActiveAlertsListHeaderProps) {
   const { t } = useAppTranslations("alerts")
   const sourceSelectOptions: SearchableComboboxOption[] = [
@@ -87,7 +96,7 @@ export function ActiveAlertsListHeader({
           <CardTitle>{t("active.title")}</CardTitle>
           <CardDescription>{t("active.description")}</CardDescription>
         </div>
-        <div className="grid w-full gap-3 md:w-[560px] md:grid-cols-2">
+        <div className="grid w-full gap-3 md:w-[760px] md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="active-alert-source">{t("active.filterSource")}</Label>
             <SearchableCombobox
@@ -108,17 +117,21 @@ export function ActiveAlertsListHeader({
               placeholder: t("active.searchPlaceholder"),
               label: t("active.filterKeyword"),
               inputClassName: "h-10",
-              trailing: searchQuery ? (
-                <button
-                  type="button"
-                  onClick={() => onSearchQueryChange("")}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : null,
             }}
           />
+          <div className="flex flex-wrap items-end justify-end gap-2 pt-7">
+            {hasPendingFilterChanges ? (
+              <Badge variant="outline" className="h-9 rounded-md px-3 text-xs">
+                {t("active.pendingFilterChanges")}
+              </Badge>
+            ) : null}
+            <Button variant="outline" onClick={onResetFilters} disabled={!hasActiveFilters && !hasPendingFilterChanges} className="h-10 min-w-[112px]">
+              {t("active.resetFilters")}
+            </Button>
+            <Button onClick={onApplyFilters} disabled={!hasPendingFilterChanges} className="h-10 min-w-[112px]">
+              {t("active.applyFilters")}
+            </Button>
+          </div>
         </div>
       </div>
     </CardHeader>

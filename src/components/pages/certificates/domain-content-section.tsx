@@ -18,8 +18,11 @@ type DomainContentSectionProps = {
   filters: {
     domainKeyword: string
     statusFilter: "all" | "enabled" | "disabled"
+    hasPendingFilterChanges: boolean
+    hasActiveFilters: boolean
     onDomainKeywordChange: (value: string) => void
     onStatusFilterChange: (value: "all" | "enabled" | "disabled") => void
+    onApplyFilters: () => void
     onResetFilters: () => void
   }
   table: {
@@ -55,8 +58,11 @@ export function DomainContentSection({ t, locale, stats, filters, table }: Domai
         t={t}
         domainKeyword={filters.domainKeyword}
         statusFilter={filters.statusFilter}
+        hasPendingFilterChanges={filters.hasPendingFilterChanges}
+        hasActiveFilters={filters.hasActiveFilters}
         onDomainKeywordChange={filters.onDomainKeywordChange}
         onStatusFilterChange={filters.onStatusFilterChange}
+        onApplyFilters={filters.onApplyFilters}
         onResetFilters={filters.onResetFilters}
       />
 

@@ -109,6 +109,7 @@ export default function AgentsPage() {
     : 0
 
   const [search, setSearch] = useState(searchParamValue)
+  const [searchDraft, setSearchDraft] = useState(searchParamValue)
   const [offset, setOffset] = useState(initialOffset)
   const limit = 20
 
@@ -154,6 +155,7 @@ export default function AgentsPage() {
       : 0
 
     setSearch((prev) => (prev === nextSearch ? prev : nextSearch))
+    setSearchDraft((prev) => (prev === nextSearch ? prev : nextSearch))
     setOffset((prev) => (prev === nextOffset ? prev : nextOffset))
   }, [searchParams])
 
@@ -193,6 +195,20 @@ export default function AgentsPage() {
 
     return agents.filter((agent) => agent.agent_id.toLowerCase().includes(keyword))
   }, [agents, search])
+
+  const hasActiveFilters = Boolean(search.trim())
+  const hasPendingFilterChanges = searchDraft.trim() !== search.trim()
+
+  const handleApplyFilters = () => {
+    setSearch(searchDraft)
+    setOffset(0)
+  }
+
+  const handleResetFilters = () => {
+    setSearch("")
+    setSearchDraft("")
+    setOffset(0)
+  }
 
   const statusStats = useMemo(() => {
     return agents.reduce(
@@ -281,12 +297,26 @@ export default function AgentsPage() {
               <FilterToolbar
                 className="md:grid-cols-1 xl:grid-cols-1"
                 search={{
-                  value: search,
-                  onValueChange: setSearch,
+                  value: searchDraft,
+                  onValueChange: setSearchDraft,
+                  label: t("agents.searchLabel"),
                   placeholder: t("agents.searchPlaceholder"),
                   inputClassName: "h-10",
                 }}
               />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 md:self-end">
+              {hasPendingFilterChanges ? (
+                <Badge variant="outline" className="h-9 rounded-md px-3 text-xs">
+                  {t("agents.pendingFilterChanges")}
+                </Badge>
+              ) : null}
+              <Button variant="outline" onClick={handleResetFilters} disabled={!hasActiveFilters && !hasPendingFilterChanges} className="h-10 min-w-[112px]">
+                {t("agents.resetFilters")}
+              </Button>
+              <Button onClick={handleApplyFilters} disabled={!hasPendingFilterChanges} className="h-10 min-w-[112px]">
+                {t("agents.applyFilters")}
+              </Button>
             </div>
           </div>
         </CardHeader>

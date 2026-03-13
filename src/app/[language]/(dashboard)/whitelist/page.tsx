@@ -116,6 +116,7 @@ export default function WhitelistPage() {
 
   const [offset, setOffset] = useState(initialOffset)
   const [search, setSearch] = useState(searchParamValue)
+  const [searchDraft, setSearchDraft] = useState(searchParamValue)
 
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [newAgentId, setNewAgentId] = useState("")
@@ -166,6 +167,7 @@ export default function WhitelistPage() {
       : 0
 
     setSearch((previous) => (previous === nextSearch ? previous : nextSearch))
+    setSearchDraft((previous) => (previous === nextSearch ? previous : nextSearch))
     setOffset((previous) => (previous === nextOffset ? previous : nextOffset))
   }, [searchParams])
 
@@ -352,9 +354,15 @@ export default function WhitelistPage() {
     }
   }
 
-  const handleSearchChange = (value: string) => {
-    setSearch(value)
+  const handleApplyFilters = () => {
+    setSearch(searchDraft)
     setOffset((previous) => (previous === 0 ? previous : 0))
+  }
+
+  const handleResetFilters = () => {
+    setSearch("")
+    setSearchDraft("")
+    setOffset(0)
   }
 
   const filteredAgents = useMemo(() => {
@@ -370,6 +378,9 @@ export default function WhitelistPage() {
       return agentId.includes(keyword) || description.includes(keyword)
     })
   }, [agents, search])
+
+  const hasActiveFilters = Boolean(search.trim())
+  const hasPendingFilterChanges = searchDraft.trim() !== search.trim()
 
   const stats = useMemo(() => {
     return agents.reduce(
@@ -508,12 +519,31 @@ export default function WhitelistPage() {
               <FilterToolbar
                 className="md:grid-cols-1 xl:grid-cols-1"
                 search={{
-                  value: search,
-                  onValueChange: handleSearchChange,
+                  value: searchDraft,
+                  onValueChange: setSearchDraft,
+                  label: t("whitelist.searchLabel"),
                   placeholder: t("whitelist.searchPlaceholder"),
                   inputClassName: "h-10",
                 }}
               />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 md:self-end">
+              {hasPendingFilterChanges ? (
+                <Badge variant="outline" className="h-9 rounded-md px-3 text-xs">
+                  {t("whitelist.pendingFilterChanges")}
+                </Badge>
+              ) : null}
+              <Button
+                variant="outline"
+                onClick={handleResetFilters}
+                disabled={!hasActiveFilters && !hasPendingFilterChanges}
+                className="h-10 min-w-[112px]"
+              >
+                {t("whitelist.resetFilters")}
+              </Button>
+              <Button onClick={handleApplyFilters} disabled={!hasPendingFilterChanges} className="h-10 min-w-[112px]">
+                {t("whitelist.applyFilters")}
+              </Button>
             </div>
           </div>
         </CardHeader>

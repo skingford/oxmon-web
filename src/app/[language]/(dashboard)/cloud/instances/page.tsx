@@ -188,10 +188,13 @@ export default function CloudInstancesPage() {
   const [providerFilter, setProviderFilter] = useState("all")
   const [regionFilter, setRegionFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [searchKeywordDraft, setSearchKeywordDraft] = useState("")
+  const [providerFilterDraft, setProviderFilterDraft] = useState("all")
+  const [regionFilterDraft, setRegionFilterDraft] = useState("all")
+  const [statusFilterDraft, setStatusFilterDraft] = useState("all")
   const [aiCheckJobsPageSize, setAICheckJobsPageSize] = useState<number>(AI_CHECK_JOBS_PAGE_SIZE_OPTIONS[0])
   const [pageSize, setPageSize] = useState<number>(20)
   const [offset, setOffset] = useState(0)
-  const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState("")
   const [triggeringAICheckAll, setTriggeringAICheckAll] = useState(false)
   const [aiCheckPollIntervalSecs, setAICheckPollIntervalSecs] = useState<(typeof AI_CHECK_POLL_INTERVAL_OPTIONS)[number]>(15)
   const [refreshingAICheckJobId, setRefreshingAICheckJobId] = useState<string | null>(null)
@@ -243,6 +246,10 @@ export default function CloudInstancesPage() {
     setProviderFilter((prev) => (prev === nextProviderFilter ? prev : nextProviderFilter))
     setRegionFilter((prev) => (prev === nextRegionFilter ? prev : nextRegionFilter))
     setStatusFilter((prev) => (prev === nextStatusFilter ? prev : nextStatusFilter))
+    setSearchKeywordDraft((prev) => (prev === nextSearchKeyword ? prev : nextSearchKeyword))
+    setProviderFilterDraft((prev) => (prev === nextProviderFilter ? prev : nextProviderFilter))
+    setRegionFilterDraft((prev) => (prev === nextRegionFilter ? prev : nextRegionFilter))
+    setStatusFilterDraft((prev) => (prev === nextStatusFilter ? prev : nextStatusFilter))
     setAICheckJobsPageSize((prev) => (prev === nextAICheckJobsPageSize ? prev : nextAICheckJobsPageSize))
     setAICheckJobsPage((prev) => (prev === nextAICheckJobsPage ? prev : nextAICheckJobsPage))
     setPageSize((prev) => (prev === nextPageSize ? prev : nextPageSize))
@@ -323,28 +330,20 @@ export default function CloudInstancesPage() {
   ])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebouncedSearchKeyword(searchKeyword)
-    }, 300)
-
-    return () => window.clearTimeout(timer)
-  }, [searchKeyword])
-
-  useEffect(() => {
     if (syncingFromUrlRef.current) {
       syncingFromUrlRef.current = false
       return
     }
 
     setOffset(0)
-  }, [debouncedSearchKeyword, pageSize, providerFilter, regionFilter, statusFilter])
+  }, [pageSize, providerFilter, regionFilter, searchKeyword, statusFilter])
 
   const fetchInstances = useCallback(async (silent = false) => {
     const params: CloudInstanceQueryParams = {
       provider: providerFilter !== "all" ? providerFilter : undefined,
       region: regionFilter !== "all" ? regionFilter : undefined,
       status: statusFilter !== "all" ? statusFilter : undefined,
-      search: debouncedSearchKeyword.trim() || undefined,
+      search: searchKeyword.trim() || undefined,
       limit: pageSize,
       offset,
     }
@@ -365,7 +364,7 @@ export default function CloudInstancesPage() {
         },
       }
     )
-  }, [debouncedSearchKeyword, execute, offset, pageSize, providerFilter, regionFilter, statusFilter, t])
+  }, [execute, offset, pageSize, providerFilter, regionFilter, searchKeyword, statusFilter, t])
 
   useEffect(() => {
     fetchInstances()
@@ -698,6 +697,16 @@ export default function CloudInstancesPage() {
   }, [providerFilter, providerOptionValues])
 
   useEffect(() => {
+    if (providerFilterDraft === "all") {
+      return
+    }
+
+    if (!providerOptionValues.includes(providerFilterDraft)) {
+      setProviderFilterDraft("all")
+    }
+  }, [providerFilterDraft, providerOptionValues])
+
+  useEffect(() => {
     if (statusFilter === "all") {
       return
     }
@@ -706,6 +715,68 @@ export default function CloudInstancesPage() {
       setStatusFilter("all")
     }
   }, [statusFilter, statusOptions])
+
+  useEffect(() => {
+    if (statusFilterDraft === "all") {
+      return
+    }
+
+    if (!statusOptions.includes(statusFilterDraft)) {
+      setStatusFilterDraft("all")
+    }
+  }, [statusFilterDraft, statusOptions])
+
+  useEffect(() => {
+    if (regionFilter === "all") {
+      return
+    }
+
+    if (!regionOptions.includes(regionFilter)) {
+      setRegionFilter("all")
+    }
+  }, [regionFilter, regionOptions])
+
+  useEffect(() => {
+    if (regionFilterDraft === "all") {
+      return
+    }
+
+    if (!regionOptions.includes(regionFilterDraft)) {
+      setRegionFilterDraft("all")
+    }
+  }, [regionFilterDraft, regionOptions])
+
+  const hasActiveFilters =
+    Boolean(searchKeyword.trim()) ||
+    providerFilter !== "all" ||
+    regionFilter !== "all" ||
+    statusFilter !== "all"
+
+  const hasPendingFilterChanges =
+    searchKeywordDraft.trim() !== searchKeyword.trim() ||
+    providerFilterDraft !== providerFilter ||
+    regionFilterDraft !== regionFilter ||
+    statusFilterDraft !== statusFilter
+
+  const handleApplyFilters = useCallback(() => {
+    setSearchKeyword(searchKeywordDraft)
+    setProviderFilter(providerFilterDraft === "all" ? "all" : normalizeCloudProvider(providerFilterDraft))
+    setRegionFilter(regionFilterDraft)
+    setStatusFilter(statusFilterDraft)
+    setOffset(0)
+  }, [providerFilterDraft, regionFilterDraft, searchKeywordDraft, statusFilterDraft])
+
+  const handleResetFilters = useCallback(() => {
+    setSearchKeyword("")
+    setProviderFilter("all")
+    setRegionFilter("all")
+    setStatusFilter("all")
+    setSearchKeywordDraft("")
+    setProviderFilterDraft("all")
+    setRegionFilterDraft("all")
+    setStatusFilterDraft("all")
+    setOffset(0)
+  }, [])
 
   const pagination = useServerOffsetPagination({
     offset,
@@ -1012,17 +1083,21 @@ export default function CloudInstancesPage() {
       />
 
       <CloudInstancesFiltersCard
-        searchKeyword={searchKeyword}
-        providerFilter={providerFilter}
-        regionFilter={regionFilter}
-        statusFilter={statusFilter}
+        searchKeyword={searchKeywordDraft}
+        providerFilter={providerFilterDraft}
+        regionFilter={regionFilterDraft}
+        statusFilter={statusFilterDraft}
+        hasPendingChanges={hasPendingFilterChanges}
+        hasActiveFilters={hasActiveFilters}
         providerOptions={providerOptions}
         regionOptions={regionOptions}
         statusOptions={statusOptions}
-        onSearchKeywordChange={setSearchKeyword}
-        onProviderFilterChange={(value) => setProviderFilter(value === "all" ? "all" : normalizeCloudProvider(value))}
-        onRegionFilterChange={setRegionFilter}
-        onStatusFilterChange={setStatusFilter}
+        onSearchKeywordChange={setSearchKeywordDraft}
+        onProviderFilterChange={setProviderFilterDraft}
+        onRegionFilterChange={setRegionFilterDraft}
+        onStatusFilterChange={setStatusFilterDraft}
+        onApplyFilters={handleApplyFilters}
+        onResetFilters={handleResetFilters}
         getStatusLabel={getStatusFilterLabel}
         texts={{
           title: t("cloud.instances.filtersTitle"),
@@ -1035,6 +1110,9 @@ export default function CloudInstancesPage() {
           filterRegionAll: t("cloud.instances.filterRegionAll"),
           filterStatus: t("cloud.instances.filterStatus"),
           filterStatusAll: t("cloud.instances.filterStatusAll"),
+          applyFilters: t("cloud.instances.applyFilters"),
+          clearFilters: t("cloud.instances.clearFilters"),
+          pendingFilterChanges: t("cloud.instances.pendingFilterChanges"),
         }}
       />
 

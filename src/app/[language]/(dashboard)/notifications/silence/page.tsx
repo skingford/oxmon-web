@@ -53,13 +53,17 @@ export default function SilenceWindowsPage() {
 
   const {
     searchKeyword,
-    setSearchKeyword,
     statusFilter,
-    setStatusFilter,
     originModeFilter,
-    setOriginModeFilter,
     onlyOriginMarked,
-    setOnlyOriginMarked,
+    searchKeywordDraft,
+    setSearchKeywordDraft,
+    statusFilterDraft,
+    setStatusFilterDraft,
+    originModeFilterDraft,
+    setOriginModeFilterDraft,
+    onlyOriginMarkedDraft,
+    setOnlyOriginMarkedDraft,
     tablePageSize,
     setTablePageSize,
     tablePageSizeOptions,
@@ -94,9 +98,11 @@ export default function SilenceWindowsPage() {
     setDeletingId,
     stats,
     hasActiveFilters,
+    hasPendingFilterChanges,
     originMarksCount,
     originModeCounts,
     hasWindowOrigins,
+    applyFilters,
     resetFilters,
   } = useSilenceWindowsPageState({ windows })
 
@@ -168,23 +174,25 @@ export default function SilenceWindowsPage() {
       <SilenceStatsCards t={t} stats={stats} />
 
       <SilenceFiltersCard
-        searchKeyword={searchKeyword}
-        statusFilter={statusFilter}
-        originModeFilter={originModeFilter}
+        searchKeyword={searchKeywordDraft}
+        statusFilter={statusFilterDraft}
+        originModeFilter={originModeFilterDraft}
         windowOriginTtlDays={windowOriginTtlDays}
-        onlyOriginMarked={onlyOriginMarked}
+        onlyOriginMarked={onlyOriginMarkedDraft}
+        hasPendingFilterChanges={hasPendingFilterChanges}
         hasActiveFilters={hasActiveFilters}
         hasWindowOrigins={hasWindowOrigins}
         importingOrigins={importingOrigins}
         originMarksCount={originMarksCount}
         originModeCounts={originModeCounts}
         importOriginsInputRef={importOriginsInputRef}
-        onSearchKeywordChange={setSearchKeyword}
-        onStatusFilterChange={(value) => setStatusFilter(value as SilenceStatusFilter)}
-        onOriginModeFilterChange={(value) => setOriginModeFilter(value as WindowOriginModeFilter)}
+        onSearchKeywordChange={setSearchKeywordDraft}
+        onStatusFilterChange={(value) => setStatusFilterDraft(value as SilenceStatusFilter)}
+        onOriginModeFilterChange={(value) => setOriginModeFilterDraft(value as WindowOriginModeFilter)}
         onWindowOriginTtlDaysChange={handleWindowOriginTtlDaysChange}
-        onOnlyOriginMarkedChange={setOnlyOriginMarked}
+        onOnlyOriginMarkedChange={setOnlyOriginMarkedDraft}
         onImportWindowOrigins={handleImportWindowOrigins}
+        onApplyFilters={applyFilters}
         onResetFilters={resetFilters}
         onClearWindowOrigins={clearWindowOrigins}
         onTriggerImportOrigins={triggerImportWindowOrigins}

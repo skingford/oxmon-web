@@ -134,6 +134,12 @@ export default function SystemDictionaryEntriesPage() {
   const [sortMode, setSortMode] = useState<DictionarySortMode>(
     DEFAULT_DICTIONARY_SORT_MODE,
   );
+  const [enabledOnlyDraft, setEnabledOnlyDraft] = useState(false);
+  const [searchKeywordDraft, setSearchKeywordDraft] = useState("");
+  const [sortModeDraft, setSortModeDraft] = useState<DictionarySortMode>(
+    DEFAULT_DICTIONARY_SORT_MODE,
+  );
+  const [selectedTypeDraft, setSelectedTypeDraft] = useState("");
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [createSubmitting, setCreateSubmitting] = useState(false);
@@ -214,6 +220,20 @@ export default function SystemDictionaryEntriesPage() {
       typeSummaries.find((summary) => summary.dict_type === selectedType) ||
       null
     );
+  }, [selectedType, typeSummaries]);
+
+  useEffect(() => {
+    setSelectedTypeDraft((previous) => {
+      if (previous && typeSummaries.some((summary) => summary.dict_type === previous)) {
+        return previous;
+      }
+
+      if (selectedType && typeSummaries.some((summary) => summary.dict_type === selectedType)) {
+        return selectedType;
+      }
+
+      return typeSummaries[0]?.dict_type || "";
+    });
   }, [selectedType, typeSummaries]);
 
   const currentTypeDisplay = selectedTypeSummary
@@ -313,14 +333,32 @@ export default function SystemDictionaryEntriesPage() {
   }, [items, searchKeyword, sortMode]);
 
   const hasActiveFilters =
+    selectedTypeDraft !== selectedType ||
     Boolean(searchKeyword.trim()) ||
     enabledOnly ||
     sortMode !== DEFAULT_DICTIONARY_SORT_MODE;
 
+  const hasPendingFilterChanges =
+    selectedTypeDraft !== selectedType ||
+    searchKeywordDraft.trim() !== searchKeyword.trim() ||
+    enabledOnlyDraft !== enabledOnly ||
+    sortModeDraft !== sortMode;
+
+  const handleApplyFilters = () => {
+    setSelectedType(selectedTypeDraft);
+    setSearchKeyword(searchKeywordDraft);
+    setEnabledOnly(enabledOnlyDraft);
+    setSortMode(sortModeDraft);
+  };
+
   const handleResetFilters = () => {
+    setSelectedTypeDraft(typeSummaries[0]?.dict_type || "");
     setSearchKeyword("");
+    setSearchKeywordDraft("");
     setEnabledOnly(false);
+    setEnabledOnlyDraft(false);
     setSortMode(DEFAULT_DICTIONARY_SORT_MODE);
+    setSortModeDraft(DEFAULT_DICTIONARY_SORT_MODE);
   };
 
   const openCreateDialog = () => {
@@ -628,8 +666,8 @@ export default function SystemDictionaryEntriesPage() {
           <FilterToolbar
             className="gap-4 xl:grid-cols-5"
             search={{
-              value: searchKeyword,
-              onValueChange: setSearchKeyword,
+              value: searchKeywordDraft,
+              onValueChange: setSearchKeywordDraft,
               placeholder: t("dictionarySearchPlaceholder"),
               label: t("dictionarySearchPlaceholder"),
               inputClassName: "h-10",
@@ -638,13 +676,13 @@ export default function SystemDictionaryEntriesPage() {
             <div className="space-y-2">
               <Label>{t("dictionaryTypeLabel")}</Label>
               <SearchableCombobox
-                value={selectedType || ""}
+                value={selectedTypeDraft || ""}
                 options={typeSummaries.map((typeSummary) => ({
                   value: typeSummary.dict_type,
                   label: typeSummary.dict_type_label,
                   subtitle: `${typeSummary.dict_type} · ${typeSummary.count}`,
                 }))}
-                onValueChange={(value) => setSelectedType(value)}
+                onValueChange={(value) => setSelectedTypeDraft(value)}
                 disabled={loadingTypes || typeSummaries.length === 0}
                 placeholder={
                   loadingTypes
@@ -661,9 +699,9 @@ export default function SystemDictionaryEntriesPage() {
             <div className="space-y-2">
               <Label>{t("dictionarySortLabel")}</Label>
               <Select
-                value={sortMode}
+                value={sortModeDraft}
                 onValueChange={(value) =>
-                  setSortMode(value as DictionarySortMode)
+                  setSortModeDraft(value as DictionarySortMode)
                 }
               >
                 <SelectTrigger className="h-10 w-full bg-background">
@@ -699,25 +737,40 @@ export default function SystemDictionaryEntriesPage() {
                   {t("dictionaryEnabledOnlyShort")}
                 </p>
                 <Switch
-                  checked={enabledOnly}
-                  onCheckedChange={setEnabledOnly}
+                  checked={enabledOnlyDraft}
+                  onCheckedChange={setEnabledOnlyDraft}
                   aria-label={t("dictionaryEnabledOnlyShort")}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="invisible">{t("dictionaryResetFilters")}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleResetFilters}
-                disabled={!hasActiveFilters}
-                className="h-10 w-full"
-              >
-                <FilterX className="mr-2 h-4 w-4" />
-                {t("dictionaryResetFilters")}
-              </Button>
+              <Label className="invisible">{t("dictionaryApplyFilters")}</Label>
+              <div className="flex min-h-10 w-full flex-wrap items-center justify-end gap-2">
+                {hasPendingFilterChanges ? (
+                  <Badge variant="outline" className="h-9 rounded-md px-3 text-xs">
+                    {t("dictionaryPendingFilterChanges")}
+                  </Badge>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetFilters}
+                  disabled={!hasActiveFilters && !hasPendingFilterChanges}
+                  className="h-10 min-w-[112px]"
+                >
+                  <FilterX className="mr-2 h-4 w-4" />
+                  {t("dictionaryResetFilters")}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleApplyFilters}
+                  disabled={!hasPendingFilterChanges}
+                  className="h-10 min-w-[112px]"
+                >
+                  {t("dictionaryApplyFilters")}
+                </Button>
+              </div>
             </div>
           </FilterToolbar>
 
