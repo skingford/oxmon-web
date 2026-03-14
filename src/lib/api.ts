@@ -106,6 +106,8 @@ import {
   CertDomainsBackfillResponse,
   CertDomainsSummary,
   CertDomain,
+  DomainDetailView,
+  DomainOverviewItem,
   CreateDomainRequest,
   UpdateDomainRequest,
   BatchCreateDomainsRequest,
@@ -1226,6 +1228,41 @@ export const api = {
   getCertDomainsSummary: () =>
     request<CertDomainsSummary>("/v1/certs/domains/summary"),
 
+  listDomainOverview: (
+    params: PaginationParams & {
+      domain_contains?: string;
+      is_valid_eq?: boolean;
+      has_error_eq?: boolean;
+      days_until_expiry_lte?: number;
+    } = {},
+  ) =>
+    requestListResponse<DomainOverviewItem>(
+      `/v1/certs/domains/overview${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
+    ),
+
+  listAllDomainOverview: (
+    params: {
+      domain_contains?: string;
+      is_valid_eq?: boolean;
+      has_error_eq?: boolean;
+      days_until_expiry_lte?: number;
+    } = {},
+  ) =>
+    requestAllPages<DomainOverviewItem>(
+      (page) =>
+        requestListItems<DomainOverviewItem>(
+          `/v1/certs/domains/overview${buildQueryString({ ...params, ...page })}`,
+        ),
+      {
+        limit: 200,
+        offset: 0,
+      },
+    ),
+
   createDomain: (data: CreateDomainRequest) =>
     request<IdResponse>("/v1/certs/domains", { method: "POST", body: data }),
 
@@ -1236,6 +1273,9 @@ export const api = {
     }),
 
   getDomain: (id: string) => request<CertDomain>(`/v1/certs/domains/${id}`),
+
+  getDomainDetailView: (id: string) =>
+    request<DomainDetailView>(`/v1/certs/domains/${id}/detail-view`),
 
   updateDomain: (id: string, data: UpdateDomainRequest) =>
     request<IdResponse>(`/v1/certs/domains/${id}`, {

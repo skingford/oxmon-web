@@ -1,6 +1,6 @@
 "use client"
 
-import { CertDomain } from "@/types/api"
+import { DomainOverviewItem } from "@/types/api"
 import { DomainFiltersCard } from "@/components/pages/certificates/domain-filters-card"
 import { DomainStatsCards } from "@/components/pages/certificates/domain-stats-cards"
 import { DomainTableCard } from "@/components/pages/certificates/domain-table-card"
@@ -12,23 +12,26 @@ type DomainContentSectionProps = {
   locale: "zh" | "en"
   stats: {
     total: number
-    enabled: number
-    disabled: number
+    healthy: number
+    failed: number
+    expiring: number
   }
   filters: {
     domainKeyword: string
     statusFilter: "all" | "enabled" | "disabled"
+    healthFilter: "all" | "healthy" | "failed" | "expiring"
     hasPendingFilterChanges: boolean
     hasActiveFilters: boolean
     onDomainKeywordChange: (value: string) => void
     onStatusFilterChange: (value: "all" | "enabled" | "disabled") => void
+    onHealthFilterChange: (value: "all" | "healthy" | "failed" | "expiring") => void
     onApplyFilters: () => void
     onResetFilters: () => void
   }
   table: {
     pageLimit: number
     loading: boolean
-    domains: CertDomain[]
+    domains: DomainOverviewItem[]
     totalCount: number
     pageNumber: number
     totalPages: number
@@ -40,10 +43,10 @@ type DomainContentSectionProps = {
     updatingId: string | null
     deletingId: string | null
     onOpenCreateDialog: () => void
-    onToggleEnabled: (domain: CertDomain, enabled: boolean) => void
-    onCheckDomain: (domain: CertDomain) => void
-    onOpenHistory: (domain: CertDomain) => void
-    onDeleteDomain: (domain: CertDomain) => void
+    onToggleEnabled: (domain: DomainOverviewItem, enabled: boolean) => void
+    onCheckDomain: (domain: DomainOverviewItem) => void
+    onOpenHistory: (domain: DomainOverviewItem) => void
+    onDeleteDomain: (domain: DomainOverviewItem) => void
     onPrevPage: () => void
     onNextPage: () => void
   }
@@ -58,10 +61,12 @@ export function DomainContentSection({ t, locale, stats, filters, table }: Domai
         t={t}
         domainKeyword={filters.domainKeyword}
         statusFilter={filters.statusFilter}
+        healthFilter={filters.healthFilter}
         hasPendingFilterChanges={filters.hasPendingFilterChanges}
         hasActiveFilters={filters.hasActiveFilters}
         onDomainKeywordChange={filters.onDomainKeywordChange}
         onStatusFilterChange={filters.onStatusFilterChange}
+        onHealthFilterChange={filters.onHealthFilterChange}
         onApplyFilters={filters.onApplyFilters}
         onResetFilters={filters.onResetFilters}
       />

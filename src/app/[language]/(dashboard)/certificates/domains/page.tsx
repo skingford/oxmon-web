@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiRequestError, api } from "@/lib/api"
 import { formatCertificateDateTime, parseOptionalNonNegativeInt } from "@/lib/certificates/formats"
 import { pickCountKey } from "@/lib/i18n-count"
-import { CertCheckResult, CertDomain, CertDomainsSummary, ListResponse } from "@/types/api"
+import { CertCheckResult, DomainOverviewItem, ListResponse } from "@/types/api"
 import { useAppTranslations } from "@/hooks/use-app-translations"
 import { useServerOffsetPagination } from "@/hooks/use-server-offset-pagination"
 import { useCertificateAutoCreateDraft } from "@/hooks/use-certificate-auto-create-draft"
@@ -22,11 +22,14 @@ import { DomainToolbarSection } from "@/components/pages/certificates/domain-too
 import { toast, toastActionSuccess, toastApiError, toastCreated, toastDeleted, toastStatusError } from "@/lib/toast"
 
 const PAGE_LIMIT = 20
-const DOMAIN_LOOKUP_LIMIT = 200
-
 type DomainsQueryState = {
-  domainsPage: ListResponse<CertDomain>
-  summary: CertDomainsSummary | null
+  domainsPage: ListResponse<DomainOverviewItem>
+  stats: {
+    total: number
+    healthy: number
+    failed: number
+    expiring: number
+  }
 }
 
 export default function DomainsPage() {
@@ -40,14 +43,17 @@ export default function DomainsPage() {
   const {
     domainKeyword,
     statusFilter,
+    healthFilter,
     domainKeywordDraft,
     statusFilterDraft,
+    healthFilterDraft,
     hasPendingFilterChanges,
     hasActiveFilters,
     offset,
     setOffset,
     setDomainKeywordDraft,
     setStatusFilterDraft,
+    setHealthFilterDraft,
     handleApplyFilters,
     handleResetFilters,
   } = useCertificateDomainsQueryState({
@@ -58,7 +64,7 @@ export default function DomainsPage() {
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [batchDialogOpen, setBatchDialogOpen] = useState(false)
-  const [deleteDialogDomain, setDeleteDialogDomain] = useState<CertDomain | null>(null)
+  const [deleteDialogDomain, setDeleteDialogDomain] = useState<DomainOverviewItem | null>(null)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
 
   const [creating, setCreating] = useState(false)
@@ -75,7 +81,7 @@ export default function DomainsPage() {
   const [batchDomains, setBatchDomains] = useState("")
 
   const [historyLoading, setHistoryLoading] = useState(false)
-  const [historyDomain, setHistoryDomain] = useState<CertDomain | null>(null)
+  const [historyDomain, setHistoryDomain] = useState<DomainOverviewItem | null>(null)
   const [historyItems, setHistoryItems] = useState<CertCheckResult[]>([])
   const [autoCreateDomain, setAutoCreateDomain] = useState<string | null>(null)
   const [autoCreateAdvancedOpen, setAutoCreateAdvancedOpen] = useState(false)
@@ -117,11 +123,15 @@ export default function DomainsPage() {
       limit: PAGE_LIMIT,
       offset: 0,
     },
-    summary: null,
+    stats: {
+      total: 0,
+      healthy: 0,
+      failed: 0,
+      expiring: 0,
+    },
   })
   const domainsPage = domainsData.domainsPage
   const domains = domainsPage.items
-  const summary = domainsData.summary
 
   const resetAutoCreateDraft = (preserveAdvanced = true) => {
     setAutoCreateDomain(null)
@@ -158,19 +168,56 @@ export default function DomainsPage() {
     async (silent = false) => {
       await execute(
         async () => {
-          const [domainsPageData, summaryData] = await Promise.all([
-            api.listDomains({
-              limit: PAGE_LIMIT,
-              offset,
-              domain__contains: domainKeyword.trim() || undefined,
-              enabled__eq: statusFilter === "all" ? undefined : statusFilter === "enabled",
-            }),
-            api.getCertDomainsSummary(),
-          ])
+          const domainsPageData = await api.listAllDomainOverview({
+            domain_contains: domainKeyword.trim() || undefined,
+          })
+
+          const filteredOverviewItems = domainsPageData.filter((item) => {
+            if (statusFilter === "enabled") {
+              if (!item.enabled) {
+                return false
+              }
+            }
+
+            if (statusFilter === "disabled") {
+              if (item.enabled) {
+                return false
+              }
+            }
+
+            if (healthFilter === "healthy") {
+              return Boolean(item.is_valid && item.chain_valid && !item.check_error && (item.days_until_expiry ?? 9999) > 30)
+            }
+
+            if (healthFilter === "failed") {
+              return Boolean(item.check_error || item.is_valid === false || item.chain_valid === false)
+            }
+
+            if (healthFilter === "expiring") {
+              return Boolean(item.is_valid && item.chain_valid && !item.check_error && item.days_until_expiry !== null && item.days_until_expiry !== undefined && item.days_until_expiry <= 30)
+            }
+
+            return true
+          })
+
+          const pagedItems = filteredOverviewItems.slice(offset, offset + PAGE_LIMIT)
+          const healthy = domainsPageData.filter((item) => item.is_valid && item.chain_valid && !item.check_error && (item.days_until_expiry ?? 9999) > 30).length
+          const failed = domainsPageData.filter((item) => item.check_error || item.is_valid === false || item.chain_valid === false).length
+          const expiring = domainsPageData.filter((item) => item.is_valid && item.chain_valid && !item.check_error && item.days_until_expiry !== null && item.days_until_expiry !== undefined && item.days_until_expiry <= 30).length
 
           return {
-            domainsPage: domainsPageData,
-            summary: summaryData,
+            domainsPage: {
+              items: pagedItems,
+              total: filteredOverviewItems.length,
+              limit: PAGE_LIMIT,
+              offset,
+            },
+            stats: {
+              total: domainsPageData.length,
+              healthy,
+              failed,
+              expiring,
+            },
           }
         },
         {
@@ -181,7 +228,7 @@ export default function DomainsPage() {
         }
       )
     },
-    [domainKeyword, execute, offset, statusFilter, t]
+    [domainKeyword, execute, healthFilter, offset, statusFilter, t]
   )
 
   useEffect(() => {
@@ -281,7 +328,7 @@ export default function DomainsPage() {
     }
   }
 
-  const handleToggleEnabled = async (domain: CertDomain, enabled: boolean) => {
+  const handleToggleEnabled = async (domain: DomainOverviewItem, enabled: boolean) => {
     setUpdatingId(domain.id)
 
     try {
@@ -297,7 +344,7 @@ export default function DomainsPage() {
     }
   }
 
-  const handleCheckDomain = async (domain: CertDomain) => {
+  const handleCheckDomain = async (domain: DomainOverviewItem) => {
     setCheckingId(domain.id)
 
     try {
@@ -392,13 +439,11 @@ export default function DomainsPage() {
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 409) {
         try {
-          const maybeExisting = await api.listDomains({
-            limit: DOMAIN_LOOKUP_LIMIT,
-            offset: 0,
-            domain__contains: domain,
+          const maybeExisting = await api.listAllDomainOverview({
+            domain_contains: domain,
           })
 
-          const existing = maybeExisting.items.find((item) => item.domain.toLowerCase() === domain.toLowerCase())
+          const existing = maybeExisting.find((item) => item.domain.toLowerCase() === domain.toLowerCase())
 
           if (existing) {
             toast.success(t("certificates.domains.toastAutoCreateConflict", { domain }))
@@ -419,7 +464,7 @@ export default function DomainsPage() {
     }
   }
 
-  const openHistoryDialog = async (domain: CertDomain) => {
+  const openHistoryDialog = async (domain: DomainOverviewItem) => {
     setHistoryDomain(domain)
     setHistoryDialogOpen(true)
     setHistoryLoading(true)
@@ -466,17 +511,7 @@ export default function DomainsPage() {
     }
   }
 
-  const stats = useMemo(() => {
-    if (summary) {
-      return summary
-    }
-
-    return {
-      total: 0,
-      enabled: 0,
-      disabled: 0,
-    }
-  }, [summary])
+  const stats = useMemo(() => domainsData.stats, [domainsData.stats])
 
   const createDialogText = {
     trigger: t("certificates.domains.addButton"),
@@ -607,10 +642,12 @@ export default function DomainsPage() {
         filters={{
           domainKeyword: domainKeywordDraft,
           statusFilter: statusFilterDraft,
+          healthFilter: healthFilterDraft,
           hasPendingFilterChanges,
           hasActiveFilters,
           onDomainKeywordChange: setDomainKeywordDraft,
           onStatusFilterChange: setStatusFilterDraft,
+          onHealthFilterChange: setHealthFilterDraft,
           onApplyFilters: handleApplyFilters,
           onResetFilters: handleResetFilters,
         }}

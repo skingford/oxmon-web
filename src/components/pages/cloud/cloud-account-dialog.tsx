@@ -180,7 +180,7 @@ export const CloudAccountDialog = memo(function CloudAccountDialog({
                     step={1}
                     value={form.collectionIntervalSecs}
                     onChange={(event) => setForm((prev) => ({ ...prev, collectionIntervalSecs: event.target.value }))}
-                    placeholder="300"
+                    placeholder="3600"
                   />
                 </div>
                 <div className="space-y-2">

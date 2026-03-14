@@ -1,14 +1,18 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CertDomain } from "@/types/api"
+
+type CertificateDomainAutoCheckTarget = {
+  id: string
+  domain: string
+}
 
 type UseCertificateDomainsAutoCheckFlowParams = {
   autoCheckParamValue: string | null
   domainParamValue: string
   loading: boolean
-  domains: CertDomain[]
-  onCheckDomain: (domain: CertDomain) => Promise<void> | void
+  domains: CertificateDomainAutoCheckTarget[]
+  onCheckDomain: (domain: CertificateDomainAutoCheckTarget) => Promise<void> | void
   onAutoCreateDomain: (domain: string) => void
   onAutoCreateDialogInit?: () => void
 }

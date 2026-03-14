@@ -528,6 +528,38 @@ export interface CertDomain {
   updated_at: string;
 }
 
+export interface DomainDetailView {
+  domain_info: CertDomain;
+  latest_check: CertCheckResult | null;
+  certificate_details: CertificateDetails | null;
+}
+
+export interface DomainOverviewItem {
+  id: string;
+  domain: string;
+  port: number;
+  enabled: boolean;
+  note?: string | null;
+  check_interval_secs?: number | null;
+  last_checked_at?: string | null;
+  created_at: string;
+  is_valid?: boolean | null;
+  chain_valid?: boolean | null;
+  days_until_expiry?: number | null;
+  not_before?: string | null;
+  not_after?: string | null;
+  issuer?: string | null;
+  check_error?: string | null;
+  checked_at?: string | null;
+  fingerprint_sha256?: string | null;
+  tls_version?: string | null;
+  public_key_algorithm?: string | null;
+  public_key_bits?: number | null;
+  is_wildcard?: boolean | null;
+  subject_cn?: string | null;
+  chain_depth?: number | null;
+}
+
 export interface CreateDomainRequest {
   domain: string;
   port?: number | null;

@@ -8,19 +8,20 @@ function createSearchParams(query = "") {
 }
 
 describe("useCertificateDomainsQueryState", () => {
-  it("从 URL 初始化 domain/status/offset", () => {
+  it("从 URL 初始化 domain/status/health/offset", () => {
     const replace = vi.fn()
 
     const { result } = renderHook(() =>
       useCertificateDomainsQueryState({
         pathname: "/zh/certificates/domains",
-        searchParams: createSearchParams("domain=example.com&status=enabled&offset=20"),
+        searchParams: createSearchParams("domain=example.com&status=enabled&health=failed&offset=20"),
         replace,
       })
     )
 
     expect(result.current.domainKeyword).toBe("example.com")
     expect(result.current.statusFilter).toBe("enabled")
+    expect(result.current.healthFilter).toBe("failed")
     expect(result.current.offset).toBe(20)
     expect(replace).not.toHaveBeenCalled()
   })
@@ -38,15 +39,18 @@ describe("useCertificateDomainsQueryState", () => {
     )
 
     act(() => {
-      result.current.handleDomainKeywordChange("new.com")
+      result.current.setDomainKeywordDraft("new.com")
+      result.current.setHealthFilterDraft("healthy")
+      result.current.handleApplyFilters()
     })
 
     expect(result.current.domainKeyword).toBe("new.com")
+    expect(result.current.healthFilter).toBe("healthy")
     expect(result.current.offset).toBe(0)
 
     await waitFor(() => {
       expect(replace).toHaveBeenLastCalledWith(
-        "/zh/certificates/domains?domain=new.com&status=enabled",
+        "/zh/certificates/domains?domain=new.com&status=enabled&health=healthy",
         { scroll: false }
       )
     })
@@ -54,7 +58,7 @@ describe("useCertificateDomainsQueryState", () => {
 
   it("重置筛选时清空 domain/status/offset 并同步 URL", async () => {
     const replace = vi.fn()
-    const searchParams = createSearchParams("domain=example.com&status=disabled&offset=10")
+    const searchParams = createSearchParams("domain=example.com&status=disabled&health=expiring&offset=10")
 
     const { result } = renderHook(() =>
       useCertificateDomainsQueryState({
@@ -70,6 +74,7 @@ describe("useCertificateDomainsQueryState", () => {
 
     expect(result.current.domainKeyword).toBe("")
     expect(result.current.statusFilter).toBe("all")
+    expect(result.current.healthFilter).toBe("all")
     expect(result.current.offset).toBe(0)
 
     await waitFor(() => {

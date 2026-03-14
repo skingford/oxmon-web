@@ -1,7 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import { formatCertificateDateTime } from "@/lib/certificates/formats"
-import { CertDomain } from "@/types/api"
+import { DomainOverviewItem } from "@/types/api"
+import { withLocalePrefix } from "@/components/app-locale"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +11,7 @@ import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
-import { History, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react"
+import { AlertTriangle, Eye, History, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react"
 
 type TranslateFn = (path: string, values?: Record<string, string | number>) => string
 
@@ -27,12 +29,40 @@ function getDomainStatusMeta(enabled: boolean, t: TranslateFn) {
   }
 }
 
+function getCertificateHealthMeta(domain: DomainOverviewItem, t: TranslateFn) {
+  if (domain.is_valid === null || domain.is_valid === undefined) {
+    return {
+      className: "border-muted bg-muted text-muted-foreground",
+      label: t("certificates.domains.tableHealthUnknown"),
+    }
+  }
+
+  if (!domain.is_valid || !domain.chain_valid || domain.check_error) {
+    return {
+      className: "border-red-500/30 bg-red-500/10 text-red-600",
+      label: t("certificates.domains.tableHealthFailed"),
+    }
+  }
+
+  if ((domain.days_until_expiry ?? 9999) <= 30) {
+    return {
+      className: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+      label: t("certificates.domains.tableHealthExpiring"),
+    }
+  }
+
+  return {
+    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+    label: t("certificates.domains.tableHealthHealthy"),
+  }
+}
+
 type DomainTableCardProps = {
   t: TranslateFn
   locale: "zh" | "en"
   pageLimit: number
   loading: boolean
-  domains: CertDomain[]
+  domains: DomainOverviewItem[]
   totalCount: number
   pageNumber: number
   totalPages: number
@@ -44,10 +74,10 @@ type DomainTableCardProps = {
   updatingId: string | null
   deletingId: string | null
   onOpenCreateDialog: () => void
-  onToggleEnabled: (domain: CertDomain, enabled: boolean) => void
-  onCheckDomain: (domain: CertDomain) => void
-  onOpenHistory: (domain: CertDomain) => void
-  onDeleteDomain: (domain: CertDomain) => void
+  onToggleEnabled: (domain: DomainOverviewItem, enabled: boolean) => void
+  onCheckDomain: (domain: DomainOverviewItem) => void
+  onOpenHistory: (domain: DomainOverviewItem) => void
+  onDeleteDomain: (domain: DomainOverviewItem) => void
   onPrevPage: () => void
   onNextPage: () => void
 }
@@ -88,11 +118,11 @@ export function DomainTableCard({
             <TableHeader>
               <TableRow>
                 <TableHead>{t("certificates.domains.tableColDomain")}</TableHead>
-                <TableHead>{t("certificates.domains.tableColPort")}</TableHead>
                 <TableHead>{t("certificates.domains.tableColStatus")}</TableHead>
-                <TableHead>{t("certificates.domains.tableColInterval")}</TableHead>
+                <TableHead>{t("certificates.domains.tableColHealth")}</TableHead>
+                <TableHead>{t("certificates.domains.tableColExpiry")}</TableHead>
                 <TableHead>{t("certificates.domains.tableColLastChecked")}</TableHead>
-                <TableHead>{t("certificates.domains.tableColNote")}</TableHead>
+                <TableHead>{t("certificates.domains.tableColSnapshot")}</TableHead>
                 <TableHead className="text-right">{t("certificates.domains.tableColActions")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -123,14 +153,32 @@ export function DomainTableCard({
               ) : (
                 domains.map((domain) => {
                   const statusMeta = getDomainStatusMeta(domain.enabled, t)
+                  const healthMeta = getCertificateHealthMeta(domain, t)
                   const checking = checkingId === domain.id
                   const updating = updatingId === domain.id
                   const deleting = deletingId === domain.id
 
                   return (
                     <TableRow key={domain.id} className="hover:bg-muted/40">
-                      <TableCell className="font-medium">{domain.domain}</TableCell>
-                      <TableCell className="text-muted-foreground">{domain.port}</TableCell>
+                      <TableCell className="min-w-[260px]">
+                        <Link
+                          href={withLocalePrefix(`/certificates/domains/${domain.id}`, locale)}
+                          className="font-medium transition-colors hover:text-primary"
+                        >
+                          {domain.domain}
+                        </Link>
+                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <span>{t("certificates.domains.fieldPort")}: {domain.port}</span>
+                          <span>
+                            {t("certificates.domains.fieldInterval")}:
+                            {" "}
+                            {domain.check_interval_secs
+                              ? t("certificates.domains.intervalSeconds", { seconds: domain.check_interval_secs })
+                              : t("certificates.domains.intervalDefault")}
+                          </span>
+                          {domain.note ? <span title={domain.note}>{domain.note}</span> : null}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Badge className={statusMeta.className}>{statusMeta.label}</Badge>
@@ -141,16 +189,35 @@ export function DomainTableCard({
                           />
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {domain.check_interval_secs
-                          ? t("certificates.domains.intervalSeconds", { seconds: domain.check_interval_secs })
-                          : t("certificates.domains.intervalDefault")}
+                      <TableCell>
+                        <Badge className={healthMeta.className}>{healthMeta.label}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {formatCertificateDateTime(domain.last_checked_at, locale)}
+                        {domain.days_until_expiry === null || domain.days_until_expiry === undefined
+                          ? "-"
+                          : domain.days_until_expiry >= 0
+                            ? t("certificates.detail.daysRemaining", { days: domain.days_until_expiry })
+                            : t("certificates.detail.statusExpired")}
                       </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-muted-foreground" title={domain.note || ""}>
-                        {domain.note || t("certificates.domains.noteEmpty")}
+                      <TableCell className="text-muted-foreground">
+                        {formatCertificateDateTime(domain.checked_at || domain.last_checked_at || null, locale)}
+                      </TableCell>
+                      <TableCell className="max-w-[260px]">
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          <p className="truncate" title={domain.issuer || ""}>
+                            {domain.issuer || domain.subject_cn || t("certificates.domains.noteEmpty")}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {domain.tls_version ? <span>{domain.tls_version}</span> : null}
+                            {domain.public_key_algorithm ? <span>{domain.public_key_algorithm}</span> : null}
+                          </div>
+                          <div className={`flex items-center gap-1 ${domain.check_error ? "text-red-600" : "text-muted-foreground"}`}>
+                            {domain.check_error ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                            <span className="truncate" title={domain.check_error || ""}>
+                              {domain.check_error || t("certificates.domains.historyNoError")}
+                            </span>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -164,6 +231,16 @@ export function DomainTableCard({
                               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                               : <ShieldCheck className="mr-2 h-4 w-4" />}
                             {t("certificates.domains.actionCheck")}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            asChild
+                            title={t("certificates.domains.actionDetail")}
+                          >
+                            <Link href={withLocalePrefix(`/certificates/domains/${domain.id}`, locale)}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
                           </Button>
                           <Button
                             variant="ghost"

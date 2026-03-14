@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { toastCopied } from "@/lib/toast"
-import { User, Copy, Shield, LogOut, Loader2, AlertTriangle } from "lucide-react"
+import { SensitiveInput } from "@/components/ui/sensitive-input"
+import { User, Shield, LogOut, Loader2, AlertTriangle } from "lucide-react"
 import { motion } from "framer-motion"
 import { withLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
@@ -57,20 +57,6 @@ export default function ProfilePage() {
     }
     setLoading(false)
   }, [])
-
-  const handleCopy = () => {
-    if (token) {
-      navigator.clipboard.writeText(token)
-      toastCopied(t("toastTokenCopied"))
-    }
-  }
-
-  const handleCopyAppId = () => {
-    if (appId) {
-      navigator.clipboard.writeText(appId)
-      toastCopied(t("toastAppIdCopied"))
-    }
-  }
 
   const handleLogout = () => {
     clearAuthToken()
@@ -132,24 +118,17 @@ export default function ProfilePage() {
 
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t("fieldAppId")}</Label>
-                <div className="relative">
-                  <Input
-                    readOnly
-                    value={appId}
-                    className="bg-muted font-mono text-xs pr-12"
-                  />
-                  <div className="absolute right-1 top-1 flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleCopyAppId}
-                      className="h-8 w-8 p-0"
-                      disabled={!appId}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                <SensitiveInput
+                  readOnly
+                  value={appId}
+                  className="font-mono text-xs"
+                  showLabel={t("fieldAppId")}
+                  hideLabel={t("fieldAppId")}
+                  copyLabel={t("fieldAppId")}
+                  copiedMessage={t("toastAppIdCopied")}
+                  enableCopy
+                  maskedPreview
+                />
               </div>
 
               <div className="space-y-2">
@@ -196,23 +175,17 @@ export default function ProfilePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium">{t("fieldToken")}</Label>
-              <div className="relative">
-                <Input
-                  readOnly
-                  value={token || ""}
-                  className="font-mono text-xs pr-12 bg-muted"
-                />
-                <div className="absolute right-1 top-1 flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleCopy}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+              <SensitiveInput
+                readOnly
+                value={token || ""}
+                className="font-mono text-xs"
+                showLabel={t("fieldToken")}
+                hideLabel={t("fieldToken")}
+                copyLabel={t("menuCopyToken")}
+                copiedMessage={t("toastTokenCopied")}
+                enableCopy
+                maskedPreview
+              />
             </div>
 
             <div className="flex gap-3 p-4 rounded-lg border-2 bg-orange-50 border-orange-300">

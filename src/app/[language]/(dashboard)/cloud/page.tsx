@@ -51,7 +51,7 @@ const DEFAULT_FORM_STATE: CloudAccountFormState = {
   secretKey: "",
   endpoint: "",
   regionsText: "",
-  collectionIntervalSecs: "300",
+  collectionIntervalSecs: "3600",
   enabled: true,
 }
 
@@ -87,7 +87,7 @@ function buildCloudAccountFormState(account: CloudAccountResponse): CloudAccount
     secretKey: account.secret_key ?? "",
     endpoint: account.endpoint ?? "",
     regionsText: (account.regions || []).join(", "),
-    collectionIntervalSecs: String(account.collection_interval_secs || 300),
+    collectionIntervalSecs: String(account.collection_interval_secs || 3600),
     enabled: account.enabled,
   }
 }
@@ -113,7 +113,7 @@ export default function CloudAccountsPage() {
   const [batchDialogOpen, setBatchDialogOpen] = useState(false)
   const [batchProvider, setBatchProvider] = useState("tencent")
   const [providerDictionaryOptions, setProviderDictionaryOptions] = useState<CloudProviderOption[]>([])
-  const [batchCollectionIntervalSecs, setBatchCollectionIntervalSecs] = useState("300")
+  const [batchCollectionIntervalSecs, setBatchCollectionIntervalSecs] = useState("3600")
   const [batchText, setBatchText] = useState("")
   const [batchSubmitting, setBatchSubmitting] = useState(false)
 
@@ -326,7 +326,7 @@ export default function CloudAccountsPage() {
 
   const resetBatchForm = useCallback(() => {
     setBatchProvider(providerOptions[0]?.value || DEFAULT_FORM_STATE.provider)
-    setBatchCollectionIntervalSecs("300")
+    setBatchCollectionIntervalSecs("3600")
     setBatchText("")
     setBatchSubmitting(false)
   }, [providerOptions])

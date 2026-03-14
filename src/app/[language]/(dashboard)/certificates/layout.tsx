@@ -2,22 +2,37 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { withLocalePrefix, stripLocalePrefix } from "@/components/app-locale";
-import { useAppLocale } from "@/hooks/use-app-locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Globe, Activity } from "lucide-react";
 import { useAppTranslations } from "@/hooks/use-app-translations";
+import { cn } from "@/lib/utils";
 
 export default function CertificatesLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-    const { t, locale } = useAppTranslations("pages")
+  const { t, locale } = useAppTranslations("pages")
   const pathname = usePathname();
-  // const locale = useAppLocale();
   const normalizedPathname = stripLocalePrefix(pathname);
+  const navItems = [
+    {
+      href: "/certificates",
+      label: t("certificates.overview.navCertificates"),
+      icon: Shield,
+    },
+    {
+      href: "/certificates/domains",
+      label: t("certificates.overview.navDomains"),
+      icon: Globe,
+    },
+    {
+      href: "/certificates/status",
+      label: t("certificates.overview.navStatus"),
+      icon: Activity,
+    },
+  ] as const
 
   return (
     <motion.div
@@ -34,28 +49,34 @@ export default function CertificatesLayout({
         </div>
       </div>
 
-      <Tabs value={normalizedPathname} className="min-w-0 space-y-6">
+      <div className="min-w-0 space-y-6">
         <div className="w-full max-w-full overflow-x-auto">
-          <TabsList className="mb-0 h-12 min-w-max bg-muted/50 p-1 glass">
-          <Link href={withLocalePrefix("/certificates", locale)}>
-            <TabsTrigger value="/certificates" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
-              <Shield className="h-4 w-4" />
-              Certificates List
-            </TabsTrigger>
-          </Link>
-          <Link href={withLocalePrefix("/certificates/domains", locale)}>
-            <TabsTrigger value="/certificates/domains" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
-              <Globe className="h-4 w-4" />
-              Domains
-            </TabsTrigger>
-          </Link>
-          <Link href={withLocalePrefix("/certificates/status", locale)}>
-            <TabsTrigger value="/certificates/status" className="flex items-center gap-2 px-6 data-[state=active]:glass h-full transition-all">
-              <Activity className="h-4 w-4" />
-              Status
-            </TabsTrigger>
-          </Link>
-          </TabsList>
+          <nav
+            aria-label="Certificates navigation"
+            className="mb-0 inline-flex h-12 min-w-max items-center rounded-lg bg-muted/50 p-1 glass"
+          >
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const isActive = normalizedPathname === item.href
+
+              return (
+                <Link
+                  key={item.href}
+                  href={withLocalePrefix(item.href, locale)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "inline-flex h-full items-center gap-2 rounded-md border border-transparent px-6 py-1 text-sm font-medium whitespace-nowrap transition-all",
+                    isActive
+                      ? "glass text-foreground shadow-sm"
+                      : "text-foreground/60 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              )
+            })}
+          </nav>
         </div>
 
         <AnimatePresence mode="wait">
@@ -69,7 +90,7 @@ export default function CertificatesLayout({
             {children}
           </motion.div>
         </AnimatePresence>
-      </Tabs>
+      </div>
     </motion.div>
   );
 }

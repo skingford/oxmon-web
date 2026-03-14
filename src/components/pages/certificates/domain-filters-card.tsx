@@ -13,10 +13,12 @@ type DomainFiltersCardProps = {
   t: TranslateFn
   domainKeyword: string
   statusFilter: "all" | "enabled" | "disabled"
+  healthFilter: "all" | "healthy" | "failed" | "expiring"
   hasPendingFilterChanges: boolean
   hasActiveFilters: boolean
   onDomainKeywordChange: (value: string) => void
   onStatusFilterChange: (value: "all" | "enabled" | "disabled") => void
+  onHealthFilterChange: (value: "all" | "healthy" | "failed" | "expiring") => void
   onApplyFilters: () => void
   onResetFilters: () => void
 }
@@ -25,10 +27,12 @@ export function DomainFiltersCard({
   t,
   domainKeyword,
   statusFilter,
+  healthFilter,
   hasPendingFilterChanges,
   hasActiveFilters,
   onDomainKeywordChange,
   onStatusFilterChange,
+  onHealthFilterChange,
   onApplyFilters,
   onResetFilters,
 }: DomainFiltersCardProps) {
@@ -40,7 +44,7 @@ export function DomainFiltersCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <FilterToolbar
-          className="gap-3 md:grid-cols-2 xl:grid-cols-4"
+          className="gap-3 md:grid-cols-2 xl:grid-cols-5"
           search={{
             value: domainKeyword,
             onValueChange: onDomainKeywordChange,
@@ -59,6 +63,21 @@ export function DomainFiltersCard({
                 <SelectItem value="all">{t("certificates.domains.filterStatusAll")}</SelectItem>
                 <SelectItem value="enabled">{t("certificates.domains.filterStatusEnabled")}</SelectItem>
                 <SelectItem value="disabled">{t("certificates.domains.filterStatusDisabled")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("certificates.domains.filterHealthLabel")}</Label>
+            <Select value={healthFilter} onValueChange={(value) => onHealthFilterChange(value as "all" | "healthy" | "failed" | "expiring")}>
+              <SelectTrigger className="h-10 w-full bg-background">
+                <SelectValue placeholder={t("certificates.domains.filterHealthAll")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("certificates.domains.filterHealthAll")}</SelectItem>
+                <SelectItem value="healthy">{t("certificates.domains.filterHealthHealthy")}</SelectItem>
+                <SelectItem value="failed">{t("certificates.domains.filterHealthFailed")}</SelectItem>
+                <SelectItem value="expiring">{t("certificates.domains.filterHealthExpiring")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
