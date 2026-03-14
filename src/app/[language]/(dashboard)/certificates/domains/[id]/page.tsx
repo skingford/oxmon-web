@@ -112,9 +112,9 @@ function renderListOrFallback(items: string[], fallback: string) {
 
 function TechnicalField({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <div className="text-sm break-all">{value}</div>
+    <div className="rounded-xl border border-border/60 bg-background/80 p-4 shadow-sm">
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+      <div className="mt-2 text-sm break-all text-foreground">{value}</div>
     </div>
   )
 }
@@ -129,13 +129,36 @@ function TrendCard({
   children: ReactNode
 }) {
   return (
-    <Card className="overflow-hidden border-0 bg-gradient-to-br from-white via-slate-50 to-slate-100/80 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.25)]">
-      <CardHeader className="border-b border-slate-200/70 pb-4">
+    <Card className="overflow-hidden border-border/60 shadow-sm">
+      <CardHeader className="border-b border-border/60 pb-4">
         <CardTitle className="text-base">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="pt-6">{children}</CardContent>
     </Card>
+  )
+}
+
+function SummaryStatCard({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string
+  value: ReactNode
+  tone?: "default" | "success" | "danger"
+}) {
+  const valueClassName = tone === "success"
+    ? "text-emerald-600"
+    : tone === "danger"
+      ? "text-red-600"
+      : "text-foreground"
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className={`mt-3 text-3xl font-semibold tabular-nums ${valueClassName}`}>{value}</p>
+    </div>
   )
 }
 
@@ -453,26 +476,9 @@ export default function DomainDetailPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (!detail) {
-    return null
-  }
-
-  const domain = detail.domain_info
-  const latestCheck = detail.latest_check
-  const certificate = detail.certificate_details
-  const monitoringStatusMeta = getBooleanBadgeMeta(domain.enabled)
-  const latestStatusMeta = getLatestCheckStatusMeta(latestCheck, t)
-  const LatestStatusIcon = latestStatusMeta.icon
-  const latestResolvedIps = formatList(latestCheck?.resolved_ips)
-  const latestSanList = formatList(latestCheck?.san_list)
+  const domain = detail?.domain_info ?? null
+  const latestCheck = detail?.latest_check ?? null
+  const certificate = detail?.certificate_details ?? null
   const historyStats = useMemo(() => {
     const validCount = historyItems.filter((item) => item.is_valid && item.chain_valid).length
     const invalidCount = historyItems.length - validCount
@@ -525,22 +531,44 @@ export default function DomainDetailPage() {
         availability: item.is_valid && item.chain_valid ? 100 : 0,
       }))
   }, [historyItems, locale])
+
+  if (loading) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!detail) {
+    return null
+  }
+
+  const monitoringStatusMeta = getBooleanBadgeMeta(domain.enabled)
+  const latestStatusMeta = getLatestCheckStatusMeta(latestCheck, t)
+  const LatestStatusIcon = latestStatusMeta.icon
+  const latestResolvedIps = formatList(latestCheck?.resolved_ips)
+  const latestSanList = formatList(latestCheck?.san_list)
   const latestSummaryItems = [
     {
       label: t("certificates.domains.detailSummaryTotalChecks"),
       value: historyStats.total,
+      tone: "default" as const,
     },
     {
       label: t("certificates.domains.detailSummaryValidChecks"),
       value: historyStats.valid,
+      tone: "success" as const,
     },
     {
       label: t("certificates.domains.detailSummaryInvalidChecks"),
       value: historyStats.invalid,
+      tone: "danger" as const,
     },
     {
       label: t("certificates.domains.detailSummaryResolvedIpCount"),
       value: latestResolvedIps.length,
+      tone: "default" as const,
     },
   ]
 
@@ -587,13 +615,12 @@ export default function DomainDetailPage() {
         </div>
       </div>
 
-      <Card className="relative overflow-hidden border-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_28%),linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.96),rgba(239,246,255,0.9))] shadow-[0_24px_80px_-36px_rgba(15,23,42,0.35)]">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.45),transparent)]" />
-        <CardContent className="relative pt-6">
-          <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)_auto]">
+      <Card className="overflow-hidden border-border/60 shadow-sm">
+        <CardHeader className="border-b border-border/60">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-100 via-white to-slate-100 shadow-inner ring-1 ring-slate-200/80">
-                <Globe className="h-10 w-10 text-sky-600" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-600 shadow-sm">
+                <Globe className="h-8 w-8" />
               </div>
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -601,8 +628,9 @@ export default function DomainDetailPage() {
                   <Badge className={monitoringStatusMeta.className}>
                     {domain.enabled ? t("certificates.domains.statusEnabled") : t("certificates.domains.statusDisabled")}
                   </Badge>
+                  <Badge className={latestStatusMeta.className}>{latestStatusMeta.label}</Badge>
                 </div>
-                <p className="max-w-xl text-sm text-muted-foreground">{t("certificates.domains.detailHeroDescription")}</p>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{t("certificates.domains.detailHeroDescription")}</p>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="secondary">{t("certificates.domains.fieldPort")}: {domain.port}</Badge>
                   <Badge variant="secondary">
@@ -612,12 +640,42 @@ export default function DomainDetailPage() {
                       ? t("certificates.domains.intervalDefault")
                       : t("certificates.domains.intervalSeconds", { seconds: domain.check_interval_secs })}
                   </Badge>
-                  <Badge className={latestStatusMeta.className}>{latestStatusMeta.label}</Badge>
+                  <Badge variant="secondary">
+                    {t("certificates.domains.tableColLastChecked")}:
+                    {" "}
+                    {formatCertificateDateTime(domain.last_checked_at, locale)}
+                  </Badge>
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:w-[360px]">
+              <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${latestStatusMeta.className}`}>
+                    <LatestStatusIcon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                      {t("certificates.domains.detailLatestCheckTitle")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">{latestStatusMeta.label}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  {t("certificates.detail.fieldLastChecked")}
+                </p>
+                <p className="mt-2 text-sm font-medium">
+                  {formatCertificateDateTime(latestCheck?.checked_at || null, locale)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <TechnicalField label={t("certificates.domains.fieldDomain")} value={<span className="font-mono">{domain.domain}</span>} />
               <TechnicalField label={t("certificates.domains.tableColStatus")} value={domain.enabled ? t("certificates.domains.statusEnabled") : t("certificates.domains.statusDisabled")} />
               <TechnicalField label={t("certificates.domains.tableColLastChecked")} value={formatCertificateDateTime(domain.last_checked_at, locale)} />
@@ -626,36 +684,11 @@ export default function DomainDetailPage() {
               <TechnicalField label={t("certificates.domains.detailFieldSubject")} value={latestCheck?.subject || certificate?.subject_cn || "-"} />
               <TechnicalField label={t("certificates.domains.detailSummaryResolvedIpCount")} value={latestResolvedIps.length} />
               <TechnicalField label={t("certificates.domains.fieldNote")} value={domain.note || t("certificates.domains.noteEmpty")} />
-            </div>
-
-            <div className="flex flex-col justify-start gap-2">
-              <Button variant="outline" onClick={handleOpenEdit}>
-                <Pencil className="mr-2 h-4 w-4" />
-                {t("certificates.domains.detailEditButton")}
-              </Button>
-              <Button onClick={() => void handleCheckNow()} disabled={checking}>
-                {checking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                {checking ? t("certificates.domains.detailChecking") : t("certificates.domains.actionCheck")}
-              </Button>
-              <Button variant="outline" asChild>
-                <a href={`https://${domain.domain}`} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  {t("certificates.detail.btnVisit")}
-                </a>
-              </Button>
-              <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t("certificates.domains.actionDelete")}
-              </Button>
-            </div>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {latestSummaryItems.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm backdrop-blur">
-                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{item.label}</p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums">{item.value}</p>
-              </div>
+              <SummaryStatCard key={item.label} label={item.label} value={item.value} tone={item.tone} />
             ))}
           </div>
         </CardContent>
@@ -727,13 +760,13 @@ export default function DomainDetailPage() {
 
       <Tabs defaultValue="history" className="space-y-4">
         <TabsList variant="line" className="rounded-none border-b bg-transparent p-0">
-          <TabsTrigger value="history" className="px-4">{t("certificates.domains.detailTabHistory")}</TabsTrigger>
-          <TabsTrigger value="latest" className="px-4">{t("certificates.domains.detailTabLatest")}</TabsTrigger>
-          <TabsTrigger value="certificate" className="px-4">{t("certificates.domains.detailTabCertificate")}</TabsTrigger>
+          <TabsTrigger value="history" className="px-4 pb-3">{t("certificates.domains.detailTabHistory")}</TabsTrigger>
+          <TabsTrigger value="latest" className="px-4 pb-3">{t("certificates.domains.detailTabLatest")}</TabsTrigger>
+          <TabsTrigger value="certificate" className="px-4 pb-3">{t("certificates.domains.detailTabCertificate")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="history">
-          <Card>
+          <Card className="border-border/60 shadow-sm">
             <CardHeader className="gap-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -848,7 +881,7 @@ export default function DomainDetailPage() {
 
         <TabsContent value="latest">
           <div className="grid gap-6 xl:grid-cols-2">
-            <Card>
+            <Card className="border-border/60 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Server className="h-5 w-5" />
@@ -908,7 +941,7 @@ export default function DomainDetailPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-border/60 shadow-sm">
               <CardHeader>
                 <CardTitle>{t("certificates.domains.detailOverviewTitle")}</CardTitle>
                 <CardDescription>{t("certificates.domains.detailOverviewDescription")}</CardDescription>
