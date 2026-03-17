@@ -628,7 +628,7 @@
         "statExpiring": "即将到期",
         "filtersTitle": "筛选条件",
         "filtersDescription": "支持按域名与启用状态筛选",
-        "filterDomainPlaceholder": "按域名筛选（domain__contains）",
+        "filterDomainPlaceholder": "按域名筛选（输入完整域名时精确匹配）",
         "filterStatusAll": "全部",
         "filterStatusEnabled": "仅启用",
         "filterStatusDisabled": "仅停用",

@@ -628,7 +628,7 @@
         "statExpiring": "Expiring Soon",
         "filtersTitle": "Filters",
         "filtersDescription": "Filter by domain and enabled status",
-        "filterDomainPlaceholder": "Filter domains (domain__contains)",
+        "filterDomainPlaceholder": "Filter domains (full domain matches exactly)",
         "filterStatusAll": "All",
         "filterStatusEnabled": "Enabled",
         "filterStatusDisabled": "Disabled",

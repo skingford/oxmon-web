@@ -168,11 +168,29 @@ export default function DomainsPage() {
     async (silent = false) => {
       await execute(
         async () => {
+          const normalizedKeyword = domainKeyword.trim().toLowerCase()
+          const useExactDomainMatch =
+            normalizedKeyword.includes(".") &&
+            !normalizedKeyword.startsWith(".") &&
+            !normalizedKeyword.endsWith(".")
+
           const domainsPageData = await api.listAllDomainOverview({
             domain_contains: domainKeyword.trim() || undefined,
           })
 
-          const filteredOverviewItems = domainsPageData.filter((item) => {
+          const domainMatchedItems = normalizedKeyword
+            ? domainsPageData.filter((item) => {
+                const normalizedDomain = item.domain.trim().toLowerCase()
+
+                if (useExactDomainMatch) {
+                  return normalizedDomain === normalizedKeyword
+                }
+
+                return normalizedDomain.includes(normalizedKeyword)
+              })
+            : domainsPageData
+
+          const filteredOverviewItems = domainMatchedItems.filter((item) => {
             if (statusFilter === "enabled") {
               if (!item.enabled) {
                 return false
