@@ -6,7 +6,8 @@ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigat
 import { ApiRequestError, api } from "@/lib/api"
 import { buildTranslatedPaginationTextBundle } from "@/lib/pagination-summary"
 import { copyApiCurlCommand } from "@/lib/api-curl"
-import { AgentDetail, AgentReportLogItem, LatestMetric } from "@/types/api"
+import { getInstanceContactChannels } from "@/lib/notifications/instance-contact-utils"
+import { AgentDetail, AgentReportLogItem, InstanceContactItem, LatestMetric } from "@/types/api"
 import { formatDateTimeByLocale } from "@/lib/date-time"
 import { formatMetricValue } from "@/lib/metric-format"
 import { useAppLocale } from "@/hooks/use-app-locale"
@@ -54,7 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertCircle, ArrowLeft, Check, ChevronDown, Gauge, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react"
+import { AlertCircle, ArrowLeft, Check, ChevronDown, Gauge, Loader2, Pencil, RefreshCw, Trash2, Users } from "lucide-react"
 import { toast, toastApiError, toastCopied, toastDeleted, toastSaved } from "@/lib/toast"
 
 const REPORT_LOGS_PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -594,6 +595,14 @@ export default function AgentDetailPage() {
     limit: REPORT_LOGS_PAGE_SIZE_OPTIONS[1],
     offset: 0,
   }, { initialLoading: false })
+  const {
+    data: matchedContacts,
+    loading: matchedContactsLoading,
+    refreshing: matchedContactsRefreshing,
+    error: matchedContactsError,
+    execute: executeMatchedContactsRequest,
+    reset: resetMatchedContactsRequest,
+  } = useRequestState<InstanceContactItem[]>([], { initialLoading: false })
   const [notFound, setNotFound] = useState(false)
   const [resolvedAgentId, setResolvedAgentId] = useState("")
   const [agentDetail, setAgentDetail] = useState<AgentDetail | null>(null)
@@ -622,6 +631,7 @@ export default function AgentDetailPage() {
   const previousAgentRef = useRef<string | null>(null)
 
   const agentsPath = useMemo(() => withLocalePrefix("/agents", locale), [locale])
+  const instanceContactsPath = useMemo(() => withLocalePrefix("/notifications/contacts", locale), [locale])
   const reportLogsCurlLastCopiedStorageKey = useMemo(() => {
     const scopeId = agentRef || resolvedAgentId || "unknown"
     return `${REPORT_LOGS_CURL_LAST_COPIED_AT_KEY_PREFIX}${scopeId}`
@@ -844,9 +854,32 @@ export default function AgentDetailPage() {
     [agentDetail, agentRef, executeReportLogsRequest, reportLogsOffset, reportLogsPageSize, resolvedAgentId, t]
   )
 
+  const fetchMatchedContacts = useCallback(
+    async (silent = false) => {
+      if (!resolvedAgentId) {
+        return
+      }
+
+      await executeMatchedContactsRequest(
+        () => api.matchInstanceContacts(resolvedAgentId),
+        {
+          silent,
+          onError: (error) => {
+            toastApiError(error, t("agentDetail.toastFetchContactsError"))
+          },
+        }
+      )
+    },
+    [executeMatchedContactsRequest, resolvedAgentId, t]
+  )
+
   useEffect(() => {
     fetchAgentDetail()
   }, [fetchAgentDetail])
+
+  useEffect(() => {
+    fetchMatchedContacts()
+  }, [fetchMatchedContacts])
 
   useEffect(() => {
     let cancelled = false
@@ -950,9 +983,10 @@ export default function AgentDetailPage() {
     if (previousAgentRef.current !== agentRef) {
       setReportLogsOffset(0)
       setExpandedReportLogKeys({})
+      resetMatchedContactsRequest([])
       previousAgentRef.current = agentRef
     }
-  }, [agentRef])
+  }, [agentRef, resetMatchedContactsRequest])
 
   const openEditDialog = async () => {
     if (!agentRef) {
@@ -1182,10 +1216,14 @@ export default function AgentDetailPage() {
         <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:justify-end">
           <Button
             variant="outline"
-            onClick={() => Promise.all([fetchLatestMetrics(true), fetchReportLogs(true)])}
-            disabled={loading || refreshing || reportLogsRefreshing || !agentRef}
+            onClick={() => Promise.all([
+              fetchLatestMetrics(true),
+              fetchReportLogs(true),
+              fetchMatchedContacts(true),
+            ])}
+            disabled={loading || refreshing || reportLogsLoading || reportLogsRefreshing || matchedContactsLoading || matchedContactsRefreshing || !agentRef}
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing || reportLogsRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing || reportLogsLoading || reportLogsRefreshing || matchedContactsLoading || matchedContactsRefreshing ? "animate-spin" : ""}`} />
             {t("agentDetail.refreshButton")}
           </Button>
           <Button
@@ -1249,6 +1287,80 @@ export default function AgentDetailPage() {
               </Card>
             ))}
           </div>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+              <div className="space-y-1">
+                <CardTitle>{t("agentDetail.contactsTitle")}</CardTitle>
+                <CardDescription>{t("agentDetail.contactsDescription")}</CardDescription>
+              </div>
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link href={instanceContactsPath}>
+                  <Users className="mr-2 h-4 w-4" />
+                  {t("agentDetail.contactsManage")}
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {matchedContactsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t("agentDetail.contactsLoading")}
+                </div>
+              ) : matchedContactsError ? (
+                <p className="text-sm text-muted-foreground">{matchedContactsError}</p>
+              ) : matchedContacts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("agentDetail.contactsEmpty")}</p>
+              ) : (
+                <div className="space-y-3">
+                  {matchedContacts.map((contact) => {
+                    const channels = getInstanceContactChannels(contact)
+
+                    return (
+                      <div key={contact.id} className="rounded-lg border bg-muted/20 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">{contact.contact_name}</p>
+                              <Badge variant={contact.enabled ? "secondary" : "outline"}>
+                                {contact.enabled ? t("agentDetail.contactsStatusEnabled") : t("agentDetail.contactsStatusDisabled")}
+                              </Badge>
+                            </div>
+                            {contact.description ? (
+                              <p className="text-sm text-muted-foreground">{contact.description}</p>
+                            ) : null}
+                          </div>
+                          <Badge variant="outline">
+                            {t("agentDetail.contactsPatternCount", { count: contact.agent_patterns.length })}
+                          </Badge>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {contact.agent_patterns.map((pattern) => (
+                            <Badge key={`${contact.id}-${pattern}`} variant="outline" className="font-mono text-[11px]">
+                              {pattern}
+                            </Badge>
+                          ))}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {channels.length === 0 ? (
+                            <Badge variant="outline">{t("agentDetail.contactsNoChannel")}</Badge>
+                          ) : (
+                            channels.map((channel) => (
+                              <Badge key={`${contact.id}-${channel.type}`} variant="secondary">
+                                {t(`agentDetail.contactsChannel${channel.type[0].toUpperCase()}${channel.type.slice(1)}`)}: {channel.value}
+                              </Badge>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

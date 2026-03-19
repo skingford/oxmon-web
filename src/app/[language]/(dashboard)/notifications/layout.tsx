@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { withLocalePrefix, stripLocalePrefix } from "@/components/app-locale"
 import { useAppLocale } from "@/hooks/use-app-locale"
 import { useAppTranslations } from "@/hooks/use-app-translations"
-import { Inbox, ScrollText, ShieldOff } from "lucide-react"
+import { Inbox, ScrollText, ShieldOff, Users } from "lucide-react"
 
 export default function NotificationsLayout({
   children,
@@ -39,6 +39,12 @@ export default function NotificationsLayout({
               <TabsTrigger value="/notifications" className="flex h-full items-center gap-2 px-6">
                 <Inbox className="h-4 w-4" />
                 {t("notifications.tabsChannels")}
+              </TabsTrigger>
+            </Link>
+            <Link href={withLocalePrefix("/notifications/contacts", locale)}>
+              <TabsTrigger value="/notifications/contacts" className="flex h-full items-center gap-2 px-6">
+                <Users className="h-4 w-4" />
+                {t("notifications.tabsContacts")}
               </TabsTrigger>
             </Link>
             <Link href={withLocalePrefix("/notifications/silence", locale)}>

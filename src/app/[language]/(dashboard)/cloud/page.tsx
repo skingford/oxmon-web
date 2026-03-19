@@ -18,11 +18,13 @@ import type {
   BatchCreateCloudAccountsRequest,
   CloudAccountResponse,
   CreateCloudAccountRequest,
+  DiagnoseResponse,
   UpdateCloudAccountRequest,
 } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { CloudAccountsFiltersCard } from "@/components/pages/cloud/cloud-accounts-filters-card"
 import { CloudAccountBatchImportDialog } from "@/components/pages/cloud/cloud-account-batch-import-dialog"
+import { CloudAccountDiagnoseDialog } from "@/components/pages/cloud/cloud-account-diagnose-dialog"
 import { CloudAccountDialog, type CloudAccountFormState } from "@/components/pages/cloud/cloud-account-dialog"
 import { CloudAccountsStatsCards } from "@/components/pages/cloud/cloud-accounts-stats-cards"
 import { CloudAccountsTableCard } from "@/components/pages/cloud/cloud-accounts-table-card"
@@ -119,9 +121,14 @@ export default function CloudAccountsPage() {
 
   const [testingId, setTestingId] = useState<string | null>(null)
   const [collectingId, setCollectingId] = useState<string | null>(null)
+  const [diagnosingId, setDiagnosingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<CloudAccountResponse | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [diagnoseTarget, setDiagnoseTarget] = useState<CloudAccountResponse | null>(null)
+  const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResponse | null>(null)
+  const [diagnoseError, setDiagnoseError] = useState<string | null>(null)
+  const [diagnoseDialogOpen, setDiagnoseDialogOpen] = useState(false)
 
   const accounts = data.accounts
 
@@ -650,6 +657,37 @@ export default function CloudAccountsPage() {
     }
   }, [fetchAccounts, t])
 
+  const runDiagnose = useCallback(async (account: CloudAccountResponse) => {
+    setDiagnosingId(account.id)
+    setDiagnoseTarget(account)
+    setDiagnoseDialogOpen(true)
+    setDiagnoseResult(null)
+    setDiagnoseError(null)
+
+    try {
+      const result = await api.diagnoseCloudAccount(account.id)
+      setDiagnoseResult(result)
+    } catch (error) {
+      const message = getApiErrorMessage(error, t("cloud.accounts.toastDiagnoseError"))
+      setDiagnoseError(message)
+      toast.error(message)
+    } finally {
+      setDiagnosingId((current) => (current === account.id ? null : current))
+    }
+  }, [t])
+
+  const handleDiagnose = useCallback(async (account: CloudAccountResponse) => {
+    await runDiagnose(account)
+  }, [runDiagnose])
+
+  const handleRetryDiagnose = useCallback(async () => {
+    if (!diagnoseTarget) {
+      return
+    }
+
+    await runDiagnose(diagnoseTarget)
+  }, [diagnoseTarget, runDiagnose])
+
   const handleCopyTestCurl = useCallback(async (account: CloudAccountResponse, insecure = false) => {
     try {
       await copyApiCurlCommand({
@@ -673,6 +711,19 @@ export default function CloudAccountsPage() {
       toastCopied(t("cloud.accounts.toastCopyCollectCurlSuccess"))
     } catch {
       toast.error(t("cloud.accounts.toastCopyCollectCurlError"))
+    }
+  }, [t])
+
+  const handleCopyDiagnoseCurl = useCallback(async (account: CloudAccountResponse, insecure = false) => {
+    try {
+      await copyApiCurlCommand({
+        path: `/v1/cloud/accounts/${account.id}/diagnose`,
+        method: "POST",
+        insecure,
+      })
+      toastCopied(t("cloud.accounts.toastCopyDiagnoseCurlSuccess"))
+    } catch {
+      toast.error(t("cloud.accounts.toastCopyDiagnoseCurlError"))
     }
   }, [t])
 
@@ -808,12 +859,15 @@ export default function CloudAccountsPage() {
         accounts={filteredAccounts}
         testingId={testingId}
         collectingId={collectingId}
+        diagnosingId={diagnosingId}
         togglingId={togglingId}
         onToggleEnabled={handleToggleEnabled}
         onTestConnection={handleTestConnection}
         onCollect={handleCollect}
+        onDiagnose={handleDiagnose}
         onCopyTestCurl={handleCopyTestCurl}
         onCopyCollectCurl={handleCopyCollectCurl}
+        onCopyDiagnoseCurl={handleCopyDiagnoseCurl}
         onCopyUpdateCurl={handleCopyUpdateCurl}
         onEdit={openEditDialog}
         onDelete={setDeleteTarget}
@@ -841,10 +895,12 @@ export default function CloudAccountsPage() {
           statusDisabled: t("cloud.accounts.statusDisabled"),
           actionTest: t("cloud.accounts.actionTest"),
           actionCollect: t("cloud.accounts.actionCollect"),
+          actionDiagnose: t("cloud.accounts.actionDiagnose"),
           actionMore: t("cloud.accounts.actionMore"),
           actionDebugCurl: t("cloud.accounts.actionDebugCurl"),
           actionCopyTestCurl: t("cloud.accounts.actionCopyTestCurl"),
           actionCopyCollectCurl: t("cloud.accounts.actionCopyCollectCurl"),
+          actionCopyDiagnoseCurl: t("cloud.accounts.actionCopyDiagnoseCurl"),
           actionCopyUpdateCurl: t("cloud.accounts.actionCopyUpdateCurl"),
           actionEdit: t("cloud.accounts.actionEdit"),
           actionDelete: t("cloud.accounts.actionDelete"),
@@ -870,6 +926,34 @@ export default function CloudAccountsPage() {
         onSubmit={handleSubmit}
         setForm={setForm}
         getProviderLabel={getProviderLabel}
+        t={t}
+      />
+
+      <CloudAccountDiagnoseDialog
+        open={diagnoseDialogOpen}
+        loading={Boolean(diagnoseTarget) && diagnosingId === diagnoseTarget.id}
+        locale={locale}
+        account={diagnoseTarget}
+        result={diagnoseResult}
+        errorMessage={diagnoseError}
+        onOpenChange={(open) => {
+          setDiagnoseDialogOpen(open)
+
+          if (!open) {
+            setDiagnoseTarget(null)
+            setDiagnoseResult(null)
+            setDiagnoseError(null)
+            setDiagnosingId(null)
+          }
+        }}
+        onRefresh={handleRetryDiagnose}
+        onCopyCurl={() => {
+          if (!diagnoseTarget) {
+            return
+          }
+
+          void handleCopyDiagnoseCurl(diagnoseTarget)
+        }}
         t={t}
       />
 

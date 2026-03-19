@@ -68,6 +68,10 @@ const headerMetaByExactPath: Record<string, AppHeaderMetaKeyConfig> = {
     titleKey: "itemNotifications",
     descriptionKey: "notificationsDescription",
   },
+  "/notifications/contacts": {
+    titleKey: "itemInstanceContacts",
+    descriptionKey: "instanceContactsDescription",
+  },
   "/notifications/logs": {
     titleKey: "itemNotificationLogs",
     descriptionKey: "notificationLogsDescription",

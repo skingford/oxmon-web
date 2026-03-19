@@ -153,7 +153,11 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/dashboard": ["/v1/dashboard/overview"],
   "/metrics": ["/v1/metrics"],
   "/agents": ["/v1/agents"],
-  "/agents/": ["/v1/agents", "/v1/agents/{id}/report-logs"],
+  "/agents/": [
+    "/v1/agents",
+    "/v1/agents/{id}/report-logs",
+    "/v1/instance-contacts/match/{agent_id}",
+  ],
   "/whitelist": ["/v1/agents/whitelist"],
   "/alerts": ["/v1/alerts/active"],
   "/alerts/history": ["/v1/alerts/history"],
@@ -162,9 +166,18 @@ export const sidebarApiPathMap: Record<SidebarPath, string[]> = {
   "/certificates/domains": ["/v1/certs/domains"],
   "/certificates/status": ["/v1/certs/status"],
   "/notifications": ["/v1/notifications/channels"],
+  "/notifications/contacts": [
+    "/v1/instance-contacts",
+    "/v1/instance-contacts/{id}",
+    "/v1/instance-contacts/match/{agent_id}",
+  ],
   "/notifications/logs": ["/v1/notifications/logs"],
   "/notifications/silence": ["/v1/notifications/silence-windows"],
-  "/cloud": ["/v1/cloud/accounts", "/v1/cloud/accounts/batch"],
+  "/cloud": [
+    "/v1/cloud/accounts",
+    "/v1/cloud/accounts/batch",
+    "/v1/cloud/accounts/{id}/diagnose",
+  ],
   "/cloud/instances": [
     "/v1/cloud/instances",
     "/v1/cloud/instances/ai-check",
@@ -299,6 +312,11 @@ const sidebarMenuGroupsBase: SidebarGroupConfigBase[] = [
           {
             titleKey: "itemNotificationChannels",
             url: "/notifications",
+            exact: true,
+          },
+          {
+            titleKey: "itemInstanceContacts",
+            url: "/notifications/contacts",
             exact: true,
           },
           {

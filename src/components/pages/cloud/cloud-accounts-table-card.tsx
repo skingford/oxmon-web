@@ -1,6 +1,6 @@
 "use client"
 
-import { Loader2, MoreHorizontal, Play, TestTube2 } from "lucide-react"
+import { FileSearch, Loader2, MoreHorizontal, Play, TestTube2 } from "lucide-react"
 import type { CloudAccountResponse } from "@/types/api"
 import { normalizeCloudProvider } from "@/lib/cloud-provider"
 import { Badge } from "@/components/ui/badge"
@@ -25,12 +25,15 @@ type CloudAccountsTableCardProps = {
   accounts: CloudAccountResponse[]
   testingId: string | null
   collectingId: string | null
+  diagnosingId: string | null
   togglingId: string | null
   onToggleEnabled: (account: CloudAccountResponse) => void
   onTestConnection: (account: CloudAccountResponse) => void
   onCollect: (account: CloudAccountResponse) => void
+  onDiagnose: (account: CloudAccountResponse) => void
   onCopyTestCurl: (account: CloudAccountResponse, insecure?: boolean) => void | Promise<void>
   onCopyCollectCurl: (account: CloudAccountResponse, insecure?: boolean) => void | Promise<void>
+  onCopyDiagnoseCurl: (account: CloudAccountResponse, insecure?: boolean) => void | Promise<void>
   onCopyUpdateCurl: (account: CloudAccountResponse, insecure?: boolean) => void | Promise<void>
   onEdit: (account: CloudAccountResponse) => void
   onDelete: (account: CloudAccountResponse) => void
@@ -55,10 +58,12 @@ type CloudAccountsTableCardProps = {
     statusDisabled: string
     actionTest: string
     actionCollect: string
+    actionDiagnose: string
     actionMore: string
     actionDebugCurl: string
     actionCopyTestCurl: string
     actionCopyCollectCurl: string
+    actionCopyDiagnoseCurl: string
     actionCopyUpdateCurl: string
     actionEdit: string
     actionDelete: string
@@ -75,12 +80,15 @@ export function CloudAccountsTableCard({
   accounts,
   testingId,
   collectingId,
+  diagnosingId,
   togglingId,
   onToggleEnabled,
   onTestConnection,
   onCollect,
+  onDiagnose,
   onCopyTestCurl,
   onCopyCollectCurl,
+  onCopyDiagnoseCurl,
   onCopyUpdateCurl,
   onEdit,
   onDelete,
@@ -204,6 +212,17 @@ export function CloudAccountsTableCard({
                               )}
                               {texts.actionCollect}
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => onDiagnose(account)}
+                              disabled={diagnosingId === account.id}
+                            >
+                              {diagnosingId === account.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <FileSearch className="h-3.5 w-3.5" />
+                              )}
+                              {texts.actionDiagnose}
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>{texts.debugMenuLabel}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
@@ -228,6 +247,18 @@ export function CloudAccountsTableCard({
                               onCopy={(insecure) => onCopyCollectCurl(account, insecure)}
                               label={texts.actionCopyCollectCurl}
                               preferenceKeyId="cloud-accounts-copy-collect-curl"
+                              suffix={<HttpMethodBadge method="POST" className="ml-auto" />}
+                              insecureBadgeLabel={texts.copyApiCurlInsecureBadge}
+                            />
+                            <CopyCurlSubmenu
+                              texts={{
+                                title: texts.actionCopyDiagnoseCurl,
+                                normal: texts.copyApiCurlNormal,
+                                insecure: texts.copyApiCurlInsecure,
+                              }}
+                              onCopy={(insecure) => onCopyDiagnoseCurl(account, insecure)}
+                              label={texts.actionCopyDiagnoseCurl}
+                              preferenceKeyId="cloud-accounts-copy-diagnose-curl"
                               suffix={<HttpMethodBadge method="POST" className="ml-auto" />}
                               insecureBadgeLabel={texts.copyApiCurlInsecureBadge}
                             />

@@ -1,7 +1,7 @@
 # OpenAPI 对齐清单
 
-最后更新时间：2026-03-11
-接口文档：`http://localhost:8080/v1/openapi.json`（OpenAPI 3.1.0, version 0.1.8）
+最后更新时间：2026-03-18
+接口文档：`http://localhost:8080/v1/openapi.json`（OpenAPI 3.1.0, version 0.1.10）
 
 ## 本次对齐范围
 
@@ -33,9 +33,21 @@
   - 单实例 AI 检测按最新响应处理：`POST /v1/cloud/instances/{id}/ai-check` 返回 `report_id`
   - 全量云实例 AI 检测按最新响应处理：`POST /v1/cloud/instances/ai-check` 返回 `job_id`
   - `TriggerCloudAICheckRequest` 不再发送旧字段 `send_notification`
+- 云资源与联系人
+  - 新增 `POST /v1/cloud/accounts/{id}/diagnose` 封装
+  - 新增实例联系人接口封装：
+    - `GET /v1/instance-contacts`
+    - `POST /v1/instance-contacts`
+    - `GET /v1/instance-contacts/{id}`
+    - `PUT /v1/instance-contacts/{id}`
+    - `DELETE /v1/instance-contacts/{id}`
+    - `GET /v1/instance-contacts/match/{agent_id}`
 - 系统与证书
   - 新增 `POST /v1/system/certs/backfill-domains`
   - 新增 `POST /v1/notifications/test-cert-report`
+  - OpenAPI 基线补齐证书域名概览接口：
+    - `GET /v1/certs/domains/overview`
+    - `GET /v1/certs/domains/{id}/detail-view`
   - 证书、域名、证书状态、批量创建域名按最新数组响应解析
 - 列表接口解析已全部收紧到最新结构
   - 直接声明为数组响应并按当前分页参数包装 `ListResponse`

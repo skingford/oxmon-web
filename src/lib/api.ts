@@ -54,6 +54,7 @@ import {
   CloudAICheckJobQueryParams,
   CloudAICheckJobResponse,
   CloudAccountResponse,
+  DiagnoseResponse,
   CloudInstanceMetricsQueryParams,
   CloudInstanceMetricsResponse,
   CloudInstanceQueryParams,
@@ -111,6 +112,9 @@ import {
   CreateDomainRequest,
   UpdateDomainRequest,
   BatchCreateDomainsRequest,
+  CreateInstanceContactRequest,
+  InstanceContactItem,
+  InstanceContactQueryParams,
   MetricCatalogQueryParams,
   MetricDataPointResponse,
   MetricSourceItemResponse,
@@ -124,6 +128,7 @@ import {
   SilenceWindow,
   SilenceWindowQueryParams,
   CreateSilenceWindowRequest,
+  UpdateInstanceContactRequest,
   UpdateSilenceWindowRequest,
   EnableRequest,
   IdResponse,
@@ -743,6 +748,14 @@ export const api = {
       method: "POST",
     }),
 
+  diagnoseCloudAccount: (id: string) =>
+    request<DiagnoseResponse>(
+      `/v1/cloud/accounts/${encodeURIComponent(id)}/diagnose`,
+      {
+        method: "POST",
+      },
+    ),
+
   listCloudInstances: (params?: CloudInstanceQueryParams) => {
     if (hasExplicitPaginationParams(params)) {
       return requestListItems<CloudInstanceResponse>(
@@ -836,6 +849,68 @@ export const api = {
 
   getCloudAICheckJob: (id: string) =>
     request<CloudAICheckJobResponse>(`/v1/cloud/instances/ai-check/jobs/${id}`),
+
+  listInstanceContacts: (params: InstanceContactQueryParams = {}) => {
+    if (hasExplicitPaginationParams(params)) {
+      return requestListItems<InstanceContactItem>(
+        `/v1/instance-contacts${buildQueryString(params)}`,
+      )
+    }
+
+    const queryParams = {
+      contact_name_contains: params.contact_name_contains,
+      enabled_eq: params.enabled_eq,
+    }
+
+    return requestAllPages<InstanceContactItem>((page) =>
+      requestListItems<InstanceContactItem>(
+        `/v1/instance-contacts${buildQueryString({ ...queryParams, ...page })}`,
+      ),
+    )
+  },
+
+  listInstanceContactsPage: (params: InstanceContactQueryParams = {}) =>
+    requestListResponse<InstanceContactItem>(
+      `/v1/instance-contacts${buildQueryString(params)}`,
+      {
+        fallbackLimit: params.limit ?? 0,
+        fallbackOffset: params.offset ?? 0,
+      },
+    ),
+
+  getInstanceContact: (id: string) =>
+    request<InstanceContactItem>(
+      `/v1/instance-contacts/${encodeURIComponent(id)}`,
+    ),
+
+  createInstanceContact: (data: CreateInstanceContactRequest) =>
+    request<IdResponse>("/v1/instance-contacts", {
+      method: "POST",
+      body: data,
+    }),
+
+  updateInstanceContact: (
+    id: string,
+    data: UpdateInstanceContactRequest,
+  ) =>
+    request<InstanceContactItem>(
+      `/v1/instance-contacts/${encodeURIComponent(id)}`,
+      {
+        method: "PUT",
+        body: data,
+      },
+    ),
+
+  deleteInstanceContact: (id: string) =>
+    request<unknown>(`/v1/instance-contacts/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      allowEmptyResponse: true,
+    }).then(() => undefined),
+
+  matchInstanceContacts: (agentId: string) =>
+    requestListItems<InstanceContactItem>(
+      `/v1/instance-contacts/match/${encodeURIComponent(agentId)}`,
+    ),
 
   listAIAccounts: (
     params: PaginationParams & {

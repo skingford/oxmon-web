@@ -843,6 +843,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/certs/domains/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询所有监控域名的综合概览，包含检查状态与证书摘要。
+         * @description 与 `/v1/certs/status` 的区别：
+         *     - 本接口以域名配置为基础，通过 LEFT JOIN 合并检查结果和证书详情，
+         *       **始终返回全部已启用域名**（含从未成功收集证书详情的异常域名）。
+         *     - 异常域名排在前面，`check_error` 字段包含具体错误原因。
+         *     - 适合作为"证书监控主列表"的数据源。
+         */
+        get: operations["list_domain_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/certs/domains/summary": {
         parameters: {
             query?: never;
@@ -908,6 +932,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/certs/domains/{id}/detail-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取单个域名的完整明细视图（域名配置 + 最新检查结果 + 证书详情）。
+         * @description 返回三部分聚合数据：
+         *     - `domain_info`：域名配置（检查间隔、备注、启用状态等）
+         *     - `latest_check`：最新一次检查结果，含错误原因（未检查时为 null）
+         *     - `certificate_details`：详细证书信息，含指纹、TLS 版本、密钥算法等（仅成功收集时有值）
+         */
+        get: operations["get_domain_detail_view"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/certs/domains/{id}/history": {
         parameters: {
             query?: never;
@@ -933,8 +980,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 分页查询所有域名的最新证书检查结果。
-         *     默认排序：`checked_at` 倒序；默认分页：`limit=20&offset=0`。
+         * 分页查询已启用域名的最新证书检查结果。
+         * @description **职责说明**：本接口返回已有检查记录的域名状态，数据来源为 `cert_check_results` 表。
+         *     与 `/v1/certs/domains/overview` 的区别：
+         *     - 本接口仅返回已执行过至少一次检查的域名（INNER JOIN），适合查询"最近一次检查状态"。
+         *     - 若需要包含从未被成功收集证书详情的异常域名（完整列表），请使用 `/v1/certs/domains/overview`。
          */
         get: operations["cert_status_all"];
         put?: never;
@@ -1064,6 +1114,23 @@ export interface paths {
         put?: never;
         /** 手动触发云账户采集 */
         post: operations["trigger_cloud_account_collection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cloud/accounts/{id}/diagnose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 诊断云账户连接（返回完整请求链路信息） */
+        post: operations["diagnose_cloud_account"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1362,6 +1429,60 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/instance-contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 列出实例联系人。 */
+        get: operations["list_instance_contacts"];
+        put?: never;
+        /** 创建实例联系人。 */
+        post: operations["create_instance_contact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/instance-contacts/match/{agent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询指定实例匹配的联系人。 */
+        get: operations["match_instance_contacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/instance-contacts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取实例联系人详情。 */
+        get: operations["get_instance_contact"];
+        /** 更新实例联系人。 */
+        put: operations["update_instance_contact"];
+        post?: never;
+        /** 删除实例联系人。 */
+        delete: operations["delete_instance_contact"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2176,7 +2297,7 @@ export interface components {
          *     `账号名:SecretId:SecretKey:region1,region2`
          *
          *     多条记录用 `|` 分隔，例如：
-         *     `主账号:AKID123:secret:ap-shanghai,ap-guangzhou|子账号:AKID456:secret2:ap-beijing`
+         *     `主账号:example-secret-id-1:example-secret-key-1:ap-shanghai,ap-guangzhou|子账号:example-secret-id-2:example-secret-key-2:ap-beijing`
          */
         BatchCreateCloudAccountsRequest: {
             /** @description 供应商（tencent 或 alibaba） */
@@ -2461,6 +2582,14 @@ export interface components {
             secret_key: string;
             /** @description 地域列表（如 ["ap-shanghai", "ap-guangzhou"]） */
             regions: string[];
+            /** @description 私有云访问地址（深信服 SCP 等私有云专用） */
+            endpoint?: string | null;
+            /** @description AWS4 签名使用的 region（深信服 SCP 专用，默认 regionOne） */
+            region_for_sign?: string | null;
+            /** @description 深信服 SCP 6.3.0 及更早版本需要的 Cookie 认证 Token（SCP 6.3.70+ 无需） */
+            scp_auth_token?: string | null;
+            /** @description 深信服 SCP 自定义指标名称映射（JSON 格式），为空时使用默认指标名 */
+            scp_metric_names?: string | null;
             /** Format: int64 */
             collection_interval_secs: number;
             enabled: boolean;
@@ -2895,6 +3024,15 @@ export interface components {
             regions: string[];
             /** @description 私有云访问地址（深信服 SCP 必填，如 "192.168.1.100" 或 "scp.example.com"） */
             endpoint?: string | null;
+            /** @description AWS4 签名使用的 region（深信服 SCP 专用，默认 regionOne，一般无需填写） */
+            region_for_sign?: string | null;
+            /** @description 深信服 SCP 6.3.0 及更早版本需要的 Cookie 认证 Token（SCP 6.3.70+ 无需） */
+            scp_auth_token?: string | null;
+            /**
+             * @description 深信服 SCP 自定义指标名称映射（JSON 格式），为空时使用默认指标名
+             *     示例：{"cpu":"vcpus_util","memory":"mem_util","disk":"volume_util"}
+             */
+            scp_metric_names?: string | null;
             /**
              * Format: int64
              * @description 采集间隔（秒，默认 3600）
@@ -2954,6 +3092,16 @@ export interface components {
             /** @description 备注（可选） */
             note?: string | null;
         };
+        CreateInstanceContactRequest: {
+            /** @description JSON 数组，多个 glob pattern，如 ["prod-web-*","cloud:tencent:ins-*"] */
+            agent_patterns: string[];
+            contact_name: string;
+            contact_email?: string | null;
+            contact_phone?: string | null;
+            contact_dingtalk?: string | null;
+            contact_webhook?: string | null;
+            description?: string | null;
+        };
         CreateSilenceWindowRequest: {
             start_time: string;
             end_time: string;
@@ -3006,6 +3154,38 @@ export interface components {
              */
             uptime_secs: number;
         };
+        /** @description 诊断报告响应 */
+        DiagnoseResponse: {
+            provider: string;
+            account_name: string;
+            success: boolean;
+            error_message?: string | null;
+            traces: components["schemas"]["DiagnoseTraceResponse"][];
+            diagnosed_at: string;
+        };
+        /** @description 诊断请求追踪信息 */
+        DiagnoseTraceResponse: {
+            method: string;
+            url: string;
+            request_headers: [
+                string,
+                string
+            ][];
+            request_body?: string | null;
+            sign_algorithm: string;
+            canonical_request: string;
+            string_to_sign: string;
+            credential_scope: string;
+            /** Format: int32 */
+            response_status: number;
+            response_headers: [
+                string,
+                string
+            ][];
+            response_body: string;
+            /** Format: int64 */
+            duration_ms: number;
+        };
         /** @description 系统字典条目 */
         DictionaryItem: {
             /** @description 唯一标识 */
@@ -3053,6 +3233,95 @@ export interface components {
              * @description 该类型下的条目数量
              */
             count: number;
+        };
+        /** @description 域名明细视图（单个域名的完整信息聚合） */
+        DomainDetailView: {
+            /** @description 域名配置信息 */
+            domain_info: components["schemas"]["CertDomain"];
+            latest_check?: null | components["schemas"]["CertCheckResult"];
+            certificate_details?: null | components["schemas"]["CertificateDetails"];
+        };
+        /**
+         * @description 域名综合概览条目（合并 cert_domains + cert_check_results + certificate_details）
+         *     用于展示所有监控域名的状态，包括异常域名
+         */
+        DomainOverviewItem: {
+            /** @description 域名 ID */
+            id: string;
+            /** @description 域名 */
+            domain: string;
+            /**
+             * Format: int32
+             * @description 端口号
+             */
+            port: number;
+            /** @description 是否启用 */
+            enabled: boolean;
+            /** @description 备注 */
+            note?: string | null;
+            /**
+             * Format: int64
+             * @description 检查间隔秒数
+             */
+            check_interval_secs?: number | null;
+            /**
+             * Format: date-time
+             * @description 上次检查时间
+             */
+            last_checked_at?: string | null;
+            /**
+             * Format: date-time
+             * @description 创建时间
+             */
+            created_at: string;
+            /** @description 证书是否有效 */
+            is_valid?: boolean | null;
+            /** @description 证书链是否有效 */
+            chain_valid?: boolean | null;
+            /**
+             * Format: int64
+             * @description 距离过期天数（负数表示已过期）
+             */
+            days_until_expiry?: number | null;
+            /**
+             * Format: date-time
+             * @description 证书生效时间
+             */
+            not_before?: string | null;
+            /**
+             * Format: date-time
+             * @description 证书过期时间
+             */
+            not_after?: string | null;
+            /** @description 证书颁发者 */
+            issuer?: string | null;
+            /** @description 检查错误原因（异常域名可见此字段） */
+            check_error?: string | null;
+            /**
+             * Format: date-time
+             * @description 最近检查时间
+             */
+            checked_at?: string | null;
+            /** @description 证书 SHA-256 指纹 */
+            fingerprint_sha256?: string | null;
+            /** @description TLS 版本 */
+            tls_version?: string | null;
+            /** @description 公钥算法 */
+            public_key_algorithm?: string | null;
+            /**
+             * Format: int32
+             * @description 公钥长度
+             */
+            public_key_bits?: number | null;
+            /** @description 是否通配符证书 */
+            is_wildcard?: boolean | null;
+            /** @description 主体通用名称 */
+            subject_cn?: string | null;
+            /**
+             * Format: int32
+             * @description 证书链深度
+             */
+            chain_depth?: number | null;
         };
         /**
          * @example {
@@ -3103,6 +3372,19 @@ export interface components {
         IdResponse: {
             /** @description 资源 ID */
             id: string;
+        };
+        InstanceContactItem: {
+            id: string;
+            agent_patterns: string[];
+            contact_name: string;
+            contact_email?: string | null;
+            contact_phone?: string | null;
+            contact_dingtalk?: string | null;
+            contact_webhook?: string | null;
+            enabled: boolean;
+            description?: string | null;
+            created_at: string;
+            updated_at: string;
         };
         /** @description 最新指标数据 */
         LatestMetric: {
@@ -3476,6 +3758,12 @@ export interface components {
             regions?: string[] | null;
             /** @description 私有云访问地址（传入则更新） */
             endpoint?: string | null;
+            /** @description AWS4 签名 region（深信服 SCP 专用，传入则更新） */
+            region_for_sign?: string | null;
+            /** @description 深信服 SCP Cookie 认证 Token（传入则更新，传 null 则清除） */
+            scp_auth_token?: string | null;
+            /** @description 深信服 SCP 自定义指标名称映射（传入则更新，传 null 则清除恢复默认） */
+            scp_metric_names?: string | null;
             /** Format: int64 */
             collection_interval_secs?: number | null;
             enabled?: boolean | null;
@@ -3526,6 +3814,16 @@ export interface components {
             check_interval_secs?: number | null;
             /** @description 备注（可选） */
             note?: string | null;
+        };
+        UpdateInstanceContactRequest: {
+            agent_patterns?: string[] | null;
+            contact_name?: string | null;
+            contact_email?: string | null;
+            contact_phone?: string | null;
+            contact_dingtalk?: string | null;
+            contact_webhook?: string | null;
+            enabled?: boolean | null;
+            description?: string | null;
         };
         /** @description 更新通知渠道请求 */
         UpdateNotificationChannelRequest: {
@@ -3802,7 +4100,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminUserResponse"];
+                    "application/json": components["schemas"]["IdResponse"];
                 };
             };
             /** @description 请求参数错误 */
@@ -4585,7 +4883,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AIAccountResponse"];
+                    "application/json": components["schemas"]["IdResponse"];
                 };
             };
             /** @description AI 账号不存在 */
@@ -4593,7 +4891,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
             };
         };
     };
@@ -5910,6 +6210,46 @@ export interface operations {
             };
         };
     };
+    list_domain_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 域名包含匹配（模糊搜索） */
+                domain_contains: string | null;
+                /** @description 是否有效过滤（true=仅正常, false=仅异常） */
+                is_valid_eq: boolean | null;
+                /** @description 是否仅显示有错误的域名（true=仅异常） */
+                has_error_eq: boolean | null;
+                /** @description 距离过期天数上限 */
+                days_until_expiry_lte: number | null;
+                limit: number | null;
+                offset: number | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 域名综合概览分页列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DomainOverviewItem"][];
+                };
+            };
+            /** @description 未授权 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     cert_domains_summary: {
         parameters: {
             query?: never;
@@ -6114,6 +6454,47 @@ export interface operations {
             };
         };
     };
+    get_domain_detail_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 域名 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 域名明细视图 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DomainDetailView"];
+                };
+            };
+            /** @description 未授权 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 域名不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     cert_check_history: {
         parameters: {
             query?: {
@@ -6178,7 +6559,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 域名证书状态分页列表 */
+            /** @description 域名证书检查状态分页列表 */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6485,7 +6866,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CloudAccountResponse"];
+                    "application/json": components["schemas"]["IdResponse"];
                 };
             };
             /** @description 云账户不存在 */
@@ -6548,6 +6929,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TriggerCollectionResponse"];
+                };
+            };
+            /** @description 云账户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    diagnose_cloud_account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 云账户ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 诊断报告 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnoseResponse"];
                 };
             };
             /** @description 云账户不存在 */
@@ -7365,6 +7778,239 @@ export interface operations {
             };
             /** @description 缺少或无效的 ox-app-id */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    list_instance_contacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                limit: number | null;
+                offset: number | null;
+                contact_name_contains: string | null;
+                enabled_eq: boolean | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 实例联系人列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceContactItem"][];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    create_instance_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInstanceContactRequest"];
+            };
+        };
+        responses: {
+            /** @description 实例联系人已创建 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdResponse"];
+                };
+            };
+            /** @description 请求参数错误 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    match_instance_contacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Agent ID 或云实例虚拟 ID */
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 匹配的联系人列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceContactItem"][];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_instance_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 联系人 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 实例联系人详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceContactItem"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未找到 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    update_instance_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 联系人 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInstanceContactRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceContactItem"];
+                };
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未找到 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    delete_instance_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 联系人 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未认证 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description 未找到 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

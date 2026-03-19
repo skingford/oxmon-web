@@ -327,6 +327,11 @@ export interface CloudAICheckJobQueryParams extends PaginationParams {
   job_type?: string;
 }
 
+export interface InstanceContactQueryParams extends PaginationParams {
+  contact_name_contains?: string;
+  enabled_eq?: boolean;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;
@@ -982,6 +987,20 @@ export interface CloudInstanceDetailResponse extends CloudInstanceResponse {
   last_collected_at?: string | null;
 }
 
+export interface InstanceContactItem {
+  id: string;
+  agent_patterns: string[];
+  contact_name: string;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  contact_dingtalk?: string | null;
+  contact_webhook?: string | null;
+  enabled: boolean;
+  description?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CreateCloudAccountRequest {
   config_key: string;
   provider: string;
@@ -1007,6 +1026,27 @@ export interface UpdateCloudAccountRequest {
   enabled?: boolean | null;
 }
 
+export interface CreateInstanceContactRequest {
+  agent_patterns: string[];
+  contact_name: string;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  contact_dingtalk?: string | null;
+  contact_webhook?: string | null;
+  description?: string | null;
+}
+
+export interface UpdateInstanceContactRequest {
+  agent_patterns?: string[] | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  contact_dingtalk?: string | null;
+  contact_webhook?: string | null;
+  enabled?: boolean | null;
+  description?: string | null;
+}
+
 export interface TestConnectionResponse {
   success: boolean;
   message: string;
@@ -1017,6 +1057,32 @@ export interface TriggerCollectionResponse {
   success: boolean;
   message: string;
   collected_count?: number | null;
+}
+
+export type DiagnoseHeaderEntry = [string, string];
+
+export interface DiagnoseTraceResponse {
+  method: string;
+  url: string;
+  request_headers: DiagnoseHeaderEntry[];
+  request_body?: string | null;
+  sign_algorithm: string;
+  canonical_request: string;
+  string_to_sign: string;
+  credential_scope: string;
+  response_status: number;
+  response_headers: DiagnoseHeaderEntry[];
+  response_body: string;
+  duration_ms: number;
+}
+
+export interface DiagnoseResponse {
+  provider: string;
+  account_name: string;
+  success: boolean;
+  error_message?: string | null;
+  traces: DiagnoseTraceResponse[];
+  diagnosed_at: string;
 }
 
 export interface TriggerCloudAICheckRequest {
