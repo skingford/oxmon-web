@@ -559,6 +559,121 @@ function formatRelativeTimeFromNow(timestamp: string, locale: "zh" | "en", nowMs
   return rtf.format(Math.round(diffSeconds / 86400), "day")
 }
 
+function formatRelativeTime(value: string | null | undefined, locale: "zh" | "en") {
+  if (!value) {
+    return "-"
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "-"
+  }
+
+  const diffMs = Date.now() - date.getTime()
+  const absMs = Math.abs(diffMs)
+  const isPast = diffMs >= 0
+
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+
+  const makeText = (count: number, unit: "minute" | "hour" | "day") => {
+    if (locale === "zh") {
+      const unitText = unit === "minute" ? "分钟" : unit === "hour" ? "小时" : "天"
+      return isPast ? `${count} ${unitText}前` : `${count} ${unitText}后`
+    }
+
+    const unitText = unit === "minute" ? "minute" : unit === "hour" ? "hour" : "day"
+    const plural = count === 1 ? unitText : `${unitText}s`
+    return isPast ? `${count} ${plural} ago` : `in ${count} ${plural}`
+  }
+
+  if (absMs < minute) {
+    return locale === "zh" ? "刚刚" : "just now"
+  }
+
+  if (absMs < hour) {
+    return makeText(Math.floor(absMs / minute), "minute")
+  }
+
+  if (absMs < day) {
+    return makeText(Math.floor(absMs / hour), "hour")
+  }
+
+  return makeText(Math.floor(absMs / day), "day")
+}
+
+function formatIntervalSecs(value: number | null | undefined, locale: "zh" | "en") {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "-"
+  }
+
+  return locale === "zh" ? `${value} 秒` : `${value} sec`
+}
+
+function getAgentStatusMeta(
+  status: string | null | undefined,
+  t: ReturnType<typeof useAppTranslations>["t"]
+) {
+  const normalized = status?.trim().toLowerCase()
+
+  if (normalized === "active") {
+    return {
+      label: t("agentDetail.statusActive"),
+      className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+    }
+  }
+
+  if (normalized === "inactive") {
+    return {
+      label: t("agentDetail.statusInactive"),
+      className: "border-muted bg-muted text-muted-foreground",
+    }
+  }
+
+  return {
+    label: t("agentDetail.statusUnknown"),
+    className: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+  }
+}
+
+function getMetricBarClass(value?: number) {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return "bg-muted-foreground/30"
+  }
+
+  if (value > 90) {
+    return "bg-red-500"
+  }
+
+  if (value > 80) {
+    return "bg-amber-500"
+  }
+
+  return "bg-emerald-500"
+}
+
+function FieldItem({
+  label,
+  value,
+  mono = false,
+  hint,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+  hint?: string
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={mono ? "font-mono text-sm" : "text-sm"}>{value || "-"}</p>
+      {hint && hint !== "-" ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
+  )
+}
+
 export default function AgentDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -1078,26 +1193,42 @@ export default function AgentDetailPage() {
       title: t("agentDetail.cardCpu"),
       value: formatPercent(cpu),
       valueClass: resolveValueColor(cpu, true),
+      progressValue: cpu ?? null,
     },
     {
       key: "memory",
       title: t("agentDetail.cardMemory"),
       value: formatPercent(memory),
       valueClass: resolveValueColor(memory, true),
+      progressValue: memory ?? null,
     },
     {
       key: "disk",
       title: t("agentDetail.cardDisk"),
       value: formatPercent(disk),
       valueClass: resolveValueColor(disk, true),
+      progressValue: disk ?? null,
     },
     {
       key: "load",
       title: t("agentDetail.cardLoad"),
       value: formatLoad(load),
       valueClass: resolveValueColor(load),
+      progressValue: null,
     },
   ]
+  const latestSnapshotAt = useMemo(() => formatUpdatedAt(metrics, locale), [locale, metrics])
+  const agentStatusMeta = useMemo(
+    () => getAgentStatusMeta(agentDetail?.status, t),
+    [agentDetail?.status, t]
+  )
+  const refreshBusy =
+    loading
+    || refreshing
+    || reportLogsLoading
+    || reportLogsRefreshing
+    || matchedContactsLoading
+    || matchedContactsRefreshing
   const reportLogsPagination = useServerOffsetPagination({
     offset: reportLogsOffset,
     limit: reportLogsPageSize,
@@ -1200,44 +1331,111 @@ export default function AgentDetailPage() {
     void copyReportLogsCurl(reportLogsCurlPreference.mode, reportLogsCurlPreference.insecure)
   }, [copyReportLogsCurl, reportLogsCurlPreference.insecure, reportLogsCurlPreference.mode])
 
-  return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Button variant="ghost" className="mb-2 -ml-3" asChild>
+  if (loading && !agentDetail && !notFound) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-3">
+          <Button asChild type="button" variant="outline">
             <Link href={agentsPath}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               {t("agentDetail.backToList")}
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("agentDetail.title", { agentId: resolvedAgentId || agentRef || "-" })}</h1>
+        </div>
+        <Card>
+          <CardContent className="flex h-40 items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+              {t("agentDetail.loading")}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-3">
+          <Button asChild type="button" variant="outline">
+            <Link href={agentsPath}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {t("agentDetail.backToList")}
+            </Link>
+          </Button>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("agentDetail.notFoundTitle")}</CardTitle>
+            <CardDescription>
+              {t("agentDetail.notFoundDescription", {
+                agentId: resolvedAgentId || agentRef || "-",
+              })}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Button asChild type="button" variant="outline" size="sm">
+              <Link href={agentsPath}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                {t("agentDetail.backToList")}
+              </Link>
+            </Button>
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            {t("agentDetail.title", { agentId: resolvedAgentId || agentRef || "-" })}
+          </h2>
           <p className="text-sm text-muted-foreground">{t("agentDetail.description")}</p>
         </div>
-        <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className={agentStatusMeta.className}>
+            {agentStatusMeta.label}
+          </Badge>
+          <Badge variant={agentDetail?.in_whitelist ? "secondary" : "outline"}>
+            {agentDetail?.in_whitelist
+              ? t("agentDetail.whitelistBound")
+              : t("agentDetail.whitelistUnbound")}
+          </Badge>
+          <div className="rounded-md border px-2 py-1 text-xs text-muted-foreground">
+            {t("agentDetail.updatedAt", { time: latestSnapshotAt })}
+          </div>
           <Button
+            type="button"
             variant="outline"
             onClick={() => Promise.all([
+              fetchAgentDetail(),
               fetchLatestMetrics(true),
               fetchReportLogs(true),
               fetchMatchedContacts(true),
             ])}
-            disabled={loading || refreshing || reportLogsLoading || reportLogsRefreshing || matchedContactsLoading || matchedContactsRefreshing || !agentRef}
+            disabled={refreshBusy || !agentRef}
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing || reportLogsLoading || reportLogsRefreshing || matchedContactsLoading || matchedContactsRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshBusy ? "animate-spin" : ""}`} />
             {t("agentDetail.refreshButton")}
           </Button>
           <Button
+            type="button"
             variant="outline"
             onClick={openEditDialog}
-            disabled={notFound || preparingEdit || updating || deleting}
+            disabled={preparingEdit || updating || deleting}
           >
             {preparingEdit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pencil className="mr-2 h-4 w-4" />}
             {t("agentDetail.editButton")}
           </Button>
           <Button
+            type="button"
             variant="destructive"
             onClick={() => setIsDeleteDialogOpen(true)}
-            disabled={notFound || deleting || updating}
+            disabled={deleting || updating}
           >
             <Trash2 className="mr-2 h-4 w-4" />
             {t("agentDetail.deleteButton")}
@@ -1245,465 +1443,557 @@ export default function AgentDetailPage() {
         </div>
       </div>
 
-      {loading ? (
-        <Card>
-          <CardContent className="flex h-56 flex-col items-center justify-center text-muted-foreground">
-            <Loader2 className="mb-3 h-6 w-6 animate-spin" />
-            {t("agentDetail.loading")}
-          </CardContent>
-        </Card>
-      ) : notFound ? (
-        <Card>
-          <CardContent className="flex h-64 flex-col items-center justify-center gap-3 text-center">
-            <AlertCircle className="h-10 w-10 text-destructive/70" />
-            <div>
-              <p className="text-base font-medium">{t("agentDetail.notFoundTitle")}</p>
-              <p className="text-sm text-muted-foreground">{t("agentDetail.notFoundDescription")}</p>
-            </div>
-            <Button variant="outline" asChild>
-              <Link href={agentsPath}>{t("agentDetail.backToList")}</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600">{t("agentDetail.updatedBadge")}</Badge>
-            <span className="text-sm text-muted-foreground">{t("agentDetail.updatedAt", { time: formatUpdatedAt(metrics, locale) })}</span>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("agentDetail.sectionBasicTitle")}</CardTitle>
+          <CardDescription>{t("agentDetail.sectionBasicDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FieldItem
+            label={t("agentDetail.fieldAgentId")}
+            value={resolvedAgentId || agentRef || "-"}
+            mono
+          />
+          <FieldItem
+            label={t("agentDetail.fieldRecordId")}
+            value={agentDetail?.id || "-"}
+            mono
+          />
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">{t("agentDetail.fieldStatus")}</p>
+            <Badge variant="outline" className={agentStatusMeta.className}>
+              {agentStatusMeta.label}
+            </Badge>
           </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:gap-6">
-            {cards.map((card) => (
-              <Card key={card.key}>
-                <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-2 text-sm">
-                    <Gauge className="h-4 w-4" />
-                    {card.title}
-                  </CardDescription>
-                  <CardTitle className={`text-4xl font-bold tracking-tight ${card.valueClass}`}>
-                    {card.value}
-                  </CardTitle>
-                </CardHeader>
-              </Card>
-            ))}
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">{t("agentDetail.fieldWhitelist")}</p>
+            <Badge variant={agentDetail?.in_whitelist ? "secondary" : "outline"}>
+              {agentDetail?.in_whitelist
+                ? t("agentDetail.whitelistBound")
+                : t("agentDetail.whitelistUnbound")}
+            </Badge>
+            {agentDetail?.whitelist_id ? (
+              <p className="font-mono text-xs text-muted-foreground">
+                {agentDetail.whitelist_id}
+              </p>
+            ) : null}
           </div>
+          <FieldItem
+            label={t("agentDetail.fieldCollectionIntervalDisplay")}
+            value={formatIntervalSecs(agentDetail?.collection_interval_secs, locale)}
+          />
+          <FieldItem
+            label={t("agentDetail.fieldFirstSeen")}
+            value={formatDateTimeByLocale(
+              agentDetail?.first_seen,
+              locale,
+              agentDetail?.first_seen || "-",
+              { hour12: false }
+            )}
+            hint={formatRelativeTime(agentDetail?.first_seen, locale)}
+          />
+          <FieldItem
+            label={t("agentDetail.fieldLastSeen")}
+            value={formatDateTimeByLocale(
+              agentDetail?.last_seen,
+              locale,
+              agentDetail?.last_seen || "-",
+              { hour12: false }
+            )}
+            hint={formatRelativeTime(agentDetail?.last_seen, locale)}
+          />
+          <FieldItem
+            label={t("agentDetail.fieldCreatedAt")}
+            value={formatDateTimeByLocale(
+              agentDetail?.created_at,
+              locale,
+              agentDetail?.created_at || "-",
+              { hour12: false }
+            )}
+          />
+          <FieldItem
+            label={t("agentDetail.fieldUpdatedAt")}
+            value={formatDateTimeByLocale(
+              agentDetail?.updated_at,
+              locale,
+              agentDetail?.updated_at || "-",
+              { hour12: false }
+            )}
+          />
+          <FieldItem
+            label={t("agentDetail.fieldDescription")}
+            value={agentDetail?.description || "-"}
+          />
+        </CardContent>
+      </Card>
 
-          <Card>
-            <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-              <div className="space-y-1">
-                <CardTitle>{t("agentDetail.contactsTitle")}</CardTitle>
-                <CardDescription>{t("agentDetail.contactsDescription")}</CardDescription>
-              </div>
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link href={instanceContactsPath}>
-                  <Users className="mr-2 h-4 w-4" />
-                  {t("agentDetail.contactsManage")}
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {matchedContactsLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("agentDetail.contactsLoading")}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("agentDetail.sectionMetricsTitle")}</CardTitle>
+          <CardDescription>
+            {t("agentDetail.sectionMetricsDescription", {
+              time: latestSnapshotAt,
+            })}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {cards.map((card) => (
+            <div key={card.key} className="rounded-lg border p-4">
+              <p className="text-xs text-muted-foreground">{card.title}</p>
+              <p className={`mt-1 text-2xl font-semibold ${card.valueClass}`}>
+                {card.value}
+              </p>
+              {card.progressValue !== null ? (
+                <div className="mt-3">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full transition-all ${getMetricBarClass(card.progressValue)}`}
+                      style={{ width: `${Math.max(0, Math.min(100, card.progressValue))}%` }}
+                      aria-hidden="true"
+                    />
+                  </div>
                 </div>
-              ) : matchedContactsError ? (
-                <p className="text-sm text-muted-foreground">{matchedContactsError}</p>
-              ) : matchedContacts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("agentDetail.contactsEmpty")}</p>
-              ) : (
-                <div className="space-y-3">
-                  {matchedContacts.map((contact) => {
-                    const channels = getInstanceContactChannels(contact)
+              ) : null}
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Gauge className="h-3.5 w-3.5" />
+                <span>{t("agentDetail.updatedBadge")}</span>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-                    return (
-                      <div key={contact.id} className="rounded-lg border bg-muted/20 p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-medium">{contact.contact_name}</p>
-                              <Badge variant={contact.enabled ? "secondary" : "outline"}>
-                                {contact.enabled ? t("agentDetail.contactsStatusEnabled") : t("agentDetail.contactsStatusDisabled")}
-                              </Badge>
-                            </div>
-                            {contact.description ? (
-                              <p className="text-sm text-muted-foreground">{contact.description}</p>
-                            ) : null}
-                          </div>
-                          <Badge variant="outline">
-                            {t("agentDetail.contactsPatternCount", { count: contact.agent_patterns.length })}
+      <Card>
+        <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <CardTitle>{t("agentDetail.contactsTitle")}</CardTitle>
+            <CardDescription>{t("agentDetail.contactsDescription")}</CardDescription>
+          </div>
+          <Button asChild type="button" variant="outline" size="sm">
+            <Link href={instanceContactsPath}>
+              <Users className="mr-2 h-4 w-4" />
+              {t("agentDetail.contactsManage")}
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {matchedContactsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t("agentDetail.contactsLoading")}
+            </div>
+          ) : matchedContactsError ? (
+            <p className="text-sm text-muted-foreground">{matchedContactsError}</p>
+          ) : matchedContacts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("agentDetail.contactsEmpty")}</p>
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {matchedContacts.map((contact) => {
+                const channels = getInstanceContactChannels(contact)
+
+                return (
+                  <div key={contact.id} className="rounded-lg border bg-muted/20 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{contact.contact_name}</p>
+                          <Badge variant={contact.enabled ? "secondary" : "outline"}>
+                            {contact.enabled
+                              ? t("agentDetail.contactsStatusEnabled")
+                              : t("agentDetail.contactsStatusDisabled")}
                           </Badge>
                         </div>
-
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {contact.agent_patterns.map((pattern) => (
-                            <Badge key={`${contact.id}-${pattern}`} variant="outline" className="font-mono text-[11px]">
-                              {pattern}
-                            </Badge>
-                          ))}
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {channels.length === 0 ? (
-                            <Badge variant="outline">{t("agentDetail.contactsNoChannel")}</Badge>
-                          ) : (
-                            channels.map((channel) => (
-                              <Badge key={`${contact.id}-${channel.type}`} variant="secondary">
-                                {t(`agentDetail.contactsChannel${channel.type[0].toUpperCase()}${channel.type.slice(1)}`)}: {channel.value}
-                              </Badge>
-                            ))
-                          )}
-                        </div>
+                        {contact.description ? (
+                          <p className="text-sm text-muted-foreground">{contact.description}</p>
+                        ) : null}
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("agentDetail.rawTitle")}</CardTitle>
-              <CardDescription>{t("agentDetail.rawDescription")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {metrics.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("agentDetail.rawEmpty")}</p>
-              ) : (
-                <div className="space-y-2">
-                  {metrics.map((metric, index) => (
-                    <div
-                      key={buildMetricItemKey(metric, index)}
-                      className="rounded-md border bg-muted/20 p-3"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-medium">
-                            {getMetricDisplayName(metric.metric_name, metricNameLabelMap)}
-                          </p>
-                          <p className="font-mono text-xs text-muted-foreground">{metric.metric_name}</p>
-                        </div>
-                        <span className="text-sm">{formatMetricValue(metric.value, metric.metric_name, { ratioToPercent: true })}</span>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t("agentDetail.rawTime", { time: formatDateTimeByLocale(metric.timestamp, locale) })}
-                      </p>
+                      <Badge variant="outline">
+                        {t("agentDetail.contactsPatternCount", {
+                          count: contact.agent_patterns.length,
+                        })}
+                      </Badge>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-              <div className="space-y-1">
-                <CardTitle>{t("agentDetail.reportLogsTitle")}</CardTitle>
-                <CardDescription>{t("agentDetail.reportLogsDescription")}</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <DropdownMenu>
-                      <TooltipTrigger asChild>
-                        <div className="inline-flex items-center">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="rounded-r-none border-r-0"
-                            onClick={copyReportLogsCurlByPreference}
-                            disabled={!agentRef && !resolvedAgentId}
-                          >
-                            {reportLogsCurlPrimaryLabel}
-                          </Button>
-                          <DropdownMenuTrigger asChild>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {contact.agent_patterns.map((pattern) => (
+                        <Badge
+                          key={`${contact.id}-${pattern}`}
+                          variant="outline"
+                          className="font-mono text-[11px]"
+                        >
+                          {pattern}
+                        </Badge>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {channels.length === 0 ? (
+                        <Badge variant="outline">{t("agentDetail.contactsNoChannel")}</Badge>
+                      ) : (
+                        channels.map((channel) => (
+                          <Badge key={`${contact.id}-${channel.type}`} variant="secondary">
+                            {t(
+                              `agentDetail.contactsChannel${channel.type[0].toUpperCase()}${channel.type.slice(1)}`
+                            )}
+                            : {channel.value}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("agentDetail.rawTitle")}</CardTitle>
+          <CardDescription>{t("agentDetail.rawDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {metrics.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("agentDetail.rawEmpty")}</p>
+          ) : (
+            <div className="space-y-3">
+              {metrics.map((metric, index) => (
+                <div
+                  key={buildMetricItemKey(metric, index)}
+                  className="rounded-lg border bg-muted/20 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {getMetricDisplayName(metric.metric_name, metricNameLabelMap)}
+                      </p>
+                      <p className="font-mono text-xs text-muted-foreground">{metric.metric_name}</p>
+                    </div>
+                    <span className="text-sm">
+                      {formatMetricValue(metric.value, metric.metric_name, {
+                        ratioToPercent: true,
+                      })}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {t("agentDetail.rawTime", {
+                      time: formatDateTimeByLocale(metric.timestamp, locale),
+                    })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-1">
+            <CardTitle>{t("agentDetail.reportLogsTitle")}</CardTitle>
+            <CardDescription>{t("agentDetail.reportLogsDescription")}</CardDescription>
+            {reportLogsCurlLastCopiedAt ? (
+              <p className="text-xs text-muted-foreground">
+                {t("agentDetail.reportLogsCurlLastCopiedAt", {
+                  time: formatDateTimeByLocale(reportLogsCurlLastCopiedAt, locale),
+                })}
+                {` · ${reportLogsCurlLastCopiedRelativeText}`}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <DropdownMenu>
+                  <TooltipTrigger asChild>
+                    <div className="inline-flex items-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-r-none border-r-0"
+                        onClick={copyReportLogsCurlByPreference}
+                        disabled={!agentRef && !resolvedAgentId}
+                      >
+                        {reportLogsCurlPrimaryLabel}
+                      </Button>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-l-none px-2"
+                          disabled={!agentRef && !resolvedAgentId}
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </div>
+                  </TooltipTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => copyReportLogsCurl("current")}
+                      className={reportLogsCurlPreference.mode === "current" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                    >
+                      {reportLogsCurlPreference.mode === "current" && !reportLogsCurlPreference.insecure ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : null}
+                      {t("agentDetail.reportLogsCurlCopyCurrent")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => copyReportLogsCurl("first")}
+                      className={reportLogsCurlPreference.mode === "first" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                    >
+                      {reportLogsCurlPreference.mode === "first" && !reportLogsCurlPreference.insecure ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : null}
+                      {t("agentDetail.reportLogsCurlCopyFirstPage")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => copyReportLogsCurl("agentOnly")}
+                      className={reportLogsCurlPreference.mode === "agentOnly" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                    >
+                      {reportLogsCurlPreference.mode === "agentOnly" && !reportLogsCurlPreference.insecure ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : null}
+                      {t("agentDetail.reportLogsCurlCopyAgentOnly")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => copyReportLogsCurl("current", true)}
+                      className={reportLogsCurlPreference.mode === "current" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                    >
+                      {reportLogsCurlPreference.mode === "current" && reportLogsCurlPreference.insecure ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : null}
+                      {t("agentDetail.reportLogsCurlCopyCurrentInsecure")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => copyReportLogsCurl("first", true)}
+                      className={reportLogsCurlPreference.mode === "first" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                    >
+                      {reportLogsCurlPreference.mode === "first" && reportLogsCurlPreference.insecure ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : null}
+                      {t("agentDetail.reportLogsCurlCopyFirstPageInsecure")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => copyReportLogsCurl("agentOnly", true)}
+                      className={reportLogsCurlPreference.mode === "agentOnly" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
+                    >
+                      {reportLogsCurlPreference.mode === "agentOnly" && reportLogsCurlPreference.insecure ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : null}
+                      {t("agentDetail.reportLogsCurlCopyAgentOnlyInsecure")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <TooltipContent side="top">
+                  <div className="space-y-1">
+                    <div>{t("agentDetail.reportLogsCurlPrimaryTooltip", {
+                      action: reportLogsCurlPrimaryLabel,
+                    })}</div>
+                    <div className="text-xs text-background/85">
+                      {t("agentDetail.reportLogsCurlPrimaryTooltipParams", {
+                        params: reportLogsCurlPrimaryParamsText,
+                      })}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fetchReportLogs(true)}
+              disabled={reportLogsBusy}
+            >
+              {reportLogsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              {t("agentDetail.reportLogsRefreshButton")}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[980px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("agentDetail.reportLogsColTime")}</TableHead>
+                  <TableHead>{t("agentDetail.reportLogsColHost")}</TableHead>
+                  <TableHead>{t("agentDetail.reportLogsColSystem")}</TableHead>
+                  <TableHead>{t("agentDetail.reportLogsColResource")}</TableHead>
+                  <TableHead>{t("agentDetail.reportLogsColMetricCount")}</TableHead>
+                  <TableHead>{t("agentDetail.reportLogsColStatus")}</TableHead>
+                  <TableHead>{t("agentDetail.reportLogsColSummary")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reportLogsLoading ? (
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell colSpan={7} className="h-14 text-muted-foreground">
+                        {t("agentDetail.reportLogsLoading")}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : reportLogsData.items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                      {t("agentDetail.reportLogsEmpty")}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  reportLogsData.items.map((log, index) => {
+                    const timestamp = getAgentReportLogTimestamp(log)
+                    const status = getAgentReportLogStatus(log) || t("agentDetail.reportLogsStatusUnknown")
+                    const summary = getAgentReportLogMessage(log) || t("agentDetail.reportLogsSummaryEmpty")
+                    const metricCount = getAgentReportLogMetricCount(log)
+                    const hostname = getAgentReportLogHostname(log) || "-"
+                    const system = getAgentReportLogSystem(log) || "-"
+                    const resource = getAgentReportLogResource(log) || "-"
+                    const itemKey = typeof log.id === "string" && log.id
+                      ? log.id
+                      : `${timestamp || "unknown"}-${status || "unknown"}-${index}`
+                    const expanded = Boolean(expandedReportLogKeys[itemKey])
+                    const rawJson = JSON.stringify(log, null, 2)
+
+                    return (
+                      <Fragment key={itemKey}>
+                        <TableRow>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {formatDateTimeByLocale(timestamp, locale)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">{hostname}</TableCell>
+                          <TableCell className="text-sm">{system}</TableCell>
+                          <TableCell className="text-xs">{resource}</TableCell>
+                          <TableCell className="text-xs">
+                            {metricCount === null ? "-" : metricCount}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{status}</Badge>
+                          </TableCell>
+                          <TableCell className="max-w-[360px] space-y-2">
+                            <p className="line-clamp-2 break-all text-xs text-muted-foreground">{summary}</p>
                             <Button
                               type="button"
-                              variant="outline"
                               size="sm"
-                              className="rounded-l-none px-2"
-                              disabled={!agentRef && !resolvedAgentId}
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() =>
+                                setExpandedReportLogKeys((prev) => ({
+                                  ...prev,
+                                  [itemKey]: !prev[itemKey],
+                                }))
+                              }
                             >
-                              <ChevronDown className="h-3.5 w-3.5" />
+                              {expanded
+                                ? t("agentDetail.reportLogsActionCollapse")
+                                : t("agentDetail.reportLogsActionExpand")}
                             </Button>
-                          </DropdownMenuTrigger>
-                        </div>
-                      </TooltipTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => copyReportLogsCurl("current")}
-                          className={reportLogsCurlPreference.mode === "current" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
-                        >
-                          {reportLogsCurlPreference.mode === "current" && !reportLogsCurlPreference.insecure ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : null}
-                          {t("agentDetail.reportLogsCurlCopyCurrent")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => copyReportLogsCurl("first")}
-                          className={reportLogsCurlPreference.mode === "first" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
-                        >
-                          {reportLogsCurlPreference.mode === "first" && !reportLogsCurlPreference.insecure ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : null}
-                          {t("agentDetail.reportLogsCurlCopyFirstPage")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => copyReportLogsCurl("agentOnly")}
-                          className={reportLogsCurlPreference.mode === "agentOnly" && !reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
-                        >
-                          {reportLogsCurlPreference.mode === "agentOnly" && !reportLogsCurlPreference.insecure ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : null}
-                          {t("agentDetail.reportLogsCurlCopyAgentOnly")}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => copyReportLogsCurl("current", true)}
-                          className={reportLogsCurlPreference.mode === "current" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
-                        >
-                          {reportLogsCurlPreference.mode === "current" && reportLogsCurlPreference.insecure ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : null}
-                          {t("agentDetail.reportLogsCurlCopyCurrentInsecure")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => copyReportLogsCurl("first", true)}
-                          className={reportLogsCurlPreference.mode === "first" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
-                        >
-                          {reportLogsCurlPreference.mode === "first" && reportLogsCurlPreference.insecure ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : null}
-                          {t("agentDetail.reportLogsCurlCopyFirstPageInsecure")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => copyReportLogsCurl("agentOnly", true)}
-                          className={reportLogsCurlPreference.mode === "agentOnly" && reportLogsCurlPreference.insecure ? "bg-accent/40" : undefined}
-                        >
-                          {reportLogsCurlPreference.mode === "agentOnly" && reportLogsCurlPreference.insecure ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : null}
-                          {t("agentDetail.reportLogsCurlCopyAgentOnlyInsecure")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <TooltipContent side="top">
-                      <div className="space-y-1">
-                        <div>{t("agentDetail.reportLogsCurlPrimaryTooltip", {
-                          action: reportLogsCurlPrimaryLabel,
-                        })}</div>
-                        <div className="text-xs text-background/85">
-                          {t("agentDetail.reportLogsCurlPrimaryTooltipParams", {
-                            params: reportLogsCurlPrimaryParamsText,
-                          })}
-                        </div>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fetchReportLogs(true)}
-                  disabled={reportLogsBusy}
-                >
-                  {reportLogsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  {t("agentDetail.reportLogsRefreshButton")}
-                </Button>
-              </div>
-              {reportLogsCurlLastCopiedAt ? (
-                <p className="text-xs text-muted-foreground">
-                  {t("agentDetail.reportLogsCurlLastCopiedAt", {
-                    time: formatDateTimeByLocale(reportLogsCurlLastCopiedAt, locale),
-                  })}
-                  {` · ${reportLogsCurlLastCopiedRelativeText}`}
-                </p>
-              ) : null}
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="w-full overflow-x-auto">
-                <Table className="min-w-[980px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("agentDetail.reportLogsColTime")}</TableHead>
-                      <TableHead>{t("agentDetail.reportLogsColHost")}</TableHead>
-                      <TableHead>{t("agentDetail.reportLogsColSystem")}</TableHead>
-                      <TableHead>{t("agentDetail.reportLogsColResource")}</TableHead>
-                      <TableHead>{t("agentDetail.reportLogsColMetricCount")}</TableHead>
-                      <TableHead>{t("agentDetail.reportLogsColStatus")}</TableHead>
-                      <TableHead>{t("agentDetail.reportLogsColSummary")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportLogsLoading ? (
-                      Array.from({ length: 3 }).map((_, index) => (
-                        <TableRow key={index}>
-                          <TableCell colSpan={7} className="h-14 text-muted-foreground">
-                            {t("agentDetail.reportLogsLoading")}
                           </TableCell>
                         </TableRow>
-                      ))
-                    ) : reportLogsData.items.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                          {t("agentDetail.reportLogsEmpty")}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      reportLogsData.items.map((log, index) => {
-                        const timestamp = getAgentReportLogTimestamp(log)
-                        const status = getAgentReportLogStatus(log) || t("agentDetail.reportLogsStatusUnknown")
-                        const summary = getAgentReportLogMessage(log) || t("agentDetail.reportLogsSummaryEmpty")
-                        const metricCount = getAgentReportLogMetricCount(log)
-                        const hostname = getAgentReportLogHostname(log) || "-"
-                        const system = getAgentReportLogSystem(log) || "-"
-                        const resource = getAgentReportLogResource(log) || "-"
-                        const itemKey = typeof log.id === "string" && log.id
-                          ? log.id
-                          : `${timestamp || "unknown"}-${status || "unknown"}-${index}`
-                        const expanded = Boolean(expandedReportLogKeys[itemKey])
-                        const rawJson = JSON.stringify(log, null, 2)
-
-                        return (
-                          <Fragment key={itemKey}>
-                            <TableRow>
-                              <TableCell className="text-xs text-muted-foreground">
-                                {formatDateTimeByLocale(timestamp, locale)}
-                              </TableCell>
-                              <TableCell className="font-mono text-xs">{hostname}</TableCell>
-                              <TableCell className="text-sm">{system}</TableCell>
-                              <TableCell className="text-xs">{resource}</TableCell>
-                              <TableCell className="text-xs">
-                                {metricCount === null ? "-" : metricCount}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{status}</Badge>
-                              </TableCell>
-                              <TableCell className="max-w-[360px] space-y-2">
-                                <p className="line-clamp-2 break-all text-xs text-muted-foreground">{summary}</p>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() =>
-                                    setExpandedReportLogKeys((prev) => ({
-                                      ...prev,
-                                      [itemKey]: !prev[itemKey],
-                                    }))
-                                  }
-                                >
-                                  {expanded
-                                    ? t("agentDetail.reportLogsActionCollapse")
-                                    : t("agentDetail.reportLogsActionExpand")}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                            {expanded ? (
-                              <TableRow>
-                                <TableCell colSpan={7}>
-                                  <div className="space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <p className="text-xs font-medium text-muted-foreground">
-                                        {t("agentDetail.reportLogsRawTitle")}
-                                      </p>
-                                      <div className="flex items-center gap-2">
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 px-2 text-xs"
-                                          onClick={async () => {
-                                            try {
-                                              await navigator.clipboard.writeText(rawJson)
-                                              toastCopied(t("agentDetail.reportLogsRawCopied"))
-                                            } catch {
-                                              toast.error(t("agentDetail.reportLogsRawCopyFailed"))
-                                            }
-                                          }}
-                                        >
-                                          {t("agentDetail.reportLogsRawCopyAction")}
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 px-2 text-xs"
-                                          onClick={() => {
-                                            try {
-                                              const blob = new Blob([rawJson], { type: "application/json;charset=utf-8" })
-                                              const url = URL.createObjectURL(blob)
-                                              const link = document.createElement("a")
-                                              const safeKey = itemKey.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80) || "log"
-                                              link.href = url
-                                              link.download = `agent-report-log-${safeKey}.json`
-                                              document.body.appendChild(link)
-                                              link.click()
-                                              link.remove()
-                                              URL.revokeObjectURL(url)
-                                              toast.success(t("agentDetail.reportLogsRawDownloaded"))
-                                            } catch {
-                                              toast.error(t("agentDetail.reportLogsRawDownloadFailed"))
-                                            }
-                                          }}
-                                        >
-                                          {t("agentDetail.reportLogsRawDownloadAction")}
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    <pre className="max-h-64 overflow-auto rounded-md border bg-muted/20 p-3 text-xs">
-                                      {rawJson}
-                                    </pre>
+                        {expanded ? (
+                          <TableRow>
+                            <TableCell colSpan={7}>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {t("agentDetail.reportLogsRawTitle")}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-xs"
+                                      onClick={async () => {
+                                        try {
+                                          await navigator.clipboard.writeText(rawJson)
+                                          toastCopied(t("agentDetail.reportLogsRawCopied"))
+                                        } catch {
+                                          toast.error(t("agentDetail.reportLogsRawCopyFailed"))
+                                        }
+                                      }}
+                                    >
+                                      {t("agentDetail.reportLogsRawCopyAction")}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-xs"
+                                      onClick={() => {
+                                        try {
+                                          const blob = new Blob([rawJson], { type: "application/json;charset=utf-8" })
+                                          const url = URL.createObjectURL(blob)
+                                          const link = document.createElement("a")
+                                          const safeKey = itemKey.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80) || "log"
+                                          link.href = url
+                                          link.download = `agent-report-log-${safeKey}.json`
+                                          document.body.appendChild(link)
+                                          link.click()
+                                          link.remove()
+                                          URL.revokeObjectURL(url)
+                                          toast.success(t("agentDetail.reportLogsRawDownloaded"))
+                                        } catch {
+                                          toast.error(t("agentDetail.reportLogsRawDownloadFailed"))
+                                        }
+                                      }}
+                                    >
+                                      {t("agentDetail.reportLogsRawDownloadAction")}
+                                    </Button>
                                   </div>
-                                </TableCell>
-                              </TableRow>
-                            ) : null}
-                          </Fragment>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                                </div>
+                                <pre className="max-h-64 overflow-auto rounded-md border bg-muted/20 p-3 text-xs">
+                                  {rawJson}
+                                </pre>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </Fragment>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-              <PaginationControls
-                pageSize={reportLogsPageSize}
-                pageSizeOptions={[...REPORT_LOGS_PAGE_SIZE_OPTIONS]}
-                onPageSizeChange={(value) => {
-                  const normalized = value as (typeof REPORT_LOGS_PAGE_SIZE_OPTIONS)[number]
-                  if (normalized === reportLogsPageSize) {
-                    return
-                  }
+          <PaginationControls
+            pageSize={reportLogsPageSize}
+            pageSizeOptions={[...REPORT_LOGS_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(value) => {
+              const normalized = value as (typeof REPORT_LOGS_PAGE_SIZE_OPTIONS)[number]
+              if (normalized === reportLogsPageSize) {
+                return
+              }
 
-                  setReportLogsPageSize(normalized)
-                  setReportLogsOffset(0)
-                }}
-                {...buildTranslatedPaginationTextBundle({
-                  t,
-                  summaryKey: "agentDetail.reportLogsPaginationSummary",
-                  total: reportLogsData.total,
-                  start: reportLogsPagination.rangeStart,
-                  end: reportLogsPagination.rangeEnd,
-                  pageKey: "agentDetail.reportLogsPaginationPage",
-                  currentPage: reportLogsPagination.currentPage,
-                  totalPages: reportLogsPagination.totalPages,
-                  prevKey: "agentDetail.reportLogsPaginationPrev",
-                  nextKey: "agentDetail.reportLogsPaginationNext",
-                })}
-                pageSizePlaceholder={t("agentDetail.reportLogsPageSizePlaceholder")}
-                onPrevPage={() => setReportLogsOffset((prev) => Math.max(0, prev - reportLogsPageSize))}
-                onNextPage={() => setReportLogsOffset((prev) => prev + reportLogsPageSize)}
-                prevDisabled={reportLogsBusy || !reportLogsPagination.canGoPrev}
-                nextDisabled={reportLogsBusy || !reportLogsPagination.canGoNext}
-                pageSizeOptionLabel={reportLogsPageSizeOptionLabel}
-              />
-            </CardContent>
-          </Card>
-        </>
-      )}
+              setReportLogsPageSize(normalized)
+              setReportLogsOffset(0)
+            }}
+            {...buildTranslatedPaginationTextBundle({
+              t,
+              summaryKey: "agentDetail.reportLogsPaginationSummary",
+              total: reportLogsData.total,
+              start: reportLogsPagination.rangeStart,
+              end: reportLogsPagination.rangeEnd,
+              pageKey: "agentDetail.reportLogsPaginationPage",
+              currentPage: reportLogsPagination.currentPage,
+              totalPages: reportLogsPagination.totalPages,
+              prevKey: "agentDetail.reportLogsPaginationPrev",
+              nextKey: "agentDetail.reportLogsPaginationNext",
+            })}
+            pageSizePlaceholder={t("agentDetail.reportLogsPageSizePlaceholder")}
+            onPrevPage={() => setReportLogsOffset((prev) => Math.max(0, prev - reportLogsPageSize))}
+            onNextPage={() => setReportLogsOffset((prev) => prev + reportLogsPageSize)}
+            prevDisabled={reportLogsBusy || !reportLogsPagination.canGoPrev}
+            nextDisabled={reportLogsBusy || !reportLogsPagination.canGoNext}
+            pageSizeOptionLabel={reportLogsPageSizeOptionLabel}
+          />
+        </CardContent>
+      </Card>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
